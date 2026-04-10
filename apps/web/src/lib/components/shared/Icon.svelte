@@ -53,14 +53,16 @@
 		redo:
 			'M13 7l-4-4m4 4l-4 4m4-4H5a4 4 0 000 8h2',
 		sidebar:
-			'M2 2h12a1 1 0 011 1v10a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm8 0v12'
+			'M2 2h12a1 1 0 011 1v10a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm8 0v12',
+		help:
+			'M8 15a7 7 0 110-14 7 7 0 010 14zM6.5 5.5a2 2 0 012.7-1.4c.8.3 1.3 1 1.3 1.9 0 1-1.5 1.3-1.5 2.5m0 2h.01'
 	};
 
 	const strokeIcons = new Set([
 		'cursor', 'crosshair', 'hand', 'chart', 'download', 'trash',
 		'grid', 'radio', 'link', 'tag', 'plus', 'minus', 'file',
 		'upload', 'settings', 'keyboard', 'chevron-down', 'undo', 'redo',
-		'sidebar'
+		'sidebar', 'help'
 	]);
 </script>
 

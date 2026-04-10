@@ -8,6 +8,9 @@
 	import Button from '$components/shared/Button.svelte';
 	import Select from '$components/shared/Select.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
+	import HelpDialog from '$components/dialogs/HelpDialog.svelte';
+
+	let helpOpen = $state(false);
 
 	const bandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
@@ -88,6 +91,15 @@
 	</div>
 
 	<div class="toolbar-right">
+		<Tooltip text="Help" position="bottom">
+			<button
+				class="tool-btn"
+				onclick={() => { helpOpen = true; }}
+				aria-label="Help"
+			>
+				<Icon name="help" size={14} />
+			</button>
+		</Tooltip>
 		<Tooltip text="Toggle sidebar" position="bottom">
 			<button
 				class="tool-btn"
@@ -100,6 +112,8 @@
 		</Tooltip>
 	</div>
 </header>
+
+<HelpDialog bind:open={helpOpen} />
 
 <style>
 	.toolbar {
@@ -121,6 +135,9 @@
 
 	.toolbar-right {
 		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 2px;
 	}
 
 	.logo {
