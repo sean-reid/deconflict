@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { CanvasEngine } from '$canvas/engine.js';
+	import { FloorplanLayer } from '$canvas/renderers/floorplan.js';
 	import { GridLayer } from '$canvas/renderers/grid.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { RangeRingLayer } from '$canvas/renderers/range-ring.js';
@@ -8,6 +9,7 @@
 	import { buildInterferenceGraph } from '@deconflict/geometry';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
+	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
 	import { projectState, removeAps } from '$state/project.svelte.js';
@@ -23,6 +25,8 @@
 	let selectHandler: SelectHandler;
 	let dragHandler: DragHandler;
 	let placeHandler: PlaceHandler;
+	let floorplanLayer: FloorplanLayer;
+	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
 	let rangeRingLayer: RangeRingLayer;
 	let conflictEdgeLayer: ConflictEdgeLayer;
@@ -89,21 +93,25 @@
 		engine = new CanvasEngine(canvasEl);
 
 		// Create layers
+		floorplanLayer = new FloorplanLayer();
 		const gridLayer = new GridLayer();
 		rangeRingLayer = new RangeRingLayer();
 		conflictEdgeLayer = new ConflictEdgeLayer();
 		apLayer = new ApLayer();
+		selectionRectLayer = new SelectionRectLayer();
 
-		// Add layers in draw order: grid, range rings, conflict edges, APs
+		// Add layers in draw order: floorplan, grid, range rings, conflict edges, APs, selection rect
+		engine.addLayer(floorplanLayer);
 		engine.addLayer(gridLayer);
 		engine.addLayer(rangeRingLayer);
 		engine.addLayer(conflictEdgeLayer);
 		engine.addLayer(apLayer);
+		engine.addLayer(selectionRectLayer);
 
 		// Create interaction handlers
 		panZoom = new PanZoomHandler(engine);
 		panZoom.attach();
-		selectHandler = new SelectHandler(engine);
+		selectHandler = new SelectHandler(engine, selectionRectLayer);
 		dragHandler = new DragHandler(engine);
 		placeHandler = new PlaceHandler(engine);
 
@@ -212,6 +220,27 @@
 		engine.markDirty();
 	});
 
+	// Sync floorplan image to layer
+	$effect(() => {
+		if (!floorplanLayer) return;
+		const url = projectState.floorplanUrl;
+		if (url) {
+			floorplanLayer.loadImage(url, () => {
+				engine.markDirty();
+			});
+		} else {
+			floorplanLayer.clearImage();
+		}
+		engine.markDirty();
+	});
+
+	// Sync floorplan opacity (stored in floorplanScale)
+	$effect(() => {
+		if (!floorplanLayer) return;
+		floorplanLayer.opacity = projectState.floorplanScale;
+		engine.markDirty();
+	});
+
 	// Auto-solve: debounce solver runs when APs change
 	$effect(() => {
 		const auto = solverState.autoSolve;
@@ -275,8 +304,9 @@
 		}
 	}
 
-	function handlePointerUp(_e: PointerEvent) {
+	function handlePointerUp(e: PointerEvent) {
 		if (!engine) return;
+		selectHandler.handlePointerUp(e);
 		dragHandler.handlePointerUp();
 	}
 </script>
