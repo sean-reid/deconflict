@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { setupCleanState } from './helpers';
 
 test.describe('Solver', () => {
 	test.beforeEach(async ({ page }) => {
+		await setupCleanState(page);
 		await page.goto('/');
 		await page.waitForSelector('canvas');
 	});
