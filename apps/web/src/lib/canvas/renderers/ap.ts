@@ -11,6 +11,7 @@ const ACCENT_CYAN = '#00d4ff';
 export class ApLayer implements Layer {
 	id = 'aps';
 	visible = true;
+	showLabels: boolean = true;
 
 	aps: AccessPoint[] = [];
 	selectedIds: string[] = [];
@@ -76,15 +77,17 @@ export class ApLayer implements Layer {
 			}
 
 			// Name label below the dot
-			const fontSize = 10 * screenScale;
-			ctx.font = `${fontSize}px monospace`;
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'top';
-			ctx.fillStyle = LABEL_COLOR;
-			ctx.fillText(ap.name, ap.x, ap.y + radius + 4 * screenScale);
+			if (this.showLabels) {
+				const fontSize = 10 * screenScale;
+				ctx.font = `${fontSize}px monospace`;
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'top';
+				ctx.fillStyle = LABEL_COLOR;
+				ctx.fillText(ap.name, ap.x, ap.y + radius + 4 * screenScale);
+			}
 
 			// Channel badge above-right if assigned
-			if (ap.assignedChannel !== null) {
+			if (this.showLabels && ap.assignedChannel !== null) {
 				const badgeText = String(ap.assignedChannel);
 				const badgeFontSize = 8 * screenScale;
 				ctx.font = `bold ${badgeFontSize}px monospace`;
