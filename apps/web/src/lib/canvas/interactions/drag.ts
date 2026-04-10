@@ -1,6 +1,6 @@
 import type { CanvasEngine } from '../engine.js';
 import { hitTest } from '../hit-test.js';
-import { projectState, moveAp } from '$state/project.svelte.js';
+import { projectState, moveAp, beginMove } from '$state/project.svelte.js';
 import { canvasState, isSelected } from '$state/canvas.svelte.js';
 
 export class DragHandler {
@@ -20,6 +20,7 @@ export class DragHandler {
 		const hit = hitTest(screenPoint, this.engine.camera, projectState.aps);
 
 		if (hit && isSelected(hit.id)) {
+			beginMove();
 			this._isDragging = true;
 			this.dragApId = hit.id;
 			canvasState.isDragging = true;

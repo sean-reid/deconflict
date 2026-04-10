@@ -8,9 +8,10 @@
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
-	import { projectState } from '$state/project.svelte.js';
-	import { canvasState } from '$state/canvas.svelte.js';
+	import { projectState, removeAps } from '$state/project.svelte.js';
+	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
+	import { undo, redo } from '$state/history.svelte.js';
 
 	let canvasEl: HTMLCanvasElement;
 	let containerEl: HTMLDivElement;
@@ -23,7 +24,32 @@
 	let rangeRingLayer: RangeRingLayer;
 	let zoomPercent = $state(100);
 
+	function handleKeyDown(e: KeyboardEvent) {
+		const mod = e.metaKey || e.ctrlKey;
+
+		if (mod && e.shiftKey && e.key === 'z') {
+			e.preventDefault();
+			redo();
+			return;
+		}
+
+		if (mod && e.key === 'z') {
+			e.preventDefault();
+			undo();
+			return;
+		}
+
+		if (e.key === 'Delete' || e.key === 'Backspace') {
+			if (canvasState.selectedApIds.length > 0) {
+				e.preventDefault();
+				removeAps([...canvasState.selectedApIds]);
+				clearSelection();
+			}
+		}
+	}
+
 	onMount(() => {
+		window.addEventListener('keydown', handleKeyDown);
 		engine = new CanvasEngine(canvasEl);
 
 		// Create layers
@@ -63,6 +89,7 @@
 		}, 100);
 
 		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
 			engine.stop();
 			panZoom.detach();
 			observer.disconnect();

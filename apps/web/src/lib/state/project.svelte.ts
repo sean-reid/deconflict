@@ -1,4 +1,5 @@
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
+import { pushState } from './history.svelte.js';
 
 export interface AccessPoint {
 	id: string;
@@ -30,6 +31,7 @@ export const projectState = $state({
 });
 
 export function addAp(x: number, y: number): AccessPoint {
+	pushState();
 	const ap: AccessPoint = {
 		id: createId(),
 		name: `AP-${nextApNumber++}`,
@@ -49,11 +51,13 @@ export function addAp(x: number, y: number): AccessPoint {
 export function removeAp(id: string): void {
 	const idx = projectState.aps.findIndex((ap) => ap.id === id);
 	if (idx !== -1) {
+		pushState();
 		projectState.aps.splice(idx, 1);
 	}
 }
 
 export function removeAps(ids: string[]): void {
+	pushState();
 	const idSet = new Set(ids);
 	projectState.aps = projectState.aps.filter((ap) => !idSet.has(ap.id));
 }
@@ -61,8 +65,13 @@ export function removeAps(ids: string[]): void {
 export function updateAp(id: string, changes: Partial<AccessPoint>): void {
 	const ap = projectState.aps.find((a) => a.id === id);
 	if (ap) {
+		pushState();
 		Object.assign(ap, changes);
 	}
+}
+
+export function beginMove(): void {
+	pushState();
 }
 
 export function moveAp(id: string, x: number, y: number): void {
