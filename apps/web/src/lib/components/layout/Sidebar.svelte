@@ -5,6 +5,8 @@
 	import ApList from '$components/sidebar/ApList.svelte';
 	import ApEditor from '$components/sidebar/ApEditor.svelte';
 	import SolverPanel from '$components/sidebar/SolverPanel.svelte';
+	import ComparePanel from '$components/sidebar/ComparePanel.svelte';
+	import FloorplanControls from '$components/sidebar/FloorplanControls.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
 		{ id: 'aps', label: 'APs' },
@@ -31,12 +33,15 @@
 		</nav>
 		<div class="panel-content">
 			{#if appState.sidebarPanel === 'aps'}
+				<FloorplanControls />
 				<ApList />
 				{#if hasSelection}
 					<ApEditor />
 				{/if}
 			{:else if appState.sidebarPanel === 'solver'}
 				<SolverPanel />
+			{:else if appState.sidebarPanel === 'compare'}
+				<ComparePanel />
 			{:else}
 				<p class="placeholder">{appState.sidebarPanel} panel</p>
 			{/if}
