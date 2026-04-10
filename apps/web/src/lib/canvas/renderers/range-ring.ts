@@ -18,13 +18,13 @@ export class RangeRingLayer implements Layer {
 	aps: AccessPoint[] = [];
 
 	render(rc: RenderContext): void {
-		const { ctx, camera, dpr } = rc;
+		const { ctx, camera } = rc;
 		const transform = camera.getTransform();
 		const zoom = camera.state.zoom;
 		const [a, b, c, d, e, f] = transform;
-		ctx.setTransform(a, b, c, d, e, f);
+		ctx.transform(a, b, c, d, e, f);
 
-		const screenScale = 1 / (zoom * dpr);
+		const screenScale = 1 / zoom;
 
 		for (const ap of this.aps) {
 			let strokeColor: string;

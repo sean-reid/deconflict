@@ -18,7 +18,6 @@ export class CanvasEngine {
 		this.ctx = canvas.getContext('2d')!;
 		this.camera = new Camera();
 		this.dpr = window.devicePixelRatio || 1;
-		this.camera.setDpr(this.dpr);
 	}
 
 	addLayer(layer: Layer): void {
@@ -41,7 +40,6 @@ export class CanvasEngine {
 		this.width = width;
 		this.height = height;
 		this.dpr = window.devicePixelRatio || 1;
-		this.camera.setDpr(this.dpr);
 		this.canvas.width = width * this.dpr;
 		this.canvas.height = height * this.dpr;
 		this.canvas.style.width = `${width}px`;
@@ -68,9 +66,13 @@ export class CanvasEngine {
 		const { ctx, camera, width, height, dpr } = this;
 		const rc: RenderContext = { ctx, camera, width, height, dpr };
 
-		// Clear
+		// Clear the full device-pixel buffer
 		ctx.resetTransform();
 		ctx.clearRect(0, 0, width * dpr, height * dpr);
+
+		// Apply DPR scaling once at the top level so all layer
+		// transforms operate in CSS-pixel space.
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
 		// Render each visible layer
 		for (const layer of this.layers) {

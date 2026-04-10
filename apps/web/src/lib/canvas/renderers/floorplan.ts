@@ -33,7 +33,7 @@ export class FloorplanLayer implements Layer {
 		const { ctx, camera } = rc;
 		const transform = camera.getTransform();
 		const [a, b, c, d, e, f] = transform;
-		ctx.setTransform(a, b, c, d, e, f);
+		ctx.transform(a, b, c, d, e, f);
 		ctx.globalAlpha = this.opacity;
 		ctx.drawImage(this.image, 0, 0);
 		ctx.globalAlpha = 1;

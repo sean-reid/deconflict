@@ -10,16 +10,10 @@ export interface CameraState {
 export class Camera {
 	state: CameraState = { x: 0, y: 0, zoom: 1 };
 
-	private dpr = 1;
-
-	setDpr(dpr: number): void {
-		this.dpr = dpr;
-	}
-
-	/** Get the world-to-screen transform matrix */
+	/** Get the world-to-screen transform matrix (in CSS-pixel space, no DPR). */
 	getTransform(): Matrix2D {
 		let m = identity();
-		m = scale(m, this.state.zoom * this.dpr, this.state.zoom * this.dpr);
+		m = scale(m, this.state.zoom, this.state.zoom);
 		m = translate(m, this.state.x, this.state.y);
 		return m;
 	}

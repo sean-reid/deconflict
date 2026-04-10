@@ -14,10 +14,10 @@ export class ConflictEdgeLayer implements Layer {
 	edges: Edge[] = [];
 
 	render(rc: RenderContext): void {
-		const { ctx, camera, dpr } = rc;
+		const { ctx, camera } = rc;
 		const transform = camera.getTransform();
 		const [a, b, c, d, e, f] = transform;
-		ctx.setTransform(a, b, c, d, e, f);
+		ctx.transform(a, b, c, d, e, f);
 
 		const zoom = camera.state.zoom;
 		const apMap = new Map(this.aps.map((ap) => [ap.id, ap]));
@@ -34,12 +34,12 @@ export class ConflictEdgeLayer implements Layer {
 			if (edge.isConflict) {
 				// Red dashed line for conflicts
 				ctx.strokeStyle = 'rgba(255, 68, 68, 0.7)';
-				ctx.lineWidth = 2 / (zoom * dpr);
+				ctx.lineWidth = 2 / zoom;
 				ctx.setLineDash([6 / zoom, 4 / zoom]);
 			} else {
 				// Subtle gray line for interference edges
 				ctx.strokeStyle = 'rgba(107, 113, 133, 0.2)';
-				ctx.lineWidth = 1 / (zoom * dpr);
+				ctx.lineWidth = 1 / zoom;
 				ctx.setLineDash([]);
 			}
 

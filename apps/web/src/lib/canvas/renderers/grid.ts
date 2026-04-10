@@ -10,7 +10,7 @@ export class GridLayer implements Layer {
 	visible = true;
 
 	render(rc: RenderContext): void {
-		const { ctx, camera, width, height, dpr } = rc;
+		const { ctx, camera, width, height } = rc;
 		const transform = camera.getTransform();
 		const zoom = camera.state.zoom;
 
@@ -31,11 +31,11 @@ export class GridLayer implements Layer {
 		const startY = Math.floor(topLeft.y / minor) * minor;
 		const endY = Math.ceil(bottomRight.y / minor) * minor;
 
-		// Apply camera transform
+		// Apply camera transform on top of the DPR base
 		const [a, b, c, d, e, f] = transform;
-		ctx.setTransform(a, b, c, d, e, f);
+		ctx.transform(a, b, c, d, e, f);
 
-		ctx.lineWidth = 1 / (zoom * dpr);
+		ctx.lineWidth = 1 / zoom;
 
 		// Minor grid lines
 		if (showMinor) {

@@ -13,10 +13,10 @@ export class SelectionRectLayer implements Layer {
 
 	render(rc: RenderContext): void {
 		if (!this.active) return;
-		const { ctx, camera, dpr } = rc;
+		const { ctx, camera } = rc;
 		const transform = camera.getTransform();
 		const [a, b, c, d, e, f] = transform;
-		ctx.setTransform(a, b, c, d, e, f);
+		ctx.transform(a, b, c, d, e, f);
 
 		const x = Math.min(this.startX, this.endX);
 		const y = Math.min(this.startY, this.endY);
@@ -31,7 +31,7 @@ export class SelectionRectLayer implements Layer {
 
 		// Border
 		ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
-		ctx.lineWidth = 1 / (zoom * dpr);
+		ctx.lineWidth = 1 / zoom;
 		ctx.setLineDash([4 / zoom, 4 / zoom]);
 		ctx.strokeRect(x, y, w, h);
 		ctx.setLineDash([]);
