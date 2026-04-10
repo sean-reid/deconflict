@@ -2,12 +2,14 @@
 	import Button from '$components/shared/Button.svelte';
 	import Select from '$components/shared/Select.svelte';
 	import Toggle from '$components/shared/Toggle.svelte';
+	import NewProjectDialog from '$components/dialogs/NewProjectDialog.svelte';
 	import { downloadJson, importJson } from '$lib/export/json.js';
 	import { exportPng } from '$lib/export/png.js';
 	import { exportPdf } from '$lib/export/pdf.js';
 	import { getEngineRef } from '$canvas/engine-ref.js';
 
 	let fileInputEl: HTMLInputElement;
+	let newProjectOpen = $state(false);
 	let importError = $state<string | null>(null);
 	let scale = $state('2');
 	let includeGrid = $state(false);
@@ -108,7 +110,16 @@
 		</Button>
 		<p class="description">Canvas snapshot with AP schedule table</p>
 	</div>
+
+	<div class="section">
+		<div class="section-header">PROJECT</div>
+		<Button variant="danger" onclick={() => { newProjectOpen = true; }}>
+			New Project
+		</Button>
+	</div>
 </div>
+
+<NewProjectDialog bind:open={newProjectOpen} />
 
 <style>
 	.export-panel {

@@ -18,6 +18,7 @@
 	import { undo, redo } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
+	import { scheduleSave, restoreFromStorage } from '$state/persistence.svelte.js';
 
 	let canvasEl: HTMLCanvasElement;
 	let containerEl: HTMLDivElement;
@@ -90,6 +91,7 @@
 	}
 
 	onMount(() => {
+		restoreFromStorage();
 		window.addEventListener('keydown', handleKeyDown);
 		engine = new CanvasEngine(canvasEl);
 		setEngineRef(engine);
@@ -254,6 +256,18 @@
 		autoSolveTimeout = setTimeout(() => {
 			runSolver();
 		}, 500);
+	});
+
+	// Auto-save: debounce saves when project state changes
+	$effect(() => {
+		// Touch reactive state we want to track
+		const _aps = projectState.aps;
+		const _name = projectState.name;
+		const _band = projectState.band;
+		const _channelWidth = projectState.channelWidth;
+		const _regulatoryDomain = projectState.regulatoryDomain;
+		const _floorplanScale = projectState.floorplanScale;
+		scheduleSave();
 	});
 
 	// Cursor based on active tool
