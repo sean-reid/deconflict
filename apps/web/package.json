@@ -1,0 +1,35 @@
+{
+	"name": "@deconflict/web",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"lint": "eslint src/",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:e2e": "playwright test tests/e2e",
+		"test:visual": "playwright test tests/visual",
+		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+	},
+	"devDependencies": {
+		"@deconflict/tsconfig": "workspace:*",
+		"@deconflict/eslint-config": "workspace:*",
+		"@sveltejs/adapter-static": "^3.0.8",
+		"@sveltejs/kit": "^2.21.1",
+		"@sveltejs/vite-plugin-svelte": "^5.1.0",
+		"svelte": "^5.33.0",
+		"svelte-check": "^4.2.1",
+		"vite": "^6.3.5",
+		"vitest": "^3.2.1",
+		"typescript": "^5.8.3",
+		"@playwright/test": "^1.52.0"
+	},
+	"dependencies": {
+		"@deconflict/solver": "workspace:*",
+		"@deconflict/geometry": "workspace:*",
+		"@deconflict/channels": "workspace:*"
+	}
+}
