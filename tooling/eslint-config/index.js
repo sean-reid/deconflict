@@ -1,6 +1,5 @@
 import eslint from '@typescript-eslint/eslint-plugin';
 import parser from '@typescript-eslint/parser';
-import sveltePlugin from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -29,7 +28,5 @@ export default [
 			'no-console': ['warn', { allow: ['warn', 'error'] }]
 		}
 	},
-	...sveltePlugin.configs['flat/recommended'],
-	prettier,
-	...sveltePlugin.configs['flat/prettier']
+	prettier
 ];

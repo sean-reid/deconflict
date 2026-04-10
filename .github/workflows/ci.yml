@@ -80,8 +80,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
-      - run: pnpm --filter @deconflict/web test:visual
+      - name: Check for visual tests
+        id: check-visual
+        run: |
+          if [ -n "$(find apps/web/tests/visual -name '*.spec.ts' -o -name '*.test.ts' 2>/dev/null)" ]; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+      - if: steps.check-visual.outputs.has_tests == 'true'
+        run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
+      - if: steps.check-visual.outputs.has_tests == 'true'
+        run: pnpm --filter @deconflict/web test:visual
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

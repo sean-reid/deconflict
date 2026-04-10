@@ -15,21 +15,27 @@
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
 	},
 	"devDependencies": {
-		"@deconflict/tsconfig": "workspace:*",
 		"@deconflict/eslint-config": "workspace:*",
+		"@deconflict/tsconfig": "workspace:*",
+		"@playwright/test": "^1.52.0",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.21.1",
 		"@sveltejs/vite-plugin-svelte": "^5.1.0",
+		"@typescript-eslint/eslint-plugin": "^8.32.1",
+		"@typescript-eslint/parser": "^8.32.1",
+		"eslint": "^9.27.0",
+		"eslint-config-prettier": "^10.1.5",
+		"eslint-plugin-svelte": "^3.9.1",
 		"svelte": "^5.33.0",
 		"svelte-check": "^4.2.1",
-		"vite": "^6.3.5",
-		"vitest": "^3.2.1",
+		"svelte-eslint-parser": "^1.6.0",
 		"typescript": "^5.8.3",
-		"@playwright/test": "^1.52.0"
+		"vite": "^6.3.5",
+		"vitest": "^3.2.1"
 	},
 	"dependencies": {
-		"@deconflict/solver": "workspace:*",
+		"@deconflict/channels": "workspace:*",
 		"@deconflict/geometry": "workspace:*",
-		"@deconflict/channels": "workspace:*"
+		"@deconflict/solver": "workspace:*"
 	}
 }

@@ -34,6 +34,12 @@
 		]
 	};
 
+	const defaultWidths = [{ value: '20', label: '20 MHz' }];
+
+	function getWidths(band: string): Array<{ value: string; label: string }> {
+		return widthsByBand[band as keyof typeof widthsByBand] ?? defaultWidths;
+	}
+
 	let selectedAps = $derived(
 		projectState.aps.filter((a) => canvasState.selectedApIds.includes(a.id))
 	);
@@ -151,7 +157,7 @@
 			<span class="field-label">Channel Width</span>
 			<Select
 				value={String(singleAp.channelWidth)}
-				options={widthsByBand[singleAp.band] ?? widthsByBand['5ghz']}
+				options={getWidths(singleAp.band)}
 				onchange={handleWidthChange}
 				class="full-width"
 			/>
@@ -227,7 +233,7 @@
 			<span class="field-label">Channel Width</span>
 			<Select
 				value={String(selectedAps[0]?.channelWidth ?? 20)}
-				options={widthsByBand[selectedAps[0]?.band ?? '5ghz'] ?? widthsByBand['5ghz']}
+				options={getWidths(selectedAps[0]?.band ?? '5ghz')}
 				onchange={handleWidthChange}
 				class="full-width"
 			/>
