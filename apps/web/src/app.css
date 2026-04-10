@@ -1,3 +1,5 @@
+@import './lib/theme/tokens.css';
+
 *,
 *::before,
 *::after {
@@ -13,15 +15,37 @@ body {
 }
 
 body {
-	font-family:
-		'Inter',
-		-apple-system,
-		BlinkMacSystemFont,
-		system-ui,
-		sans-serif;
-	font-size: 0.8125rem;
-	color: #e8eaf0;
-	background: #0f1117;
+	font-family: var(--font-sans);
+	font-size: var(--text-base);
+	color: var(--text-primary);
+	background: var(--bg-primary);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--border-strong);
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-tertiary);
+}
+
+.mono {
+	font-family: var(--font-mono);
+}
+
+::selection {
+	background: var(--accent-primary-glow);
+	color: var(--text-primary);
 }
