@@ -6,6 +6,17 @@
 
 	let apCount = $derived(projectState.aps.length);
 	let apLabel = $derived(apCount === 1 ? '1 access point' : `${apCount} access points`);
+	let conflictCount = $derived(solverState.lastResult?.conflicts.length ?? 0);
+	let hasSolved = $derived(solverState.lastResult !== null);
+
+	let centerMessage = $derived.by(() => {
+		if (apCount === 0) return { text: 'Add access points to get started', style: 'neutral' };
+		if (!hasSolved) return { text: `${apLabel} - click Solve to assign channels`, style: 'neutral' };
+		if (conflictCount === 0) return { text: `${apLabel} - all channels clear`, style: 'success' };
+		const conflictLabel = conflictCount === 1 ? '1 conflict' : `${conflictCount} conflicts`;
+		return { text: `${apLabel} - ${conflictLabel} detected`, style: 'warning' };
+	});
+
 	let showSaved = $state(false);
 	let fadeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -20,7 +31,7 @@
 
 <footer class="status-bar">
 	<span class="status-item zoom">{canvasState.zoom === 1 ? '100' : Math.round(canvasState.zoom * 100)}%</span>
-	<span class="status-item center">{apLabel}</span>
+	<span class="status-item center" class:status-success={centerMessage.style === 'success'} class:status-warning={centerMessage.style === 'warning'}>{centerMessage.text}</span>
 	{#if showSaved}
 		<span class="saved-indicator">Saved</span>
 	{/if}
@@ -58,6 +69,14 @@
 
 	.mono {
 		font-family: var(--font-mono);
+	}
+
+	.status-success {
+		color: var(--color-success);
+	}
+
+	.status-warning {
+		color: var(--color-error);
 	}
 
 	.saved-indicator {

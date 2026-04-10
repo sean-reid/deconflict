@@ -27,7 +27,7 @@
 	{#if projectState.aps.length === 0}
 		<div class="empty-state">
 			<p class="empty-text">No access points yet</p>
-			<p class="empty-hint">Use the Place tool (P) to add APs</p>
+			<p class="empty-hint">Click the + button in the toolbar or press P to place your WiFi devices on the canvas</p>
 		</div>
 	{:else}
 		<div class="list">
@@ -46,7 +46,15 @@
 					<span class="name">{ap.name}</span>
 					<span class="band">{bandLabels[ap.band] ?? ap.band}</span>
 					<span class="channel" class:unassigned={!ap.assignedChannel}>
-						{ap.assignedChannel ?? 'Auto'}
+						{#if ap.assignedChannel}
+							<span
+								class="channel-dot"
+								style:background-color={channelColor(ap.assignedChannel, ap.band)}
+							></span>
+							{ap.assignedChannel}
+						{:else}
+							Pending
+						{/if}
 					</span>
 				</button>
 			{/each}
@@ -160,7 +168,17 @@
 	}
 
 	.channel.unassigned {
-		color: var(--text-tertiary);
+		color: var(--text-disabled);
+		font-style: italic;
+	}
+
+	.channel-dot {
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		margin-right: 2px;
+		vertical-align: middle;
 	}
 
 	.empty-state {
