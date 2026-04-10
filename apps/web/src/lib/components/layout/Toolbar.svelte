@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { appState } from '$state/app.svelte';
 	import type { Tool } from '$state/app.svelte';
+	import { projectState } from '$state/project.svelte';
+	import type { Band } from '@deconflict/channels';
 	import { solverState, runSolver } from '$state/solver.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Select from '$components/shared/Select.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
 
-	let band = $state('5');
-
 	const bandOptions = [
-		{ value: '2.4', label: '2.4 GHz' },
-		{ value: '5', label: '5 GHz' },
-		{ value: '6', label: '6 GHz' }
+		{ value: '2.4ghz', label: '2.4 GHz' },
+		{ value: '5ghz', label: '5 GHz' },
+		{ value: '6ghz', label: '6 GHz' }
 	];
 
 	const tools: Array<{ id: Tool; icon: string; label: string }> = [
@@ -57,8 +57,9 @@
 		<div class="separator"></div>
 
 		<Select
-			bind:value={band}
+			value={projectState.band}
 			options={bandOptions}
+			onchange={(val) => { projectState.band = val as Band; }}
 		/>
 
 		<div class="separator"></div>
@@ -87,7 +88,16 @@
 	</div>
 
 	<div class="toolbar-right">
-		<span class="zoom-display">100%</span>
+		<Tooltip text="Toggle sidebar" position="bottom">
+			<button
+				class="tool-btn"
+				class:active={appState.sidebarOpen}
+				onclick={() => { appState.sidebarOpen = !appState.sidebarOpen; }}
+				aria-label="Toggle sidebar"
+			>
+				<Icon name="sidebar" size={14} />
+			</button>
+		</Tooltip>
 	</div>
 </header>
 
@@ -199,12 +209,6 @@
 		outline-offset: 1px;
 	}
 
-	.zoom-display {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--text-tertiary);
-	}
-
 	@media (max-width: 768px) {
 		.toolbar-left {
 			overflow-x: auto;
@@ -217,10 +221,6 @@
 		}
 
 		.view-toggles {
-			display: none;
-		}
-
-		.zoom-display {
 			display: none;
 		}
 	}
