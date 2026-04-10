@@ -1,9 +1,14 @@
 <script lang="ts">
+	import { projectState } from '$state/project.svelte';
+	import { canvasState } from '$state/canvas.svelte';
+
+	let apCount = $derived(projectState.aps.length);
+	let apLabel = $derived(apCount === 1 ? '1 access point' : `${apCount} access points`);
 </script>
 
 <footer class="status-bar">
-	<span class="status-item zoom">100%</span>
-	<span class="status-item center">0 access points</span>
+	<span class="status-item zoom">{canvasState.zoom === 1 ? '100' : Math.round(canvasState.zoom * 100)}%</span>
+	<span class="status-item center">{apLabel}</span>
 	<span class="status-item right"></span>
 </footer>
 

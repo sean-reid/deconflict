@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('app loads with dark theme and correct layout', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.locator('text=Deconflict')).toBeVisible();
+	await expect(page.locator('.logo')).toBeVisible();
 	// Canvas should be present
 	await expect(page.locator('canvas')).toBeVisible();
 	// Sidebar should show APs tab

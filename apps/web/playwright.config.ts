@@ -9,13 +9,14 @@ export default defineConfig({
 	workers: process.env.CI ? 1 : undefined,
 	reporter: process.env.CI ? 'github' : 'html',
 	use: {
-		baseURL: 'http://localhost:4173',
+		baseURL: 'http://localhost:4183',
 		trace: 'on-first-retry',
 		screenshot: 'only-on-failure'
 	},
 	webServer: {
-		command: 'pnpm build && pnpm preview --port 4173',
-		port: 4173,
-		reuseExistingServer: !process.env.CI
+		command: 'pnpm build && pnpm preview --port 4183',
+		port: 4183,
+		reuseExistingServer: !process.env.CI,
+		timeout: 60000
 	}
 });
