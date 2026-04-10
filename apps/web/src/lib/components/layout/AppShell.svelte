@@ -1,9 +1,16 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { appState } from '$state/app.svelte';
 	import Toolbar from './Toolbar.svelte';
 	import Sidebar from './Sidebar.svelte';
 	import StatusBar from './StatusBar.svelte';
 	import CanvasView from '$components/canvas/CanvasView.svelte';
+
+	onMount(() => {
+		if (window.innerWidth <= 768) {
+			appState.sidebarOpen = false;
+		}
+	});
 </script>
 
 <div class="app-shell">

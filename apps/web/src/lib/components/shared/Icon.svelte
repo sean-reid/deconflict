@@ -51,13 +51,16 @@
 		undo:
 			'M3 7l4-4M3 7l4 4M3 7h8a4 4 0 010 8H9',
 		redo:
-			'M13 7l-4-4m4 4l-4 4m4-4H5a4 4 0 000 8h2'
+			'M13 7l-4-4m4 4l-4 4m4-4H5a4 4 0 000 8h2',
+		sidebar:
+			'M2 2h12a1 1 0 011 1v10a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm8 0v12'
 	};
 
 	const strokeIcons = new Set([
 		'cursor', 'crosshair', 'hand', 'chart', 'download', 'trash',
 		'grid', 'radio', 'link', 'tag', 'plus', 'minus', 'file',
-		'upload', 'settings', 'keyboard', 'chevron-down', 'undo', 'redo'
+		'upload', 'settings', 'keyboard', 'chevron-down', 'undo', 'redo',
+		'sidebar'
 	]);
 </script>
 
