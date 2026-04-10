@@ -28,12 +28,14 @@
 	let dragHandler: DragHandler;
 	let placeHandler: PlaceHandler;
 	let floorplanLayer: FloorplanLayer;
+	let gridLayer: GridLayer;
 	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
 	let rangeRingLayer: RangeRingLayer;
 	let conflictEdgeLayer: ConflictEdgeLayer;
 	let zoomPercent = $state(100);
 	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
+	let showEmptyHint = $derived(projectState.aps.length === 0 && !projectState.floorplanUrl);
 
 	function handleKeyDown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
@@ -98,7 +100,7 @@
 
 		// Create layers
 		floorplanLayer = new FloorplanLayer();
-		const gridLayer = new GridLayer();
+		gridLayer = new GridLayer();
 		rangeRingLayer = new RangeRingLayer();
 		conflictEdgeLayer = new ConflictEdgeLayer();
 		apLayer = new ApLayer();
@@ -170,6 +172,12 @@
 	$effect(() => {
 		if (!rangeRingLayer) return;
 		rangeRingLayer.aps = projectState.aps;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!gridLayer) return;
+		gridLayer.visible = appState.showGrid;
 		engine.markDirty();
 	});
 
@@ -339,6 +347,12 @@
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
 	></canvas>
+	{#if showEmptyHint}
+		<div class="empty-hint">
+			<p>Drop a floorplan image here</p>
+			<p>or press <kbd>P</kbd> to start placing access points</p>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -347,9 +361,39 @@
 		height: 100%;
 		overflow: hidden;
 		background: var(--canvas-bg);
+		position: relative;
 	}
 
 	canvas {
 		display: block;
+	}
+
+	.empty-hint {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+		gap: var(--space-1, 4px);
+	}
+
+	.empty-hint p {
+		margin: 0;
+		font-size: var(--text-base);
+		color: var(--text-tertiary);
+		opacity: 0.6;
+	}
+
+	.empty-hint kbd {
+		display: inline-block;
+		padding: 1px 6px;
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		color: var(--text-secondary);
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-sm);
 	}
 </style>
