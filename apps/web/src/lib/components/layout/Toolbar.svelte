@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { appState } from '$state/app.svelte';
 	import type { Tool } from '$state/app.svelte';
+	import { solverState, runSolver } from '$state/solver.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Select from '$components/shared/Select.svelte';
@@ -62,9 +63,9 @@
 
 		<div class="separator"></div>
 
-		<Button variant="primary" size="sm" onclick={() => {}}>
+		<Button variant="primary" size="sm" disabled={solverState.isRunning} onclick={() => runSolver()}>
 			<Icon name="play" size={12} />
-			Solve
+			{solverState.isRunning ? 'Solving...' : 'Solve'}
 		</Button>
 
 		<div class="separator"></div>

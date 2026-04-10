@@ -4,6 +4,8 @@
 	import { GridLayer } from '$canvas/renderers/grid.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { RangeRingLayer } from '$canvas/renderers/range-ring.js';
+	import { ConflictEdgeLayer } from '$canvas/renderers/conflict-edge.js';
+	import { buildInterferenceGraph } from '@deconflict/geometry';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
@@ -22,6 +24,7 @@
 	let placeHandler: PlaceHandler;
 	let apLayer: ApLayer;
 	let rangeRingLayer: RangeRingLayer;
+	let conflictEdgeLayer: ConflictEdgeLayer;
 	let zoomPercent = $state(100);
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -55,11 +58,13 @@
 		// Create layers
 		const gridLayer = new GridLayer();
 		rangeRingLayer = new RangeRingLayer();
+		conflictEdgeLayer = new ConflictEdgeLayer();
 		apLayer = new ApLayer();
 
-		// Add layers in draw order: grid, range rings, APs
+		// Add layers in draw order: grid, range rings, conflict edges, APs
 		engine.addLayer(gridLayer);
 		engine.addLayer(rangeRingLayer);
+		engine.addLayer(conflictEdgeLayer);
 		engine.addLayer(apLayer);
 
 		// Create interaction handlers
@@ -125,6 +130,39 @@
 	$effect(() => {
 		if (!rangeRingLayer) return;
 		rangeRingLayer.visible = appState.showRangeRings;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!conflictEdgeLayer) return;
+		const aps = projectState.aps;
+		const apPositions = aps.map((ap) => ({
+			id: ap.id,
+			x: ap.x,
+			y: ap.y,
+			interferenceRadius: ap.interferenceRadius
+		}));
+		const { edges } = buildInterferenceGraph(apPositions);
+		const apMap = new Map(aps.map((ap) => [ap.id, ap]));
+
+		conflictEdgeLayer.edges = edges.map((edge) => {
+			const apA = apMap.get(edge.a);
+			const apB = apMap.get(edge.b);
+			const isConflict =
+				apA != null &&
+				apB != null &&
+				apA.assignedChannel != null &&
+				apB.assignedChannel != null &&
+				apA.assignedChannel === apB.assignedChannel;
+			return { aId: edge.a, bId: edge.b, isConflict };
+		});
+		conflictEdgeLayer.aps = aps;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!conflictEdgeLayer) return;
+		conflictEdgeLayer.visible = appState.showConflictEdges;
 		engine.markDirty();
 	});
 

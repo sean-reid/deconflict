@@ -4,6 +4,7 @@
 	import { canvasState } from '$state/canvas.svelte';
 	import ApList from '$components/sidebar/ApList.svelte';
 	import ApEditor from '$components/sidebar/ApEditor.svelte';
+	import SolverPanel from '$components/sidebar/SolverPanel.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
 		{ id: 'aps', label: 'APs' },
@@ -34,6 +35,8 @@
 				{#if hasSelection}
 					<ApEditor />
 				{/if}
+			{:else if appState.sidebarPanel === 'solver'}
+				<SolverPanel />
 			{:else}
 				<p class="placeholder">{appState.sidebarPanel} panel</p>
 			{/if}
