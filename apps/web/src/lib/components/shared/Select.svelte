@@ -3,12 +3,14 @@
 		value = $bindable(''),
 		options,
 		onchange,
-		class: className = ''
+		class: className = '',
+		'aria-label': ariaLabel = undefined
 	}: {
 		value?: string;
 		options: Array<{ value: string; label: string }>;
 		onchange?: (value: string) => void;
 		class?: string;
+		'aria-label'?: string;
 	} = $props();
 
 	function handleChange(e: Event) {
@@ -22,6 +24,7 @@
 	<select
 		{value}
 		onchange={handleChange}
+		aria-label={ariaLabel}
 	>
 		{#each options as opt}
 			<option value={opt.value}>{opt.label}</option>

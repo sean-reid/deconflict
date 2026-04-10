@@ -14,6 +14,7 @@
 	<button
 		role="switch"
 		aria-checked={checked}
+		aria-label={label || 'Toggle'}
 		{disabled}
 		class="track"
 		class:on={checked}
