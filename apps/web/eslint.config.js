@@ -7,7 +7,13 @@ import prettier from 'eslint-config-prettier';
 /** @type {import('eslint').Linter.Config[]} */
 export default [
 	{
-		ignores: ['**/dist/**', '**/build/**', '**/.svelte-kit/**', '**/node_modules/**']
+		ignores: [
+			'**/dist/**',
+			'**/build/**',
+			'**/.svelte-kit/**',
+			'**/node_modules/**',
+			'**/service-worker.ts'
+		]
 	},
 	{
 		files: ['**/*.ts'],
