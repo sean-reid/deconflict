@@ -13,19 +13,40 @@ const COLORS_2_4: Record<number, string> = {
 	10: '#d1d772',
 	11: '#ffe66d',
 	12: '#f0c65a',
-	13: '#e1a647',
+	13: '#e1a647'
 };
 
-const CHANNELS_5_ORDERED = [36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165];
+const CHANNELS_5_ORDERED = [
+	36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149,
+	153, 157, 161, 165
+];
 
 const HUES_5GHZ = [
-	'#4a90d9', '#5b7fc7', '#3d6baf', '#6ca0e8',
-	'#7b68ee', '#8a5ccf', '#9b59b6', '#a855c4',
-	'#2196f3', '#1e88e5', '#1565c0', '#0d47a1',
-	'#00acc1', '#0097a7', '#00838f', '#006064',
-	'#26c6da', '#4dd0e1', '#80deea', '#b2ebf2',
-	'#5c6bc0', '#7986cb', '#9fa8da', '#c5cae9',
-	'#4fc3f7',
+	'#4a90d9',
+	'#5b7fc7',
+	'#3d6baf',
+	'#6ca0e8',
+	'#7b68ee',
+	'#8a5ccf',
+	'#9b59b6',
+	'#a855c4',
+	'#2196f3',
+	'#1e88e5',
+	'#1565c0',
+	'#0d47a1',
+	'#00acc1',
+	'#0097a7',
+	'#00838f',
+	'#006064',
+	'#26c6da',
+	'#4dd0e1',
+	'#80deea',
+	'#b2ebf2',
+	'#5c6bc0',
+	'#7986cb',
+	'#9fa8da',
+	'#c5cae9',
+	'#4fc3f7'
 ];
 
 const COLORS_5: Map<number, string> = new Map(
@@ -33,9 +54,18 @@ const COLORS_5: Map<number, string> = new Map(
 );
 
 const HUES_6GHZ = [
-	'#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
-	'#1abc9c', '#3498db', '#9b59b6', '#e91e63',
-	'#00bcd4', '#8bc34a', '#ff9800', '#795548',
+	'#e74c3c',
+	'#e67e22',
+	'#f1c40f',
+	'#2ecc71',
+	'#1abc9c',
+	'#3498db',
+	'#9b59b6',
+	'#e91e63',
+	'#00bcd4',
+	'#8bc34a',
+	'#ff9800',
+	'#795548'
 ];
 
 export function channelColor(channelNumber: number, band: Band): string {

@@ -2,8 +2,8 @@ import type { Layer, RenderContext } from '../types.js';
 
 const MINOR_SPACING = 20;
 const MAJOR_SPACING = 100;
-const MINOR_COLOR = '#1a1d27';  // --canvas-grid
-const MAJOR_COLOR = '#252838';  // --canvas-grid-major
+const MINOR_COLOR = '#1a1d27'; // --canvas-grid
+const MAJOR_COLOR = '#252838'; // --canvas-grid-major
 
 export class GridLayer implements Layer {
 	id = 'grid';

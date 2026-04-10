@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { welshPowell } from '../src/algorithms/welsh-powell.js';
 import { validate } from '../src/validator.js';
-import {
-	completeK5, bipartiteGraph, petersenGraph, emptyGraph, TEST_COLORS,
-} from './fixtures.js';
+import { completeK5, bipartiteGraph, petersenGraph, emptyGraph, TEST_COLORS } from './fixtures.js';
 import { createGraph, addNode } from '../src/graph.js';
 
 describe('welsh-powell solver', () => {
@@ -60,7 +58,7 @@ describe('welsh-powell solver', () => {
 		const result = welshPowell(g, {
 			algorithm: 'welsh-powell',
 			availableColors: TEST_COLORS,
-			fixedAssignments: fixed,
+			fixedAssignments: fixed
 		});
 		expect(result.assignment.get('a')).toBe(7);
 	});

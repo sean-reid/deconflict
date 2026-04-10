@@ -31,23 +31,21 @@ interface CompareMessage {
 function deserializeGraph(data: SolveMessage['graph']): Graph {
 	return {
 		nodes: data.nodes,
-		edges: new Map(data.edges.map(([k, v]) => [k, new Set(v)])),
+		edges: new Map(data.edges.map(([k, v]) => [k, new Set(v)]))
 	};
 }
 
 function deserializeOptions(data: SolveMessage['options']): SolverOptions {
 	return {
 		...data,
-		fixedAssignments: data.fixedAssignments
-			? new Map(data.fixedAssignments)
-			: undefined,
+		fixedAssignments: data.fixedAssignments ? new Map(data.fixedAssignments) : undefined
 	};
 }
 
 function serializeResult(result: SolverResult) {
 	return {
 		...result,
-		assignment: Array.from(result.assignment.entries()),
+		assignment: Array.from(result.assignment.entries())
 	};
 }
 
@@ -67,17 +65,17 @@ self.onmessage = (event: MessageEvent<SolveMessage | CompareMessage>) => {
 			fixedAssignments: data.options.fixedAssignments
 				? new Map(data.options.fixedAssignments)
 				: undefined,
-			timeout: data.options.timeout,
+			timeout: data.options.timeout
 		};
 		const result = compareAll(graph, options);
 		self.postMessage({
 			type: 'comparison',
 			data: {
-				results: result.results.map(r => ({
+				results: result.results.map((r) => ({
 					...serializeResult(r),
-					algorithm: r.algorithm,
-				})),
-			},
+					algorithm: r.algorithm
+				}))
+			}
 		});
 	}
 };

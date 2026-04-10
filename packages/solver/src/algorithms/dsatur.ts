@@ -25,7 +25,10 @@ export function dsatur(graph: Graph, options: SolverOptions): SolverResult {
 			if (
 				sat > bestSat ||
 				(sat === bestSat && deg > bestDeg) ||
-				(sat === bestSat && deg === bestDeg && bestNode !== undefined && graph.nodes.indexOf(node) < graph.nodes.indexOf(bestNode))
+				(sat === bestSat &&
+					deg === bestDeg &&
+					bestNode !== undefined &&
+					graph.nodes.indexOf(node) < graph.nodes.indexOf(bestNode))
 			) {
 				bestNode = node;
 				bestSat = sat;
@@ -61,7 +64,7 @@ export function dsatur(graph: Graph, options: SolverOptions): SolverResult {
 		assignment,
 		colorCount: usedColors.size,
 		conflicts,
-		timeMs,
+		timeMs
 	};
 }
 

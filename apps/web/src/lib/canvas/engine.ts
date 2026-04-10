@@ -26,11 +26,11 @@ export class CanvasEngine {
 	}
 
 	removeLayer(id: string): void {
-		this.layers = this.layers.filter(l => l.id !== id);
+		this.layers = this.layers.filter((l) => l.id !== id);
 	}
 
 	getLayer(id: string): Layer | undefined {
-		return this.layers.find(l => l.id === id);
+		return this.layers.find((l) => l.id === id);
 	}
 
 	markDirty(): void {

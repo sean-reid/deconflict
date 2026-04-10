@@ -2,7 +2,7 @@ import type { Graph } from './types.js';
 
 export function validate(
 	graph: Graph,
-	assignment: Map<string, number>,
+	assignment: Map<string, number>
 ): { valid: boolean; conflicts: [string, string][] } {
 	const conflicts: [string, string][] = [];
 

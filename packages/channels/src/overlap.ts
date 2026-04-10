@@ -3,7 +3,7 @@ import type { Channel, ChannelWidth } from './types.js';
 export function getFrequencyRange(ch: Channel, width: ChannelWidth): { low: number; high: number } {
 	return {
 		low: ch.frequency - width / 2,
-		high: ch.frequency + width / 2,
+		high: ch.frequency + width / 2
 	};
 }
 
@@ -11,7 +11,7 @@ export function channelsInterfere(
 	a: Channel,
 	b: Channel,
 	widthA: ChannelWidth,
-	widthB: ChannelWidth,
+	widthB: ChannelWidth
 ): boolean {
 	if (a.band !== b.band) {
 		return false;

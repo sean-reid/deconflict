@@ -10,7 +10,7 @@ export interface AvailableChannelsOptions {
 export function getAvailableChannels(
 	band: Band,
 	domain: RegulatoryDomain,
-	options?: AvailableChannelsOptions,
+	options?: AvailableChannelsOptions
 ): Channel[] {
 	const includeDfs = options?.includeDfs ?? false;
 

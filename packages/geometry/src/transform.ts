@@ -14,7 +14,7 @@ export function multiply(a: Matrix2D, b: Matrix2D): Matrix2D {
 		a0 * b2 + a2 * b3,
 		a1 * b2 + a3 * b3,
 		a0 * b4 + a2 * b5 + a4,
-		a1 * b4 + a3 * b5 + a5,
+		a1 * b4 + a3 * b5 + a5
 	];
 }
 
@@ -41,7 +41,7 @@ export function invert(m: Matrix2D): Matrix2D {
 		-c * invDet,
 		a * invDet,
 		(c * f - d * e) * invDet,
-		(b * e - a * f) * invDet,
+		(b * e - a * f) * invDet
 	];
 }
 
@@ -49,6 +49,6 @@ export function applyToPoint(m: Matrix2D, p: Point): Point {
 	const [a, b, c, d, e, f] = m;
 	return {
 		x: a * p.x + c * p.y + e,
-		y: b * p.x + d * p.y + f,
+		y: b * p.x + d * p.y + f
 	};
 }

@@ -8,7 +8,7 @@ describe('comparator', () => {
 		const g = petersenGraph();
 		const result = compareAll(g, { availableColors: TEST_COLORS });
 		expect(result.results).toHaveLength(4);
-		const names = result.results.map(r => r.algorithm);
+		const names = result.results.map((r) => r.algorithm);
 		expect(names).toContain('greedy');
 		expect(names).toContain('dsatur');
 		expect(names).toContain('welsh-powell');

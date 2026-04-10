@@ -3,7 +3,12 @@ import { dsatur } from '../src/algorithms/dsatur.js';
 import { greedy } from '../src/algorithms/greedy.js';
 import { validate } from '../src/validator.js';
 import {
-	completeK5, bipartiteGraph, petersenGraph, cycleC5, emptyGraph, TEST_COLORS,
+	completeK5,
+	bipartiteGraph,
+	petersenGraph,
+	cycleC5,
+	emptyGraph,
+	TEST_COLORS
 } from './fixtures.js';
 import { createGraph, addNode } from '../src/graph.js';
 
@@ -59,7 +64,7 @@ describe('dsatur solver', () => {
 		const result = dsatur(g, {
 			algorithm: 'dsatur',
 			availableColors: TEST_COLORS,
-			fixedAssignments: fixed,
+			fixedAssignments: fixed
 		});
 		expect(result.assignment.get('a')).toBe(7);
 	});

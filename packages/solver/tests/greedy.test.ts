@@ -42,7 +42,7 @@ describe('greedy solver', () => {
 		const result = greedy(g, {
 			algorithm: 'greedy',
 			availableColors: TEST_COLORS,
-			fixedAssignments: fixed,
+			fixedAssignments: fixed
 		});
 		expect(result.assignment.get('a')).toBe(7);
 	});

@@ -13,7 +13,7 @@ export function backtracking(graph: Graph, options: SolverOptions): SolverResult
 			assignment: new Map(),
 			colorCount: 0,
 			conflicts: [],
-			timeMs: performance.now() - start,
+			timeMs: performance.now() - start
 		};
 	}
 
@@ -74,7 +74,7 @@ export function backtracking(graph: Graph, options: SolverOptions): SolverResult
 		assignment: bestAssignment,
 		colorCount: usedColors.size,
 		conflicts,
-		timeMs: performance.now() - start,
+		timeMs: performance.now() - start
 	};
 }
 
@@ -84,11 +84,11 @@ function solve(
 	assignment: Map<string, number>,
 	domains: Map<string, Set<number>>,
 	index: number,
-	deadline: number,
+	deadline: number
 ): Map<string, number> | null {
 	if (performance.now() > deadline) return null;
 
-	const uncolored = graph.nodes.filter(n => !assignment.has(n));
+	const uncolored = graph.nodes.filter((n) => !assignment.has(n));
 	if (uncolored.length === 0) {
 		return new Map(assignment);
 	}

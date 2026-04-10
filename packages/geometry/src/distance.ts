@@ -22,7 +22,7 @@ export function pointToSegment(p: Point, a: Point, b: Point): number {
 	const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / lengthSq));
 	const proj: Point = {
 		x: a.x + t * abx,
-		y: a.y + t * aby,
+		y: a.y + t * aby
 	};
 
 	return euclidean(p, proj);

@@ -7,11 +7,7 @@ export interface HitResult {
 	id: string;
 }
 
-export function hitTest(
-	screenPoint: Point,
-	camera: Camera,
-	aps: AccessPoint[]
-): HitResult | null {
+export function hitTest(screenPoint: Point, camera: Camera, aps: AccessPoint[]): HitResult | null {
 	const worldPoint = camera.screenToWorld(screenPoint);
 	const hitRadius = 12 / camera.state.zoom;
 

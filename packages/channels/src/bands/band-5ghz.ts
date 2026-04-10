@@ -11,14 +11,14 @@ const UNII_1: ChannelDef[] = [
 	{ number: 36, frequency: 5180, dfs: false, maxWidth: 80 },
 	{ number: 40, frequency: 5200, dfs: false, maxWidth: 80 },
 	{ number: 44, frequency: 5220, dfs: false, maxWidth: 80 },
-	{ number: 48, frequency: 5240, dfs: false, maxWidth: 80 },
+	{ number: 48, frequency: 5240, dfs: false, maxWidth: 80 }
 ];
 
 const UNII_2: ChannelDef[] = [
 	{ number: 52, frequency: 5260, dfs: true, maxWidth: 80 },
 	{ number: 56, frequency: 5280, dfs: true, maxWidth: 80 },
 	{ number: 60, frequency: 5300, dfs: true, maxWidth: 80 },
-	{ number: 64, frequency: 5320, dfs: true, maxWidth: 80 },
+	{ number: 64, frequency: 5320, dfs: true, maxWidth: 80 }
 ];
 
 const UNII_2_EXT: ChannelDef[] = [
@@ -33,7 +33,7 @@ const UNII_2_EXT: ChannelDef[] = [
 	{ number: 132, frequency: 5660, dfs: true, maxWidth: 160 },
 	{ number: 136, frequency: 5680, dfs: true, maxWidth: 160 },
 	{ number: 140, frequency: 5700, dfs: true, maxWidth: 160 },
-	{ number: 144, frequency: 5720, dfs: true, maxWidth: 160 },
+	{ number: 144, frequency: 5720, dfs: true, maxWidth: 160 }
 ];
 
 const UNII_3: ChannelDef[] = [
@@ -41,7 +41,7 @@ const UNII_3: ChannelDef[] = [
 	{ number: 153, frequency: 5765, dfs: false, maxWidth: 80 },
 	{ number: 157, frequency: 5785, dfs: false, maxWidth: 80 },
 	{ number: 161, frequency: 5805, dfs: false, maxWidth: 80 },
-	{ number: 165, frequency: 5825, dfs: false, maxWidth: 20 },
+	{ number: 165, frequency: 5825, dfs: false, maxWidth: 20 }
 ];
 
 const ALL_DEFS: ChannelDef[] = [...UNII_1, ...UNII_2, ...UNII_2_EXT, ...UNII_3];
@@ -52,9 +52,9 @@ export const CHANNELS_5GHZ: Channel[] = ALL_DEFS.map((def) => ({
 	band: '5ghz',
 	dfs: def.dfs,
 	psc: false,
-	maxWidth: def.maxWidth,
+	maxWidth: def.maxWidth
 }));
 
-export const DFS_CHANNELS_5GHZ: number[] = ALL_DEFS
-	.filter((def) => def.dfs)
-	.map((def) => def.number);
+export const DFS_CHANNELS_5GHZ: number[] = ALL_DEFS.filter((def) => def.dfs).map(
+	(def) => def.number
+);

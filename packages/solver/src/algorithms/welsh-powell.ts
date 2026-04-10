@@ -22,7 +22,7 @@ export function welshPowell(graph: Graph, options: SolverOptions): SolverResult 
 		for (const node of sorted) {
 			if (!uncolored.has(node)) continue;
 
-			const hasConflict = neighbors(graph, node).some(nb => assignment.get(nb) === color);
+			const hasConflict = neighbors(graph, node).some((nb) => assignment.get(nb) === color);
 			if (!hasConflict) {
 				assignment.set(node, color);
 				uncolored.delete(node);
@@ -38,6 +38,6 @@ export function welshPowell(graph: Graph, options: SolverOptions): SolverResult 
 		assignment,
 		colorCount: usedColors.size,
 		conflicts,
-		timeMs,
+		timeMs
 	};
 }

@@ -2,9 +2,9 @@ import type { Point, Matrix2D } from '@deconflict/geometry';
 import { identity, translate, scale, invert, applyToPoint } from '@deconflict/geometry';
 
 export interface CameraState {
-	x: number;       // pan offset in world coords
+	x: number; // pan offset in world coords
 	y: number;
-	zoom: number;    // scale factor (1.0 = 100%)
+	zoom: number; // scale factor (1.0 = 100%)
 }
 
 export class Camera {
@@ -12,7 +12,9 @@ export class Camera {
 
 	private dpr = 1;
 
-	setDpr(dpr: number): void { this.dpr = dpr; }
+	setDpr(dpr: number): void {
+		this.dpr = dpr;
+	}
 
 	/** Get the world-to-screen transform matrix */
 	getTransform(): Matrix2D {

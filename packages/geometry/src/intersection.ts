@@ -29,7 +29,9 @@ export function circleOverlapArea(a: Circle, b: Circle): number {
 	const alpha = Math.acos((dsq + r1sq - r2sq) / (2 * d * r1));
 	const beta = Math.acos((dsq + r2sq - r1sq) / (2 * d * r2));
 
-	return r1sq * alpha + r2sq * beta - r1sq * Math.sin(2 * alpha) / 2 - r2sq * Math.sin(2 * beta) / 2;
+	return (
+		r1sq * alpha + r2sq * beta - (r1sq * Math.sin(2 * alpha)) / 2 - (r2sq * Math.sin(2 * beta)) / 2
+	);
 }
 
 export function pointInCircle(p: Point, c: Circle): boolean {

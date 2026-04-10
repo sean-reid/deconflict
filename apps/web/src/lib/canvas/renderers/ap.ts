@@ -29,9 +29,8 @@ export class ApLayer implements Layer {
 			const isSelected = this.selectedIds.includes(ap.id);
 			const isHovered = this.hoveredId === ap.id;
 
-			const color = ap.assignedChannel !== null
-				? channelColor(ap.assignedChannel, ap.band)
-				: UNASSIGNED_COLOR;
+			const color =
+				ap.assignedChannel !== null ? channelColor(ap.assignedChannel, ap.band) : UNASSIGNED_COLOR;
 
 			const radius = 7 * screenScale;
 
@@ -104,7 +103,13 @@ export class ApLayer implements Layer {
 				ctx.lineTo(badgeX + badgeW - badgeRadius, badgeY);
 				ctx.arcTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + badgeRadius, badgeRadius);
 				ctx.lineTo(badgeX + badgeW, badgeY + badgeH - badgeRadius);
-				ctx.arcTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - badgeRadius, badgeY + badgeH, badgeRadius);
+				ctx.arcTo(
+					badgeX + badgeW,
+					badgeY + badgeH,
+					badgeX + badgeW - badgeRadius,
+					badgeY + badgeH,
+					badgeRadius
+				);
 				ctx.lineTo(badgeX + badgeRadius, badgeY + badgeH);
 				ctx.arcTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - badgeRadius, badgeRadius);
 				ctx.lineTo(badgeX, badgeY + badgeRadius);

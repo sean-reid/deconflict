@@ -29,7 +29,7 @@ export class DragHandler {
 			// Store start positions of all selected APs
 			this.apStartPositions.clear();
 			for (const id of canvasState.selectedApIds) {
-				const ap = projectState.aps.find(a => a.id === id);
+				const ap = projectState.aps.find((a) => a.id === id);
 				if (ap) {
 					this.apStartPositions.set(id, { x: ap.x, y: ap.y });
 				}

@@ -8,7 +8,7 @@ export const CHANNELS_2_4GHZ: Channel[] = Array.from({ length: 13 }, (_, i) => {
 		band: '2.4ghz',
 		dfs: false,
 		psc: false,
-		maxWidth: 40,
+		maxWidth: 40
 	};
 });
 

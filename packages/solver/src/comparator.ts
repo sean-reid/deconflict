@@ -8,12 +8,12 @@ const ALGORITHMS = [
 	{ name: 'greedy' as const, fn: greedy },
 	{ name: 'dsatur' as const, fn: dsatur },
 	{ name: 'welsh-powell' as const, fn: welshPowell },
-	{ name: 'backtracking' as const, fn: backtracking },
+	{ name: 'backtracking' as const, fn: backtracking }
 ];
 
 export function compareAll(
 	graph: Graph,
-	options: Omit<SolverOptions, 'algorithm'>,
+	options: Omit<SolverOptions, 'algorithm'>
 ): ComparisonResult {
 	const results: Array<SolverResult & { algorithm: string }> = [];
 

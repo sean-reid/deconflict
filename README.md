@@ -26,12 +26,12 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 Monorepo managed with pnpm workspaces and Turborepo.
 
-| Package | Description |
-|---------|-------------|
-| `apps/web` | SvelteKit SPA with canvas-based floorplan editor |
-| `packages/solver` | Graph coloring algorithms and Web Worker entry |
-| `packages/geometry` | Spatial math, interference graph construction |
-| `packages/channels` | WiFi band/channel definitions and rules |
+| Package             | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| `apps/web`          | SvelteKit SPA with canvas-based floorplan editor |
+| `packages/solver`   | Graph coloring algorithms and Web Worker entry   |
+| `packages/geometry` | Spatial math, interference graph construction    |
+| `packages/channels` | WiFi band/channel definitions and rules          |
 
 ## License
 

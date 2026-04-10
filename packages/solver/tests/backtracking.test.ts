@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { backtracking } from '../src/algorithms/backtracking.js';
 import {
-	completeK5, bipartiteGraph, petersenGraph, cycleC5, emptyGraph, TEST_COLORS,
+	completeK5,
+	bipartiteGraph,
+	petersenGraph,
+	cycleC5,
+	emptyGraph,
+	TEST_COLORS
 } from './fixtures.js';
 import { createGraph, addNode, addEdge } from '../src/graph.js';
 
@@ -55,7 +60,7 @@ describe('backtracking solver', () => {
 		const result = backtracking(g, {
 			algorithm: 'backtracking',
 			availableColors: TEST_COLORS,
-			fixedAssignments: fixed,
+			fixedAssignments: fixed
 		});
 		expect(result.assignment.get('a')).toBe(3);
 		expect(result.conflicts).toEqual([]);
@@ -72,7 +77,7 @@ describe('backtracking solver', () => {
 		const result = backtracking(g, {
 			algorithm: 'backtracking',
 			availableColors: TEST_COLORS,
-			timeout: 50,
+			timeout: 50
 		});
 		expect(result.timeMs).toBeDefined();
 		expect(result.assignment.size).toBeGreaterThan(0);

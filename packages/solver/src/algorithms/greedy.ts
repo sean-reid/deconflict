@@ -39,6 +39,6 @@ export function greedy(graph: Graph, options: SolverOptions): SolverResult {
 		assignment,
 		colorCount: usedColors.size,
 		conflicts,
-		timeMs,
+		timeMs
 	};
 }

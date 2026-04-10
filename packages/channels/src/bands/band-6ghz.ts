@@ -13,7 +13,7 @@ export const CHANNELS_6GHZ: Channel[] = CHANNEL_NUMBERS_6GHZ.map((num) => ({
 	band: '6ghz',
 	dfs: false,
 	psc: PSC_SET.has(num),
-	maxWidth: 320,
+	maxWidth: 320
 }));
 
 export const PSC_CHANNELS_6GHZ: number[] = CHANNEL_NUMBERS_6GHZ.filter((n) => PSC_SET.has(n));

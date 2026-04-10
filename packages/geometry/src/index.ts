@@ -5,7 +5,7 @@ export {
 	circleOverlapArea,
 	pointInCircle,
 	pointInRect,
-	rectsOverlap,
+	rectsOverlap
 } from './intersection.js';
 export { identity, translate, scale, multiply, invert, applyToPoint } from './transform.js';
 export type { ApPosition, InterferenceEdge } from './interference-graph.js';

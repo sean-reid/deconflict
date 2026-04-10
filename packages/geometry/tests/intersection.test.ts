@@ -4,7 +4,7 @@ import {
 	circleOverlapArea,
 	pointInCircle,
 	pointInRect,
-	rectsOverlap,
+	rectsOverlap
 } from '../src/intersection.js';
 
 describe('circlesOverlap', () => {

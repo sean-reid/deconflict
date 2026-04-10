@@ -7,7 +7,7 @@ describe('buildInterferenceGraph', () => {
 		const aps: ApPosition[] = [
 			{ id: 'A', x: 0, y: 0, interferenceRadius: 100 },
 			{ id: 'B', x: 150, y: 0, interferenceRadius: 100 },
-			{ id: 'C', x: 300, y: 0, interferenceRadius: 100 },
+			{ id: 'C', x: 300, y: 0, interferenceRadius: 100 }
 		];
 
 		const graph = buildInterferenceGraph(aps);
@@ -33,7 +33,7 @@ describe('buildInterferenceGraph', () => {
 	it('creates an edge for two APs at the same position', () => {
 		const aps: ApPosition[] = [
 			{ id: 'A', x: 0, y: 0, interferenceRadius: 10 },
-			{ id: 'B', x: 0, y: 0, interferenceRadius: 10 },
+			{ id: 'B', x: 0, y: 0, interferenceRadius: 10 }
 		];
 
 		const graph = buildInterferenceGraph(aps);
