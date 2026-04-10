@@ -1,0 +1,6 @@
+{
+	"name": "@deconflict/tsconfig",
+	"private": true,
+	"type": "module",
+	"files": ["base.json", "svelte.json"]
+}

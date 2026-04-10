@@ -1,0 +1,14 @@
+{
+	"name": "@deconflict/eslint-config",
+	"private": true,
+	"type": "module",
+	"main": "index.js",
+	"dependencies": {
+		"@typescript-eslint/eslint-plugin": "^8.32.1",
+		"@typescript-eslint/parser": "^8.32.1",
+		"eslint": "^9.27.0",
+		"eslint-config-prettier": "^10.1.5",
+		"eslint-plugin-svelte": "^3.9.1",
+		"typescript-eslint": "^8.32.1"
+	}
+}
