@@ -17,6 +17,7 @@
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
+	import { setEngineRef } from '$canvas/engine-ref.js';
 
 	let canvasEl: HTMLCanvasElement;
 	let containerEl: HTMLDivElement;
@@ -91,6 +92,7 @@
 	onMount(() => {
 		window.addEventListener('keydown', handleKeyDown);
 		engine = new CanvasEngine(canvasEl);
+		setEngineRef(engine);
 
 		// Create layers
 		floorplanLayer = new FloorplanLayer();

@@ -7,6 +7,7 @@
 	import SolverPanel from '$components/sidebar/SolverPanel.svelte';
 	import ComparePanel from '$components/sidebar/ComparePanel.svelte';
 	import FloorplanControls from '$components/sidebar/FloorplanControls.svelte';
+	import ExportPanel from '$components/sidebar/ExportPanel.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
 		{ id: 'aps', label: 'APs' },
@@ -42,8 +43,8 @@
 				<SolverPanel />
 			{:else if appState.sidebarPanel === 'compare'}
 				<ComparePanel />
-			{:else}
-				<p class="placeholder">{appState.sidebarPanel} panel</p>
+			{:else if appState.sidebarPanel === 'export'}
+				<ExportPanel />
 			{/if}
 		</div>
 	</aside>
@@ -103,9 +104,4 @@
 		padding: var(--space-4);
 	}
 
-	.placeholder {
-		color: var(--text-tertiary);
-		font-size: var(--text-sm);
-		text-transform: capitalize;
-	}
 </style>
