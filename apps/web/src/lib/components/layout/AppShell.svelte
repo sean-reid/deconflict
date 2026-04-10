@@ -1,0 +1,78 @@
+<script lang="ts">
+	import { appState } from '$state/app.svelte';
+	import Toolbar from './Toolbar.svelte';
+	import Sidebar from './Sidebar.svelte';
+	import StatusBar from './StatusBar.svelte';
+	import CanvasView from '$components/canvas/CanvasView.svelte';
+</script>
+
+<div class="app-shell">
+	<div class="toolbar-row">
+		<Toolbar />
+	</div>
+	<div class="canvas-area">
+		<CanvasView />
+	</div>
+	{#if appState.sidebarOpen}
+		<div class="sidebar-area">
+			<Sidebar />
+		</div>
+	{/if}
+	<div class="statusbar-row">
+		<StatusBar />
+	</div>
+</div>
+
+<style>
+	.app-shell {
+		display: grid;
+		grid-template-rows: 40px 1fr 24px;
+		grid-template-columns: 1fr auto;
+		width: 100vw;
+		height: 100vh;
+		background: var(--bg-primary);
+		overflow: hidden;
+	}
+
+	.toolbar-row {
+		grid-column: 1 / -1;
+		grid-row: 1;
+	}
+
+	.canvas-area {
+		grid-column: 1;
+		grid-row: 2;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.sidebar-area {
+		grid-column: 2;
+		grid-row: 2;
+		width: 320px;
+		border-left: 1px solid var(--border-subtle);
+	}
+
+	.statusbar-row {
+		grid-column: 1 / -1;
+		grid-row: 3;
+	}
+
+	@media (max-width: 768px) {
+		.app-shell {
+			grid-template-columns: 1fr;
+		}
+
+		.sidebar-area {
+			position: absolute;
+			top: 40px;
+			right: 0;
+			bottom: 24px;
+			width: 100%;
+			max-width: 320px;
+			z-index: var(--z-sidebar);
+			border-left: 1px solid var(--border-subtle);
+			background: var(--bg-secondary);
+		}
+	}
+</style>
