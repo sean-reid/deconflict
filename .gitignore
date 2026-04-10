@@ -1,0 +1,26 @@
+node_modules
+dist
+build
+.svelte-kit
+.turbo
+coverage
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Editor
+.vscode/settings.json
+.idea
+
+# AI tooling
+.claude/
+CLAUDE.md
+
+# OS
+Thumbs.db
+
+# Test artifacts
+test-results/
+playwright-report/

@@ -1,0 +1,23 @@
+{
+	"name": "deconflict",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "turbo build",
+		"dev": "turbo dev",
+		"lint": "turbo lint",
+		"test": "turbo test",
+		"typecheck": "turbo typecheck",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
+	},
+	"devDependencies": {
+		"prettier": "^3.5.3",
+		"turbo": "^2.4.4",
+		"typescript": "^5.8.3"
+	},
+	"packageManager": "pnpm@10.7.1",
+	"engines": {
+		"node": ">=22"
+	}
+}
