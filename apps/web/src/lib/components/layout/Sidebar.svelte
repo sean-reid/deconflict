@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { appState } from '$state/app.svelte';
 	import type { SidebarPanel } from '$state/app.svelte';
+	import { canvasState } from '$state/canvas.svelte';
+	import ApList from '$components/sidebar/ApList.svelte';
+	import ApEditor from '$components/sidebar/ApEditor.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
 		{ id: 'aps', label: 'APs' },
@@ -8,6 +11,8 @@
 		{ id: 'compare', label: 'Compare' },
 		{ id: 'export', label: 'Export' }
 	];
+
+	let hasSelection = $derived(canvasState.selectedApIds.length > 0);
 </script>
 
 {#if appState.sidebarOpen}
@@ -24,7 +29,14 @@
 			{/each}
 		</nav>
 		<div class="panel-content">
-			<p class="placeholder">{appState.sidebarPanel} panel</p>
+			{#if appState.sidebarPanel === 'aps'}
+				<ApList />
+				{#if hasSelection}
+					<ApEditor />
+				{/if}
+			{:else}
+				<p class="placeholder">{appState.sidebarPanel} panel</p>
+			{/if}
 		</div>
 	</aside>
 {/if}
