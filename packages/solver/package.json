@@ -20,7 +20,5 @@
 		"vitest": "^3.2.1",
 		"typescript": "^5.8.3"
 	},
-	"dependencies": {
-		"@deconflict/channels": "workspace:*"
-	}
+	"dependencies": {}
 }

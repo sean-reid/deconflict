@@ -118,10 +118,6 @@ importers:
         version: 3.2.4
 
   packages/solver:
-    dependencies:
-      '@deconflict/channels':
-        specifier: workspace:*
-        version: link:../channels
     devDependencies:
       '@deconflict/eslint-config':
         specifier: workspace:*

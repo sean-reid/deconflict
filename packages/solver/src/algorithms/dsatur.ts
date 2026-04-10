@@ -6,6 +6,7 @@ export function dsatur(graph: Graph, options: SolverOptions): SolverResult {
 	const start = performance.now();
 	const assignment = new Map<string, number>();
 	const uncolored = new Set(graph.nodes);
+	const nodeIndex = new Map(graph.nodes.map((n, i) => [n, i]));
 
 	if (options.fixedAssignments) {
 		for (const [node, color] of options.fixedAssignments) {
@@ -28,7 +29,7 @@ export function dsatur(graph: Graph, options: SolverOptions): SolverResult {
 				(sat === bestSat &&
 					deg === bestDeg &&
 					bestNode !== undefined &&
-					graph.nodes.indexOf(node) < graph.nodes.indexOf(bestNode))
+					(nodeIndex.get(node) ?? 0) < (nodeIndex.get(bestNode) ?? 0))
 			) {
 				bestNode = node;
 				bestSat = sat;
