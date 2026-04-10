@@ -14,6 +14,7 @@
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo } from '$state/history.svelte.js';
+	import { solverState, runSolver } from '$state/solver.svelte.js';
 
 	let canvasEl: HTMLCanvasElement;
 	let containerEl: HTMLDivElement;
@@ -26,8 +27,11 @@
 	let rangeRingLayer: RangeRingLayer;
 	let conflictEdgeLayer: ConflictEdgeLayer;
 	let zoomPercent = $state(100);
+	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	function handleKeyDown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement;
+		const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 		const mod = e.metaKey || e.ctrlKey;
 
 		if (mod && e.shiftKey && e.key === 'z') {
@@ -48,6 +52,35 @@
 				removeAps([...canvasState.selectedApIds]);
 				clearSelection();
 			}
+		}
+
+		if (isInput || mod) return;
+
+		switch (e.key) {
+			case 'v':
+			case 'V':
+				appState.activeTool = 'select';
+				break;
+			case 'p':
+			case 'P':
+				appState.activeTool = 'place';
+				break;
+			case 'h':
+			case 'H':
+				appState.activeTool = 'pan';
+				break;
+			case 'g':
+			case 'G':
+				appState.showGrid = !appState.showGrid;
+				break;
+			case 'r':
+			case 'R':
+				appState.showRangeRings = !appState.showRangeRings;
+				break;
+			case 'e':
+			case 'E':
+				appState.showConflictEdges = !appState.showConflictEdges;
+				break;
 		}
 	}
 
@@ -91,6 +124,7 @@
 		// Track zoom for status bar
 		const zoomInterval = setInterval(() => {
 			zoomPercent = engine.camera.getZoomPercent();
+			canvasState.zoom = engine.camera.state.zoom;
 		}, 100);
 
 		return () => {
@@ -172,6 +206,25 @@
 		engine.markDirty();
 	});
 
+	$effect(() => {
+		if (!apLayer) return;
+		apLayer.showLabels = appState.showLabels;
+		engine.markDirty();
+	});
+
+	// Auto-solve: debounce solver runs when APs change
+	$effect(() => {
+		const auto = solverState.autoSolve;
+		const aps = projectState.aps;
+		if (!auto || aps.length === 0) return;
+		if (solverState.isRunning) return;
+
+		if (autoSolveTimeout) clearTimeout(autoSolveTimeout);
+		autoSolveTimeout = setTimeout(() => {
+			runSolver();
+		}, 500);
+	});
+
 	// Cursor based on active tool
 	$effect(() => {
 		if (!canvasEl) return;
@@ -231,6 +284,8 @@
 <div class="canvas-container" bind:this={containerEl}>
 	<canvas
 		bind:this={canvasEl}
+		role="application"
+		aria-label="Channel planning canvas"
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
