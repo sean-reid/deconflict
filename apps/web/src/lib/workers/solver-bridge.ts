@@ -71,6 +71,10 @@ export class SolverBridge {
 		}
 	): Promise<SolverResult> {
 		return new Promise((resolve, reject) => {
+			// Reject any pending request
+			if (this.pendingReject) {
+				this.pendingReject(new Error('Superseded by new request'));
+			}
 			this.pendingResolve = resolve;
 			this.pendingReject = reject;
 			this.getWorker().postMessage({ type: 'solve', graph, options });
@@ -86,6 +90,10 @@ export class SolverBridge {
 		}
 	): Promise<ComparisonResult> {
 		return new Promise((resolve, reject) => {
+			// Reject any pending request
+			if (this.pendingReject) {
+				this.pendingReject(new Error('Superseded by new request'));
+			}
 			this.pendingResolve = resolve;
 			this.pendingReject = reject;
 			this.getWorker().postMessage({ type: 'compare', graph, options });
