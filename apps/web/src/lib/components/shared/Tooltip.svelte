@@ -57,10 +57,12 @@
 		background: var(--bg-elevated);
 		color: var(--text-secondary);
 		font-size: var(--text-xs);
+		line-height: 1.4;
 		padding: var(--space-1) var(--space-2);
 		border-radius: var(--radius-sm);
 		box-shadow: var(--shadow-md);
-		white-space: nowrap;
+		white-space: normal;
+		max-width: 220px;
 		pointer-events: none;
 	}
 

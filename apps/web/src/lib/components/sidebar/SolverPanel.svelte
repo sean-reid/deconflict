@@ -4,6 +4,7 @@
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Toggle from '$components/shared/Toggle.svelte';
+	import Tooltip from '$components/shared/Tooltip.svelte';
 
 	const algorithmOptions = [
 		{ value: 'greedy', label: 'Greedy' },
@@ -33,7 +34,9 @@
 
 <div class="solver-panel">
 	<div class="section">
-		<div class="section-header">ALGORITHM</div>
+		<Tooltip text="The method used to assign channels. DSatur works well for most layouts. Backtracking finds the optimal solution but takes longer." position="left">
+			<div class="section-header">ALGORITHM</div>
+		</Tooltip>
 		<Select
 			value={solverState.algorithm}
 			options={algorithmOptions}
@@ -58,10 +61,12 @@
 	</div>
 
 	<div class="section">
-		<Toggle
-			bind:checked={solverState.autoSolve}
-			label="Re-run when APs change"
-		/>
+		<Tooltip text="Automatically re-run the solver whenever you move or add access points." position="left">
+			<Toggle
+				bind:checked={solverState.autoSolve}
+				label="Re-run when APs change"
+			/>
+		</Tooltip>
 	</div>
 
 	{#if solverState.error}
@@ -75,12 +80,16 @@
 			<div class="section-header">RESULTS</div>
 
 			<div class="result-row">
-				<span class="result-label">Colors used</span>
+				<Tooltip text="The number of different channels assigned. Fewer is better since it means less spectrum used." position="left">
+					<span class="result-label">Colors used</span>
+				</Tooltip>
 				<span class="result-value accent">{solverState.lastResult?.colorCount}</span>
 			</div>
 
 			<div class="result-row">
-				<span class="result-label">Conflicts</span>
+				<Tooltip text="Pairs of nearby access points on the same channel. Zero is the goal." position="left">
+					<span class="result-label">Conflicts</span>
+				</Tooltip>
 				<span class="result-value" class:conflict-zero={conflictCount === 0} class:conflict-bad={conflictCount > 0}>
 					{conflictCount}
 				</span>

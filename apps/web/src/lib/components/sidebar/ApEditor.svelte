@@ -7,6 +7,7 @@
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 	import NumberInput from '$components/shared/NumberInput.svelte';
+	import Tooltip from '$components/shared/Tooltip.svelte';
 
 	const bandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
@@ -133,7 +134,9 @@
 		<div class="section-header">PROPERTIES</div>
 
 		<div class="field">
-			<span class="field-label">Name</span>
+			<Tooltip text="A label for this access point. Use something descriptive like 'Living Room' or 'Upstairs Hall'." position="left">
+				<span class="field-label">Name</span>
+			</Tooltip>
 			<input
 				class="text-input"
 				type="text"
@@ -144,7 +147,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Band</span>
+			<Tooltip text="The WiFi frequency band. 2.4 GHz has longer range but fewer channels. 5 GHz is faster with more channels. 6 GHz is newest and least congested." position="left">
+				<span class="field-label">Band</span>
+			</Tooltip>
 			<Select
 				value={singleAp.band}
 				options={bandOptions}
@@ -154,7 +159,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Channel Width</span>
+			<Tooltip text="Wider channels are faster but more prone to interference. 20 MHz is safest for dense environments." position="left">
+				<span class="field-label">Channel Width</span>
+			</Tooltip>
 			<Select
 				value={String(singleAp.channelWidth)}
 				options={getWidths(singleAp.band)}
@@ -164,7 +171,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Channel</span>
+			<Tooltip text="Auto lets the solver pick the best channel. Fix a channel if your router requires a specific one." position="left">
+				<span class="field-label">Channel</span>
+			</Tooltip>
 			<Select
 				value={singleAp.fixedChannel != null ? String(singleAp.fixedChannel) : ''}
 				options={channelOptions}
@@ -174,7 +183,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Interference Radius</span>
+			<Tooltip text="How far this access point's signal reaches. Increase for high-power routers, decrease for low-power ones." position="left">
+				<span class="field-label">Interference Radius</span>
+			</Tooltip>
 			<NumberInput
 				bind:value={singleAp.interferenceRadius}
 				min={50}
@@ -184,7 +195,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Power</span>
+			<Tooltip text="Transmit power in dBm. Typical home routers are 15-20 dBm. Higher means wider coverage but more interference." position="left">
+				<span class="field-label">Power</span>
+			</Tooltip>
 			<NumberInput
 				bind:value={singleAp.power}
 				min={0}
@@ -220,7 +233,9 @@
 		<div class="section-header">{selectedAps.length} APs SELECTED</div>
 
 		<div class="field">
-			<span class="field-label">Band</span>
+			<Tooltip text="The WiFi frequency band. 2.4 GHz has longer range but fewer channels. 5 GHz is faster with more channels. 6 GHz is newest and least congested." position="left">
+				<span class="field-label">Band</span>
+			</Tooltip>
 			<Select
 				value={selectedAps[0]?.band ?? '5ghz'}
 				options={bandOptions}
@@ -230,7 +245,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Channel Width</span>
+			<Tooltip text="Wider channels are faster but more prone to interference. 20 MHz is safest for dense environments." position="left">
+				<span class="field-label">Channel Width</span>
+			</Tooltip>
 			<Select
 				value={String(selectedAps[0]?.channelWidth ?? 20)}
 				options={getWidths(selectedAps[0]?.band ?? '5ghz')}
@@ -240,7 +257,9 @@
 		</div>
 
 		<div class="field">
-			<span class="field-label">Interference Radius</span>
+			<Tooltip text="How far this access point's signal reaches. Increase for high-power routers, decrease for low-power ones." position="left">
+				<span class="field-label">Interference Radius</span>
+			</Tooltip>
 			<NumberInput
 				bind:value={batchRadius}
 				min={50}
