@@ -298,10 +298,13 @@
 		if (tool === 'place') {
 			placeHandler.handlePointerDown(e);
 		} else if (tool === 'select') {
-			// Try drag first (on selected AP)
+			// Try drag first (on already-selected AP)
 			if (!dragHandler.handlePointerDown(e)) {
-				// Fall through to select/deselect
-				selectHandler.handlePointerDown(e);
+				// Select/deselect, then try drag again so click-and-drag works in one gesture
+				const consumed = selectHandler.handlePointerDown(e);
+				if (consumed) {
+					dragHandler.handlePointerDown(e);
+				}
 			}
 		}
 	}
