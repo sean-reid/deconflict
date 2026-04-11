@@ -60,19 +60,14 @@ export function detectWalls(image: HTMLImageElement): DetectedWall[] {
 	// Step 3: Zhang-Suen thinning to skeletonize walls to 1px lines
 	const skeleton = zhangSuenThin(binary, w, h);
 
-	// Step 4: Scan for horizontal and vertical runs on the skeleton
-	const minLength = 15;
-	const rawWalls = extractLineSegments(skeleton, w, h, minLength, scale);
+	// Step 4: Trace continuous paths and approximate as line segments
+	const minLength = 12;
+	const allWalls = extractLineSegments(skeleton, w, h, minLength, scale);
 
-	// Step 5: Merge nearby parallel segments
-	const merged = mergeNearbySegments(rawWalls, 5 / scale);
-
-	// Step 6: Recover thickness by measuring perpendicular extent in binary image
-	for (const wall of merged) {
-		wall.thickness = measureThickness(binary, wall, w, h, scale);
-	}
-
-	return merged;
+	// Step 5: Filter out isolated segments (text, decorations)
+	// Keep only walls that are near other walls (within proximity threshold)
+	// Real building walls cluster together; text is isolated
+	return filterConnectedWalls(allWalls, 30 / scale);
 }
 
 function zhangSuenThin(binary: Uint8Array, w: number, h: number): Uint8Array {
@@ -165,6 +160,11 @@ function zhangSuenThin(binary: Uint8Array, w: number, h: number): Uint8Array {
 	return result;
 }
 
+/**
+ * Trace continuous paths along the skeleton, then approximate
+ * each path as line segments using Douglas-Peucker simplification.
+ * Handles curves, diagonals, and any wall shape.
+ */
 function extractLineSegments(
 	skeleton: Uint8Array,
 	w: number,
@@ -172,50 +172,34 @@ function extractLineSegments(
 	minLength: number,
 	scale: number
 ): DetectedWall[] {
-	const walls: DetectedWall[] = [];
+	const visited = new Uint8Array(w * h);
+	const paths: Array<Array<{ x: number; y: number }>> = [];
 
-	// Scan rows for horizontal runs
-	for (let y = 0; y < h; y++) {
-		let runStart = -1;
-		for (let x = 0; x <= w; x++) {
-			const pixel = x < w ? skeleton[y * w + x] : 0;
-			if (pixel && runStart === -1) {
-				runStart = x;
-			} else if (!pixel && runStart !== -1) {
-				const runLen = x - runStart;
-				if (runLen >= minLength) {
-					walls.push({
-						x1: runStart / scale,
-						y1: y / scale,
-						x2: x / scale,
-						y2: y / scale,
-						thickness: 3
-					});
-				}
-				runStart = -1;
-			}
+	// Find all connected paths in the skeleton
+	for (let i = 0; i < w * h; i++) {
+		if (!skeleton[i] || visited[i]) continue;
+
+		// Find an endpoint or junction to start from
+		const startX = i % w;
+		const startY = Math.floor(i / w);
+
+		// Trace from this pixel
+		const path = tracePath(skeleton, visited, w, h, startX, startY);
+		if (path.length >= minLength) {
+			paths.push(path.map((p) => ({ x: p.x / scale, y: p.y / scale })));
 		}
 	}
 
-	// Scan columns for vertical runs
-	for (let x = 0; x < w; x++) {
-		let runStart = -1;
-		for (let y = 0; y <= h; y++) {
-			const pixel = y < h ? skeleton[y * w + x] : 0;
-			if (pixel && runStart === -1) {
-				runStart = y;
-			} else if (!pixel && runStart !== -1) {
-				const runLen = y - runStart;
-				if (runLen >= minLength) {
-					walls.push({
-						x1: x / scale,
-						y1: runStart / scale,
-						x2: x / scale,
-						y2: y / scale,
-						thickness: 3
-					});
-				}
-				runStart = -1;
+	// Convert paths to line segments using Douglas-Peucker
+	const walls: DetectedWall[] = [];
+	for (const path of paths) {
+		const simplified = douglasPeucker(path, 2 / scale);
+		for (let i = 0; i < simplified.length - 1; i++) {
+			const a = simplified[i]!;
+			const b = simplified[i + 1]!;
+			const len = Math.hypot(b.x - a.x, b.y - a.y);
+			if (len >= minLength / scale) {
+				walls.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, thickness: 3 });
 			}
 		}
 	}
@@ -223,147 +207,160 @@ function extractLineSegments(
 	return walls;
 }
 
-function mergeNearbySegments(walls: DetectedWall[], maxGap: number): DetectedWall[] {
-	const merged: DetectedWall[] = [];
-	const used = new Set<number>();
-
-	for (let i = 0; i < walls.length; i++) {
-		if (used.has(i)) continue;
-		const wall = walls[i]!;
-		const isHorizontal = wall.y1 === wall.y2;
-
-		let bestX1 = wall.x1;
-		let bestY1 = wall.y1;
-		let bestX2 = wall.x2;
-		let bestY2 = wall.y2;
-
-		used.add(i);
-
-		// Find nearby parallel segments to merge
-		for (let j = i + 1; j < walls.length; j++) {
-			if (used.has(j)) continue;
-			const other = walls[j]!;
-			const otherHorizontal = other.y1 === other.y2;
-
-			if (isHorizontal !== otherHorizontal) continue;
-
-			if (isHorizontal) {
-				// Both horizontal - check if they are close in Y and overlapping in X
-				const yDist = Math.abs(bestY1 - other.y1);
-				if (yDist > maxGap) continue;
-
-				const overlapX = Math.min(bestX2, other.x2) - Math.max(bestX1, other.x1);
-				if (overlapX >= -maxGap) {
-					bestX1 = Math.min(bestX1, other.x1);
-					bestX2 = Math.max(bestX2, other.x2);
-					bestY1 = (bestY1 + other.y1) / 2;
-					bestY2 = bestY1;
-					used.add(j);
-				}
-			} else {
-				// Both vertical - check if they are close in X and overlapping in Y
-				const xDist = Math.abs(bestX1 - other.x1);
-				if (xDist > maxGap) continue;
-
-				const overlapY = Math.min(bestY2, other.y2) - Math.max(bestY1, other.y1);
-				if (overlapY >= -maxGap) {
-					bestY1 = Math.min(bestY1, other.y1);
-					bestY2 = Math.max(bestY2, other.y2);
-					bestX1 = (bestX1 + other.x1) / 2;
-					bestX2 = bestX1;
-					used.add(j);
-				}
-			}
-		}
-
-		merged.push({
-			x1: bestX1,
-			y1: bestY1,
-			x2: bestX2,
-			y2: bestY2,
-			thickness: wall.thickness
-		});
-	}
-
-	return merged;
-}
-
-function measureThickness(
-	binary: Uint8Array,
-	wall: DetectedWall,
+/** Trace a connected path through the skeleton from a starting pixel */
+function tracePath(
+	skeleton: Uint8Array,
+	visited: Uint8Array,
 	w: number,
 	h: number,
-	scale: number
-): number {
-	const isHorizontal = wall.y1 === wall.y2;
-	let totalThickness = 0;
-	let samples = 0;
+	startX: number,
+	startY: number
+): Array<{ x: number; y: number }> {
+	const path: Array<{ x: number; y: number }> = [];
+	let cx = startX;
+	let cy = startY;
 
-	if (isHorizontal) {
-		// Sample along the wall, measure vertical extent
-		const y = Math.round(wall.y1 * scale);
-		const x1 = Math.round(wall.x1 * scale);
-		const x2 = Math.round(wall.x2 * scale);
-		const step = Math.max(1, Math.round((x2 - x1) / 10));
+	while (true) {
+		const idx = cy * w + cx;
+		if (visited[idx]) break;
+		visited[idx] = 1;
+		path.push({ x: cx, y: cy });
 
-		for (let x = x1; x <= x2; x += step) {
-			if (x < 0 || x >= w) continue;
-			let up = 0;
-			let down = 0;
-
-			// Measure upward
-			for (let dy = 0; dy < 50 && y - dy >= 0; dy++) {
-				if (binary[(y - dy) * w + x]) {
-					up = dy;
-				} else {
+		// Find next unvisited neighbor (8-connected)
+		let found = false;
+		for (const [dx, dy] of [
+			[1, 0],
+			[0, 1],
+			[-1, 0],
+			[0, -1],
+			[1, 1],
+			[-1, 1],
+			[1, -1],
+			[-1, -1]
+		]) {
+			const nx = cx + dx;
+			const ny = cy + dy;
+			if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+				const ni = ny * w + nx;
+				if (skeleton[ni] && !visited[ni]) {
+					cx = nx;
+					cy = ny;
+					found = true;
 					break;
 				}
 			}
-			// Measure downward
-			for (let dy = 0; dy < 50 && y + dy < h; dy++) {
-				if (binary[(y + dy) * w + x]) {
-					down = dy;
-				} else {
-					break;
-				}
-			}
-
-			totalThickness += up + down + 1;
-			samples++;
 		}
-	} else {
-		// Vertical wall - sample along the wall, measure horizontal extent
-		const x = Math.round(wall.x1 * scale);
-		const y1 = Math.round(wall.y1 * scale);
-		const y2 = Math.round(wall.y2 * scale);
-		const step = Math.max(1, Math.round((y2 - y1) / 10));
+		if (!found) break;
+	}
 
-		for (let y = y1; y <= y2; y += step) {
-			if (y < 0 || y >= h) continue;
-			let left = 0;
-			let right = 0;
+	return path;
+}
 
-			for (let dx = 0; dx < 50 && x - dx >= 0; dx++) {
-				if (binary[y * w + (x - dx)]) {
-					left = dx;
-				} else {
-					break;
-				}
-			}
-			for (let dx = 0; dx < 50 && x + dx < w; dx++) {
-				if (binary[y * w + (x + dx)]) {
-					right = dx;
-				} else {
-					break;
-				}
-			}
+function douglasPeucker(
+	points: Array<{ x: number; y: number }>,
+	epsilon: number
+): Array<{ x: number; y: number }> {
+	if (points.length <= 2) return points;
 
-			totalThickness += left + right + 1;
-			samples++;
+	let maxDist = 0;
+	let maxIdx = 0;
+	const first = points[0]!;
+	const last = points[points.length - 1]!;
+
+	for (let i = 1; i < points.length - 1; i++) {
+		const p = points[i]!;
+		const dx = last.x - first.x;
+		const dy = last.y - first.y;
+		const lenSq = dx * dx + dy * dy;
+		let d: number;
+		if (lenSq === 0) {
+			d = Math.hypot(p.x - first.x, p.y - first.y);
+		} else {
+			const t = Math.max(0, Math.min(1, ((p.x - first.x) * dx + (p.y - first.y) * dy) / lenSq));
+			d = Math.hypot(p.x - (first.x + t * dx), p.y - (first.y + t * dy));
+		}
+		if (d > maxDist) {
+			maxDist = d;
+			maxIdx = i;
 		}
 	}
 
-	if (samples === 0) return 3;
-	const avgThicknessScaled = totalThickness / samples;
-	return Math.max(2, Math.round(avgThicknessScaled / scale));
+	if (maxDist > epsilon) {
+		const left = douglasPeucker(points.slice(0, maxIdx + 1), epsilon);
+		const right = douglasPeucker(points.slice(maxIdx), epsilon);
+		return [...left.slice(0, -1), ...right];
+	}
+
+	return [first, last];
+}
+
+/**
+ * Filter out isolated wall segments that aren't part of the main building.
+ * Real building walls connect to each other. Text, legends, and decorations
+ * produce isolated segments that don't connect to anything.
+ */
+function filterConnectedWalls(walls: DetectedWall[], proximity: number): DetectedWall[] {
+	if (walls.length <= 1) return walls;
+
+	// Build adjacency: two walls are "connected" if any endpoint is within proximity
+	const neighbors: number[][] = walls.map(() => []);
+	for (let i = 0; i < walls.length; i++) {
+		for (let j = i + 1; j < walls.length; j++) {
+			if (wallsNear(walls[i]!, walls[j]!, proximity)) {
+				neighbors[i]!.push(j);
+				neighbors[j]!.push(i);
+			}
+		}
+	}
+
+	// Find connected components via BFS
+	const componentId = new Int32Array(walls.length).fill(-1);
+	const componentSizes: number[] = [];
+	let nextId = 0;
+
+	for (let i = 0; i < walls.length; i++) {
+		if (componentId[i] !== -1) continue;
+		const id = nextId++;
+		let size = 0;
+		const queue = [i];
+		componentId[i] = id;
+		while (queue.length > 0) {
+			const idx = queue.pop()!;
+			size++;
+			for (const n of neighbors[idx]!) {
+				if (componentId[n] === -1) {
+					componentId[n] = id;
+					queue.push(n);
+				}
+			}
+		}
+		componentSizes.push(size);
+	}
+
+	// Keep only the largest connected component
+	let bestComp = 0;
+	let bestSize = 0;
+	for (let i = 0; i < componentSizes.length; i++) {
+		if (componentSizes[i]! > bestSize) {
+			bestSize = componentSizes[i]!;
+			bestComp = i;
+		}
+	}
+
+	return walls.filter((_, i) => componentId[i] === bestComp);
+}
+
+function wallsNear(a: DetectedWall, b: DetectedWall, proximity: number): boolean {
+	const p2 = proximity * proximity;
+	// Check all 4 endpoint-to-endpoint distances
+	const pairs = [
+		[a.x1, a.y1, b.x1, b.y1],
+		[a.x1, a.y1, b.x2, b.y2],
+		[a.x2, a.y2, b.x1, b.y1],
+		[a.x2, a.y2, b.x2, b.y2]
+	];
+	for (const [ax, ay, bx, by] of pairs) {
+		if ((ax! - bx!) * (ax! - bx!) + (ay! - by!) * (ay! - by!) <= p2) return true;
+	}
+	return false;
 }

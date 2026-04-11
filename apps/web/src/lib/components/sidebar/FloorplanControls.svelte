@@ -77,8 +77,8 @@
 				detectedWorldArea = (pMaxX - pMinX) * (pMaxY - pMinY);
 			}
 
-			// Wall detection (uses original image for coordinate alignment)
-			const walls = detectWalls(originalImg);
+			// Wall detection (use cleaned image to exclude text, scale with original dims)
+			const walls = detectWalls(cleanImg);
 			if (walls.length > 0) {
 				projectState.walls = walls.map((w) => ({
 					x1: w.x1 * scaleFactor,
