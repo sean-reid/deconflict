@@ -2,7 +2,7 @@
 	import { appState } from '$state/app.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
-	let collapsed = $state(false);
+	let collapsed = $state(typeof window !== 'undefined' && window.innerWidth <= 768);
 
 	const layers = [
 		{ key: 'showHeatmap', label: 'Signal heatmap' },
