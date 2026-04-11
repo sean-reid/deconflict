@@ -241,9 +241,6 @@
 				step={10}
 				label={radiusUnit}
 			/>
-			{#if projectState.calibration}
-				<span class="radius-converted">~{radiusDisplay}{radiusUnit}</span>
-			{/if}
 		</div>
 
 		<div class="field">
