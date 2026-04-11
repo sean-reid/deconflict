@@ -4,6 +4,7 @@
 	import { FloorplanLayer } from '$canvas/renderers/floorplan.js';
 	import { BoundaryLayer } from '$canvas/renderers/boundary.js';
 	import { GridLayer } from '$canvas/renderers/grid.js';
+	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { RangeRingLayer } from '$canvas/renderers/range-ring.js';
 	import { ConflictEdgeLayer } from '$canvas/renderers/conflict-edge.js';
@@ -32,6 +33,7 @@
 	let floorplanLayer: FloorplanLayer;
 	let boundaryLayer: BoundaryLayer;
 	let gridLayer: GridLayer;
+	let heatmapLayer: HeatmapLayer;
 	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
 	let rangeRingLayer: RangeRingLayer;
@@ -81,6 +83,10 @@
 			case 'E':
 				appState.showConflictEdges = !appState.showConflictEdges;
 				break;
+			case 'h':
+			case 'H':
+				appState.showHeatmap = !appState.showHeatmap;
+				break;
 		}
 	}
 
@@ -94,15 +100,17 @@
 		floorplanLayer = new FloorplanLayer();
 		boundaryLayer = new BoundaryLayer();
 		gridLayer = new GridLayer();
+		heatmapLayer = new HeatmapLayer();
 		rangeRingLayer = new RangeRingLayer();
 		conflictEdgeLayer = new ConflictEdgeLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
 
-		// Add layers in draw order: floorplan, boundary, grid, range rings, conflict edges, APs, selection rect
+		// Add layers in draw order: floorplan, boundary, grid, heatmap, range rings, conflict edges, APs, selection rect
 		engine.addLayer(floorplanLayer);
 		engine.addLayer(boundaryLayer);
 		engine.addLayer(gridLayer);
+		engine.addLayer(heatmapLayer);
 		engine.addLayer(rangeRingLayer);
 		engine.addLayer(conflictEdgeLayer);
 		engine.addLayer(apLayer);
@@ -171,6 +179,19 @@
 	$effect(() => {
 		if (!gridLayer) return;
 		gridLayer.visible = appState.showGrid;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!heatmapLayer) return;
+		heatmapLayer.visible = appState.showHeatmap;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!heatmapLayer) return;
+		heatmapLayer.aps = projectState.aps;
+		heatmapLayer.ispSpeed = projectState.ispSpeed;
 		engine.markDirty();
 	});
 

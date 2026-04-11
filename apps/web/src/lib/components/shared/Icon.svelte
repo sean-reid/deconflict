@@ -55,7 +55,9 @@
 		sidebar:
 			'M2 2h12a1 1 0 011 1v10a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1zm8 0v12',
 		help:
-			'M8 15a7 7 0 110-14 7 7 0 010 14zM6.5 5.5a2 2 0 012.7-1.4c.8.3 1.3 1 1.3 1.9 0 1-1.5 1.3-1.5 2.5m0 2h.01'
+			'M8 15a7 7 0 110-14 7 7 0 010 14zM6.5 5.5a2 2 0 012.7-1.4c.8.3 1.3 1 1.3 1.9 0 1-1.5 1.3-1.5 2.5m0 2h.01',
+		heatmap:
+			'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z'
 	};
 
 	const strokeIcons = new Set([
@@ -75,7 +77,12 @@
 	class={className}
 	aria-hidden="true"
 >
-	{#if name === 'play'}
+	{#if name === 'heatmap'}
+		<rect x="1" y="1" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.9" />
+		<rect x="9" y="1" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.5" />
+		<rect x="1" y="9" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.3" />
+		<rect x="9" y="9" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.7" />
+	{:else if name === 'play'}
 		<path d={paths[name] ?? ''} fill="currentColor" />
 	{:else}
 		<path

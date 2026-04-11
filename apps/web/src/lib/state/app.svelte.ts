@@ -6,5 +6,6 @@ export const appState = $state({
 	showGrid: true,
 	showRangeRings: true,
 	showConflictEdges: true,
-	showLabels: true
+	showLabels: true,
+	showHeatmap: false
 });

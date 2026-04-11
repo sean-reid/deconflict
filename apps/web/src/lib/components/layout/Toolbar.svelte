@@ -48,14 +48,15 @@
 	];
 
 	const viewToggles: Array<{
-		key: 'showGrid' | 'showRangeRings' | 'showConflictEdges' | 'showLabels';
+		key: 'showGrid' | 'showRangeRings' | 'showConflictEdges' | 'showLabels' | 'showHeatmap';
 		icon: string;
 		label: string;
 	}> = [
 		{ key: 'showGrid', icon: 'grid', label: 'Grid' },
 		{ key: 'showRangeRings', icon: 'radio', label: 'Range rings' },
 		{ key: 'showConflictEdges', icon: 'link', label: 'Conflict edges' },
-		{ key: 'showLabels', icon: 'tag', label: 'Labels' }
+		{ key: 'showLabels', icon: 'tag', label: 'Labels' },
+		{ key: 'showHeatmap', icon: 'heatmap', label: 'Signal heatmap' }
 	];
 </script>
 

@@ -241,7 +241,7 @@
 	{/if}
 
 	<div class="network-settings">
-		<span class="settings-label">Internet Speed (Mbps)</span>
+		<span class="settings-label">Internet Plan (Mbps)</span>
 		<input
 			type="number"
 			class="speed-input"
@@ -250,7 +250,7 @@
 			min="0"
 			step="50"
 		/>
-		<span class="settings-hint">Leave 0 for no limit</span>
+		<span class="settings-hint">Your ISP download speed - leave 0 for no limit</span>
 	</div>
 </div>
 
