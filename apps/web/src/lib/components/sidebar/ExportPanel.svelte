@@ -67,12 +67,16 @@
 
 <div class="export-panel">
 	<div class="section">
-		<div class="section-header">PROJECT FILE</div>
+		<div class="section-header">PROJECT</div>
 		<Button variant="secondary" onclick={handleSaveProject}>
 			Save Project
 		</Button>
+	</div>
+
+	<div class="section">
+		<div class="section-header">IMPORT</div>
 		<Button variant="secondary" onclick={handleLoadClick}>
-			Load Project
+			Open Project File
 		</Button>
 		<input
 			bind:this={fileInputEl}

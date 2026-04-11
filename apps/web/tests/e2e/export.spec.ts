@@ -16,11 +16,11 @@ test.describe('Export', () => {
 		await page.getByRole('tab', { name: 'Export' }).click();
 
 		// All sections should be visible
-		await expect(page.getByText('PROJECT FILE')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Save Project' })).toBeVisible();
 		await expect(page.getByText('IMAGE EXPORT')).toBeVisible();
 		await expect(page.getByText('PDF REPORT')).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Save Project' })).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Load Project' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Open Project File' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Generate Report' })).toBeVisible();
 	});
