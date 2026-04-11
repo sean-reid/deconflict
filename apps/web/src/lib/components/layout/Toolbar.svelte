@@ -332,6 +332,21 @@
 		.toolbar-left::-webkit-scrollbar {
 			display: none;
 		}
+
+		.logo,
+		.separator {
+			display: none;
+		}
+
+		.project-name {
+			max-width: 120px;
+			font-size: 12px;
+		}
+
+		.project-name-input {
+			width: 120px;
+			font-size: 12px;
+		}
 	}
 
 </style>
