@@ -10,9 +10,7 @@ test.describe('Export', () => {
 
 	test('export panel shows all sections', async ({ page }) => {
 		// Place an AP first
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		await page.locator('canvas').click({ position: { x: 300, y: 300 } });
-		await page.locator('button[aria-label="Select (V)"]').click();
 
 		// Go to Export tab
 		await page.getByRole('tab', { name: 'Export' }).click();
@@ -29,11 +27,9 @@ test.describe('Export', () => {
 
 	test('save and load project JSON roundtrip', async ({ page }) => {
 		// Place 2 APs
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 200, y: 200 } });
 		await canvas.click({ position: { x: 400, y: 300 } });
-		await page.locator('button[aria-label="Select (V)"]').click();
 
 		// Go to Export tab
 		await page.getByRole('tab', { name: 'Export' }).click();

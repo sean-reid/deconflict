@@ -10,7 +10,6 @@ test.describe('AP placement', () => {
 
 	test('place an AP by clicking the canvas with the Place tool', async ({ page }) => {
 		// Switch to Place tool
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 
 		// Click on the canvas
 		const canvas = page.locator('canvas');
@@ -21,7 +20,6 @@ test.describe('AP placement', () => {
 	});
 
 	test('place multiple APs in rapid succession', async ({ page }) => {
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 200, y: 200 } });
@@ -35,12 +33,10 @@ test.describe('AP placement', () => {
 
 	test('select an AP by clicking it', async ({ page }) => {
 		// Place an AP
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
 		// Switch to select and click the AP
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await canvas.click({ position: { x: 300, y: 300 } });
 
 		// AP should be selected in sidebar (check for the editor showing properties)
@@ -50,11 +46,9 @@ test.describe('AP placement', () => {
 
 	test('edit AP name in the sidebar', async ({ page }) => {
 		// Place and select an AP
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await canvas.click({ position: { x: 300, y: 300 } });
 
 		// Edit the name
@@ -67,12 +61,10 @@ test.describe('AP placement', () => {
 
 	test('delete an AP using the sidebar button', async ({ page }) => {
 		// Place an AP
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
 		// Select it
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await canvas.click({ position: { x: 300, y: 300 } });
 
 		// Delete it
@@ -84,10 +76,8 @@ test.describe('AP placement', () => {
 
 	test('change AP band in the editor', async ({ page }) => {
 		// Place and select
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await canvas.click({ position: { x: 300, y: 300 } });
 
 		// Change band to 2.4 GHz using the sidebar select

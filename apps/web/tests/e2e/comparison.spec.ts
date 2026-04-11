@@ -8,14 +8,12 @@ test.describe('Algorithm Comparison', () => {
 		await page.waitForSelector('canvas');
 
 		// Place 3 APs
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 250, y: 250 } });
 		await canvas.click({ position: { x: 350, y: 250 } });
 		await canvas.click({ position: { x: 300, y: 350 } });
 
 		// Switch to Compare tab
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await page.getByRole('tab', { name: 'Compare' }).click();
 
 		// Click Compare All

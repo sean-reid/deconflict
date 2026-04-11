@@ -10,7 +10,6 @@ test.describe('Solver', () => {
 
 	test('solve assigns channels to placed APs', async ({ page }) => {
 		// Place 3 APs close together so they interfere
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 		await canvas.click({ position: { x: 350, y: 300 } });
@@ -18,7 +17,6 @@ test.describe('Solver', () => {
 		await page.waitForTimeout(200);
 
 		// Switch to select tool and click Solve
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await page.getByRole('button', { name: 'Solve', exact: true }).click();
 		await page.waitForTimeout(1500);
 
@@ -30,14 +28,12 @@ test.describe('Solver', () => {
 
 	test('solver panel shows results after solving', async ({ page }) => {
 		// Place 2 APs
-		await page.locator('button[aria-label="Place AP (P)"]').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 		await canvas.click({ position: { x: 400, y: 300 } });
 		await page.waitForTimeout(200);
 
 		// Switch to select, then Solver tab
-		await page.locator('button[aria-label="Select (V)"]').click();
 		await page.getByRole('tab', { name: 'Solver' }).click();
 		await page.waitForTimeout(200);
 
