@@ -387,7 +387,6 @@
 			font-size: var(--text-sm);
 		}
 
-		.undo-redo,
 		.band-select,
 		.unit-btn,
 		.dropdown-label {
