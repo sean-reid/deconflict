@@ -98,8 +98,8 @@
 					sameChannel
 				};
 			})
-			.filter(Boolean)
-			.sort((a, b) => b!.overlap - a!.overlap);
+			.filter((n): n is { name: string; overlap: number; sameChannel: boolean } => n !== null)
+			.sort((a, b) => b.overlap - a.overlap);
 	});
 
 	let channelOptions = $derived.by(() => {

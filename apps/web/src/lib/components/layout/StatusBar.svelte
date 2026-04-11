@@ -137,16 +137,6 @@
 		background: var(--bg-hover);
 	}
 
-	.reset-btn {
-		color: var(--color-error-dim);
-		border-color: var(--color-error-dim);
-	}
-
-	.reset-btn:hover {
-		color: var(--color-error);
-		background: rgba(255, 68, 68, 0.1);
-	}
-
 	.mono {
 		font-family: var(--font-mono);
 	}

@@ -198,7 +198,7 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 	for (let i = 0; i < w * h; i++) {
 		if (blobLabels[i] === mainBlob) {
 			buildingMask[i] = 1;
-		} else if (blobLabels[i] >= 0) {
+		} else if (blobLabels[i] !== undefined && blobLabels[i]! >= 0) {
 			const blob = blobLabels[i]!;
 			const b = blobBounds[blob]!;
 			const cx = (b.minX + b.maxX) / 2;
