@@ -261,40 +261,91 @@
 		scheduleSave();
 	});
 
+	// Track pending placement vs pan gesture
+	const DRAG_THRESHOLD = 5; // px - beyond this, it's a drag/pan, not a tap
+	let pendingPlace = false;
+	let pendingPan = false;
+	let pointerStartX = 0;
+	let pointerStartY = 0;
+
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
 		if (e.button === 1) return; // middle click handled by pan-zoom
 
-		// Smart mode: hit test first, place if empty
 		const rect = engine.canvas.getBoundingClientRect();
 		const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 		const hit = hitTest(screenPoint, engine.camera, projectState.aps);
 
 		if (hit) {
-			// Tapped an existing AP: select and start drag
+			// Clicked an existing AP: select and start drag
 			selectHandler.handlePointerDown(e);
 			dragHandler.handlePointerDown(e);
+			pendingPlace = false;
+			pendingPan = false;
 		} else if (e.shiftKey) {
 			// Shift+click on empty: box select
 			selectHandler.handlePointerDown(e);
+			pendingPlace = false;
+			pendingPan = false;
 		} else {
-			// Tapped empty space: place a new AP and start drag
-			placeHandler.handlePointerDown(e);
-			dragHandler.handlePointerDown(e);
+			// Clicked empty space: could be a tap (place) or drag (pan)
+			// Defer the decision until we see movement or release
+			pendingPlace = true;
+			pendingPan = false;
+			pointerStartX = e.clientX;
+			pointerStartY = e.clientY;
+			clearSelection();
+			engine.markDirty();
 		}
 	}
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!engine) return;
+
 		if (dragHandler.isDragging) {
 			dragHandler.handlePointerMove(e);
-		} else {
-			selectHandler.handlePointerMove(e);
+			return;
 		}
+
+		if (pendingPlace) {
+			const dx = e.clientX - pointerStartX;
+			const dy = e.clientY - pointerStartY;
+			if (dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
+				// Moved beyond threshold: this is a pan, not a tap-to-place
+				pendingPlace = false;
+				pendingPan = true;
+				// Start panning from the original position
+				engine.canvas.style.cursor = 'grabbing';
+			}
+		}
+
+		if (pendingPan) {
+			const dx = (e.clientX - pointerStartX) / engine.camera.state.zoom;
+			const dy = (e.clientY - pointerStartY) / engine.camera.state.zoom;
+			engine.camera.pan(dx, dy);
+			pointerStartX = e.clientX;
+			pointerStartY = e.clientY;
+			engine.markDirty();
+			return;
+		}
+
+		selectHandler.handlePointerMove(e);
 	}
 
 	function handlePointerUp(e: PointerEvent) {
 		if (!engine) return;
+
+		if (pendingPlace) {
+			// Pointer released without significant movement: place an AP
+			placeHandler.handlePointerDown(e);
+			pendingPlace = false;
+		}
+
+		if (pendingPan) {
+			pendingPan = false;
+			engine.canvas.style.cursor = '';
+		}
+
 		selectHandler.handlePointerUp(e);
 		dragHandler.handlePointerUp();
 	}
