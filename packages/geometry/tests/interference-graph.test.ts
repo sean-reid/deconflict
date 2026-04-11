@@ -52,8 +52,8 @@ describe('buildInterferenceGraph', () => {
 	it('returns higher overlapFraction for closer APs', () => {
 		const aps: ApPosition[] = [
 			{ id: 'A', x: 0, y: 0, interferenceRadius: 100 },
-			{ id: 'B', x: 50, y: 0, interferenceRadius: 100 },  // close to A
-			{ id: 'C', x: 180, y: 0, interferenceRadius: 100 }  // far from A (barely overlapping)
+			{ id: 'B', x: 50, y: 0, interferenceRadius: 100 }, // close to A
+			{ id: 'C', x: 180, y: 0, interferenceRadius: 100 } // far from A (barely overlapping)
 		];
 
 		const graph = buildInterferenceGraph(aps);

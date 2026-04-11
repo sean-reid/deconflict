@@ -20,7 +20,6 @@ test.describe('AP placement', () => {
 	});
 
 	test('place multiple APs in rapid succession', async ({ page }) => {
-
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 200, y: 200 } });
 		await canvas.click({ position: { x: 400, y: 200 } });
