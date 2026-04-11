@@ -220,18 +220,18 @@
 		</div>
 
 		<div class="field">
-			<Tooltip text="How far this access point's signal reaches. Increase for high-power routers, decrease for low-power ones." position="left">
-				<span class="field-label">Interference Radius</span>
+			<Tooltip text="How far this access point's signal reaches. Typical indoor range: 10-30m for 5 GHz, 30-50m for 2.4 GHz." position="left">
+				<span class="field-label">Coverage Radius</span>
 			</Tooltip>
 			<NumberInput
 				bind:value={singleAp.interferenceRadius}
 				min={50}
 				max={500}
 				step={10}
-				label="px"
+				label={radiusUnit}
 			/>
 			{#if projectState.calibration}
-				<span class="radius-converted">{radiusDisplay} {radiusUnit}</span>
+				<span class="radius-converted">~{radiusDisplay}m</span>
 			{/if}
 		</div>
 
