@@ -19,6 +19,11 @@ export class FloorplanLayer implements Layer {
 	get imageHeight(): number {
 		return this.drawHeight;
 	}
+	/** The scale factor from original image pixels to world units */
+	get scaleFactor(): number {
+		const natW = this.image?.naturalWidth || this.image?.width || 1;
+		return this.drawWidth > 0 ? this.drawWidth / natW : 1;
+	}
 
 	loadImage(url: string, onReady?: () => void): void {
 		this.clearImage();

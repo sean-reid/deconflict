@@ -8,7 +8,7 @@ const FLOORPLAN_KEY = 'deconflict:floorplan';
 const SAVE_DELAY = 2000;
 
 interface SavedState {
-	version: 1;
+	version: 2;
 	name: string;
 	band: Band;
 	channelWidth: ChannelWidth;
@@ -27,7 +27,7 @@ export const persistenceState = $state({ lastSaved: null as Date | null });
 function saveToStorage(): void {
 	try {
 		const data: SavedState = {
-			version: 1,
+			version: 2,
 			name: projectState.name,
 			band: projectState.band,
 			channelWidth: projectState.channelWidth,
@@ -78,7 +78,12 @@ export function restoreFromStorage(): boolean {
 		if (!raw) return false;
 
 		const data: SavedState = JSON.parse(raw);
-		if (!data.version || data.version !== 1) return false;
+		if (!data.version || data.version < 2) {
+			// Clear stale v1 data with potentially wrong wall coordinates
+			localStorage.removeItem(STORAGE_KEY);
+			localStorage.removeItem(FLOORPLAN_KEY);
+			return false;
+		}
 		if (!Array.isArray(data.aps)) return false;
 
 		projectState.name = data.name || 'Untitled Project';
