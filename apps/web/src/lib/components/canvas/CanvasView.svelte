@@ -280,15 +280,31 @@
 
 
 	// Track pending placement vs pan gesture
-	const DRAG_THRESHOLD = 5; // px - beyond this, it's a drag/pan, not a tap
+	const DRAG_THRESHOLD = 5;
 	let pendingPlace = false;
 	let pendingPan = false;
 	let pointerStartX = 0;
 	let pointerStartY = 0;
+	let activeTouches = 0; // when 2+, pointer events are suppressed for pinch-zoom
+
+	function handleTouchStart(e: TouchEvent) {
+		activeTouches = e.touches.length;
+		if (activeTouches >= 2) {
+			// Cancel any pending single-finger action
+			pendingPlace = false;
+			pendingPan = false;
+			dragHandler.handlePointerUp();
+		}
+	}
+
+	function handleTouchEnd(e: TouchEvent) {
+		activeTouches = e.touches.length;
+	}
 
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
-		if (e.button === 1) return; // middle click handled by pan-zoom
+		if (e.button === 1) return;
+		if (activeTouches >= 2) return; // multitouch in progress, let pan-zoom handle it
 
 		const rect = engine.canvas.getBoundingClientRect();
 		const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -319,6 +335,7 @@
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!engine) return;
+		if (activeTouches >= 2) return;
 
 		if (dragHandler.isDragging) {
 			dragHandler.handlePointerMove(e);
@@ -377,6 +394,9 @@
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
+		ontouchstart={handleTouchStart}
+		ontouchend={handleTouchEnd}
+		ontouchcancel={handleTouchEnd}
 	></canvas>
 	<LayerPanel />
 	{#if showEmptyHint}
