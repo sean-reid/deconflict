@@ -6,9 +6,17 @@ export interface WallSegment {
 	x2: number;
 	y2: number;
 	thickness: number;
-	material: string; // 'drywall' | 'concrete' | 'glass' | 'brick' | 'metal'
-	attenuation: number; // dB loss
+	material: string;
+	attenuation: number;
 }
+
+const MATERIAL_COLORS: Record<string, { fill: string; stroke: string }> = {
+	drywall: { fill: 'rgb(200, 200, 210)', stroke: 'rgb(160, 165, 180)' },
+	concrete: { fill: 'rgb(140, 130, 125)', stroke: 'rgb(100, 95, 90)' },
+	brick: { fill: 'rgb(180, 120, 90)', stroke: 'rgb(150, 90, 60)' },
+	glass: { fill: 'rgb(140, 210, 240)', stroke: 'rgb(100, 190, 230)' },
+	metal: { fill: 'rgb(170, 175, 185)', stroke: 'rgb(130, 135, 145)' }
+};
 
 export class WallLayer implements Layer {
 	id = 'walls';
@@ -17,37 +25,53 @@ export class WallLayer implements Layer {
 
 	render(rc: RenderContext): void {
 		if (this.walls.length === 0) return;
-		const { ctx, camera } = rc;
+		const { ctx, camera, width, height } = rc;
 		const transform = camera.getTransform();
-		const [a, b, c, d, e, f] = transform;
-		ctx.transform(a, b, c, d, e, f);
-
 		const zoom = camera.state.zoom;
 
+		// Render walls to an offscreen canvas to prevent alpha accumulation
+		// at wall intersections
+		const offscreen = document.createElement('canvas');
+		offscreen.width = width;
+		offscreen.height = height;
+		const oc = offscreen.getContext('2d')!;
+
+		// Apply camera transform
+		const [a, b, c, d, e, f] = transform;
+		oc.setTransform(a, b, c, d, e, f);
+
 		for (const wall of this.walls) {
-			ctx.beginPath();
-			ctx.moveTo(wall.x1, wall.y1);
-			ctx.lineTo(wall.x2, wall.y2);
+			const style = MATERIAL_COLORS[wall.material] ?? MATERIAL_COLORS['drywall']!;
+			const t = Math.max(wall.thickness, 2 / zoom);
 
-			// Color by material
-			ctx.strokeStyle = materialColor(wall.material);
-			ctx.lineWidth = Math.max(wall.thickness, 2 / zoom);
-			ctx.stroke();
+			const dx = wall.x2 - wall.x1;
+			const dy = wall.y2 - wall.y1;
+			const len = Math.sqrt(dx * dx + dy * dy);
+			if (len === 0) continue;
+			const nx = (-dy / len) * (t / 2);
+			const ny = (dx / len) * (t / 2);
+
+			// Filled wall body (opaque on offscreen)
+			oc.beginPath();
+			oc.moveTo(wall.x1 + nx, wall.y1 + ny);
+			oc.lineTo(wall.x2 + nx, wall.y2 + ny);
+			oc.lineTo(wall.x2 - nx, wall.y2 - ny);
+			oc.lineTo(wall.x1 - nx, wall.y1 - ny);
+			oc.closePath();
+			oc.fillStyle = style.fill;
+			oc.fill();
+
+			// Thin edge lines
+			oc.strokeStyle = style.stroke;
+			oc.lineWidth = 0.5 / zoom;
+			oc.stroke();
 		}
-	}
-}
 
-function materialColor(material: string): string {
-	switch (material) {
-		case 'concrete':
-			return 'rgba(180, 80, 80, 0.7)';
-		case 'brick':
-			return 'rgba(200, 120, 60, 0.7)';
-		case 'glass':
-			return 'rgba(100, 200, 255, 0.7)';
-		case 'metal':
-			return 'rgba(160, 160, 180, 0.7)';
-		default:
-			return 'rgba(255, 200, 100, 0.6)'; // drywall default
+		// Composite the offscreen canvas at reduced opacity
+		// This ensures overlapping walls don't accumulate alpha
+		ctx.resetTransform();
+		ctx.globalAlpha = 0.4;
+		ctx.drawImage(offscreen, 0, 0);
+		ctx.globalAlpha = 1;
 	}
 }
