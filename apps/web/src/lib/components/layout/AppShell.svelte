@@ -74,11 +74,6 @@
 	@media (max-width: 768px) {
 		.app-shell {
 			grid-template-columns: 1fr;
-			grid-template-rows: 40px 1fr;
-		}
-
-		.statusbar-row {
-			display: none;
 		}
 
 		.sidebar-backdrop {
