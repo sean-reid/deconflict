@@ -2,6 +2,7 @@
 	import { appState } from '$state/app.svelte';
 	import { projectState } from '$state/project.svelte';
 	import { scheduleSave } from '$state/persistence.svelte';
+	import { undo, redo, canUndo, canRedo } from '$state/history.svelte';
 	import type { Band } from '@deconflict/channels';
 	import Icon from '$components/shared/Icon.svelte';
 	import Select from '$components/shared/Select.svelte';
@@ -124,6 +125,29 @@
 			<Icon name="file" size={14} />
 			<span class="dropdown-label">File</span>
 		</Dropdown>
+
+		<div class="undo-redo">
+			<Tooltip text="Undo" position="bottom">
+				<button
+					class="tool-btn"
+					onclick={undo}
+					disabled={!canUndo()}
+					aria-label="Undo"
+				>
+					<Icon name="undo" size={14} />
+				</button>
+			</Tooltip>
+			<Tooltip text="Redo" position="bottom">
+				<button
+					class="tool-btn"
+					onclick={redo}
+					disabled={!canRedo()}
+					aria-label="Redo"
+				>
+					<Icon name="redo" size={14} />
+				</button>
+			</Tooltip>
+		</div>
 
 		<div class="band-select">
 			<Select
@@ -259,6 +283,11 @@
 		font-size: var(--text-sm);
 	}
 
+	.undo-redo {
+		display: flex;
+		gap: 1px;
+	}
+
 	.band-select {
 		margin-left: 4px;
 	}
@@ -302,9 +331,14 @@
 		transition: all var(--transition-fast);
 	}
 
-	.tool-btn:hover {
+	.tool-btn:hover:not(:disabled) {
 		background: var(--bg-hover);
 		color: var(--text-primary);
+	}
+
+	.tool-btn:disabled {
+		opacity: 0.3;
+		cursor: default;
 	}
 
 	.tool-btn.active {
