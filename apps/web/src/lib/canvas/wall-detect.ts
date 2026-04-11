@@ -96,6 +96,7 @@ export async function detectWalls(
 		gray[i] = Math.round((pixels[i * 4]! + pixels[i * 4 + 1]! + pixels[i * 4 + 2]!) / 3);
 	}
 
+	// Detect background from edges
 	let edgeSum = 0,
 		edgeCount = 0;
 	for (let x = 0; x < w; x++) {
@@ -109,7 +110,9 @@ export async function detectWalls(
 		edgeCount += 2;
 	}
 	const darkBg = edgeSum / edgeCount < 128;
-	const threshold = darkBg ? 80 : 160;
+
+	// Use Otsu's method to find optimal threshold from image histogram
+	const threshold = otsuThreshold(gray, w * h);
 
 	const binary = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
@@ -540,4 +543,38 @@ function maskWords(
 	}
 
 	ctx.putImageData(imgData, 0, 0);
+}
+
+/** Otsu's method: find the threshold that minimizes intra-class variance */
+function otsuThreshold(gray: Uint8Array, n: number): number {
+	// Build histogram
+	const hist = new Float64Array(256);
+	for (let i = 0; i < n; i++) hist[gray[i]!] = (hist[gray[i]!] ?? 0) + 1;
+
+	let sum = 0;
+	for (let i = 0; i < 256; i++) sum += i * hist[i]!;
+
+	let sumB = 0;
+	let wB = 0;
+	let maxVariance = 0;
+	let bestT = 128;
+
+	for (let t = 0; t < 256; t++) {
+		wB += hist[t]!;
+		if (wB === 0) continue;
+		const wF = n - wB;
+		if (wF === 0) break;
+
+		sumB += t * hist[t]!;
+		const mB = sumB / wB;
+		const mF = (sum - sumB) / wF;
+		const variance = wB * wF * (mB - mF) * (mB - mF);
+
+		if (variance > maxVariance) {
+			maxVariance = variance;
+			bestT = t;
+		}
+	}
+
+	return bestT;
 }

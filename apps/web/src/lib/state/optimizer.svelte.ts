@@ -38,7 +38,10 @@ export async function runOptimizer(): Promise<void> {
 			interferenceRadius: ap.interferenceRadius
 		}));
 
-		const boundary = projectState.floorplanBoundary ?? [];
+		// Deep clone to strip Svelte 5 reactivity proxies (can't be structured-cloned)
+		const boundary = projectState.floorplanBoundary
+			? projectState.floorplanBoundary.map((p) => ({ x: p.x, y: p.y }))
+			: [];
 
 		const result = await bridge.optimize(
 			aps,
