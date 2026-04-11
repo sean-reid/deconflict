@@ -4,14 +4,13 @@
 	import { canvasState } from '$state/canvas.svelte';
 	import ApList from '$components/sidebar/ApList.svelte';
 	import ApEditor from '$components/sidebar/ApEditor.svelte';
-	import SolverPanel from '$components/sidebar/SolverPanel.svelte';
 	import FloorplanControls from '$components/sidebar/FloorplanControls.svelte';
-	import ExportPanel from '$components/sidebar/ExportPanel.svelte';
+	import ResultsPanel from '$components/sidebar/ResultsPanel.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
+		{ id: 'floorplan', label: 'Floorplan' },
 		{ id: 'aps', label: 'APs' },
-		{ id: 'solver', label: 'Solver' },
-		{ id: 'export', label: 'Export' }
+		{ id: 'results', label: 'Results' }
 	];
 
 	let hasSelection = $derived(canvasState.selectedApIds.length > 0);
@@ -33,16 +32,15 @@
 			{/each}
 		</div>
 		<div class="panel-content">
-			{#if appState.sidebarPanel === 'aps'}
+			{#if appState.sidebarPanel === 'floorplan'}
 				<FloorplanControls />
+			{:else if appState.sidebarPanel === 'aps'}
 				<ApList />
 				{#if hasSelection}
 					<ApEditor />
 				{/if}
-			{:else if appState.sidebarPanel === 'solver'}
-				<SolverPanel />
-			{:else if appState.sidebarPanel === 'export'}
-				<ExportPanel />
+			{:else if appState.sidebarPanel === 'results'}
+				<ResultsPanel />
 			{/if}
 		</div>
 	</aside>

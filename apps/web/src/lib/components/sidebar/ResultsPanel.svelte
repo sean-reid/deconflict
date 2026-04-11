@@ -1,26 +1,25 @@
 <script lang="ts">
-	import { solverState, runSolver } from '$state/solver.svelte';
+	import { solverState } from '$state/solver.svelte';
 	import { clearAssignments } from '$state/project.svelte';
-	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Toggle from '$components/shared/Toggle.svelte';
+	import Select from '$components/shared/Select.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
+	import { exportPng } from '$lib/export/png.js';
+	import { exportPdf } from '$lib/export/pdf.js';
+	import { getEngineRef } from '$canvas/engine-ref.js';
 
-	const algorithmOptions = [
-		{ value: 'greedy', label: 'Greedy' },
-		{ value: 'dsatur', label: 'DSatur' },
-		{ value: 'welsh-powell', label: 'Welsh-Powell' },
-		{ value: 'backtracking', label: 'Backtracking' }
+	let scale = $state('2');
+	let includeGrid = $state(false);
+
+	const scaleOptions = [
+		{ value: '1', label: '1x' },
+		{ value: '2', label: '2x' },
+		{ value: '4', label: '4x' }
 	];
 
-	let showAdvanced = $state(false);
-
-	function handleAlgorithmChange(val: string) {
-		solverState.algorithm = val as typeof solverState.algorithm;
-	}
-
-	async function handleSolve() {
-		await runSolver();
+	function handleScaleChange(val: string) {
+		scale = val;
 	}
 
 	function handleClear() {
@@ -28,6 +27,21 @@
 		solverState.lastResult = null;
 		solverState.lastTiming = 0;
 		solverState.error = null;
+	}
+
+	async function handleExportPng() {
+		const engine = getEngineRef();
+		if (!engine) return;
+		await exportPng(engine, {
+			scale: Number(scale),
+			includeGrid
+		});
+	}
+
+	async function handleExportPdf() {
+		const engine = getEngineRef();
+		if (!engine) return;
+		await exportPdf(engine);
 	}
 
 	let hasResult = $derived(solverState.lastResult !== null);
@@ -42,22 +56,7 @@
 	});
 </script>
 
-<div class="solver-panel">
-	<div class="section">
-		<Button
-			variant="primary"
-			disabled={solverState.isRunning}
-			onclick={handleSolve}
-		>
-			{#if solverState.isRunning}
-				<span class="spinner"></span>
-				Solving...
-			{:else}
-				Solve
-			{/if}
-		</Button>
-	</div>
-
+<div class="results-panel">
 	<div class="section">
 		<Tooltip text="Automatically re-run the solver whenever you move or add access points." position="left">
 			<Toggle
@@ -113,31 +112,42 @@
 				Clear Assignments
 			</Button>
 		</div>
-	{/if}
-
-	<div class="section advanced-toggle">
-		<button class="toggle-link" onclick={() => { showAdvanced = !showAdvanced; }}>
-			{showAdvanced ? 'Hide' : 'Show'} advanced options
-		</button>
-	</div>
-
-	{#if showAdvanced}
+	{:else}
 		<div class="section">
-			<Tooltip text="DSatur works well for most layouts. Backtracking finds the optimal solution but takes longer." position="left">
-				<div class="section-header">ALGORITHM</div>
-			</Tooltip>
-			<Select
-				value={solverState.algorithm}
-				options={algorithmOptions}
-				onchange={handleAlgorithmChange}
-				class="full-width"
-			/>
+			<p class="hint">Place APs and click Solve</p>
 		</div>
 	{/if}
+
+	<div class="divider"></div>
+
+	<div class="section">
+		<div class="section-header">IMAGE EXPORT</div>
+		<div class="field-row">
+			<span class="field-label">Resolution</span>
+			<Select
+				value={scale}
+				options={scaleOptions}
+				onchange={handleScaleChange}
+				aria-label="Export resolution"
+			/>
+		</div>
+		<Toggle bind:checked={includeGrid} label="Include Grid" />
+		<Button variant="primary" onclick={handleExportPng}>
+			Export PNG
+		</Button>
+	</div>
+
+	<div class="section">
+		<div class="section-header">PDF REPORT</div>
+		<Button variant="primary" onclick={handleExportPdf}>
+			Generate Report
+		</Button>
+		<p class="description">Canvas snapshot with AP schedule table</p>
+	</div>
 </div>
 
 <style>
-	.solver-panel {
+	.results-panel {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
@@ -160,6 +170,18 @@
 
 	.section :global(.btn) {
 		width: 100%;
+	}
+
+	.hint {
+		font-size: var(--text-sm);
+		color: var(--text-tertiary);
+		text-align: center;
+		margin: var(--space-2) 0;
+	}
+
+	.divider {
+		height: 1px;
+		background: var(--border-subtle);
 	}
 
 	.error-msg {
@@ -219,41 +241,20 @@
 		color: var(--color-error);
 	}
 
-	.spinner {
-		display: inline-block;
-		width: 14px;
-		height: 14px;
-		border: 2px solid transparent;
-		border-top-color: currentColor;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
+	.field-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	:global(.full-width) {
-		width: 100%;
-	}
-
-	:global(.full-width select) {
-		width: 100%;
-	}
-
-	.toggle-link {
-		background: none;
-		border: none;
-		color: var(--text-tertiary);
-		font-size: var(--text-xs);
-		cursor: pointer;
-		padding: 0;
-		text-align: left;
-	}
-
-	.toggle-link:hover {
+	.field-label {
+		font-size: var(--text-sm);
 		color: var(--text-secondary);
+	}
+
+	.description {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		margin: 0;
 	}
 </style>

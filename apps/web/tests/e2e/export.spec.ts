@@ -8,35 +8,33 @@ test.describe('Export', () => {
 		await page.waitForSelector('canvas');
 	});
 
-	test('export panel shows all sections', async ({ page }) => {
+	test('results panel shows export sections and toolbar has save/open', async ({ page }) => {
 		// Place an AP first
 		await page.locator('canvas').click({ position: { x: 300, y: 300 } });
 
-		// Go to Export tab
-		await page.getByRole('tab', { name: 'Export' }).click();
+		// Go to Results tab
+		await page.getByRole('tab', { name: 'Results' }).click();
 
-		// All sections should be visible
-		await expect(page.getByRole('button', { name: 'Save Project' })).toBeVisible();
+		// Export sections should be visible in Results panel
 		await expect(page.getByText('IMAGE EXPORT')).toBeVisible();
 		await expect(page.getByText('PDF REPORT')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Save Project' })).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Open Project File' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Generate Report' })).toBeVisible();
+
+		// Save and Open are now in the toolbar
+		await expect(page.locator('header').getByLabel('Save project')).toBeVisible();
+		await expect(page.locator('header').getByLabel('Open project')).toBeVisible();
 	});
 
-	test('save and load project JSON roundtrip', async ({ page }) => {
+	test('save project JSON via toolbar button', async ({ page }) => {
 		// Place 2 APs
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 200, y: 200 } });
 		await canvas.click({ position: { x: 400, y: 300 } });
 
-		// Go to Export tab
-		await page.getByRole('tab', { name: 'Export' }).click();
-
-		// Intercept the download
+		// Intercept the download - Save is now in the toolbar
 		const downloadPromise = page.waitForEvent('download');
-		await page.getByRole('button', { name: 'Save Project' }).click();
+		await page.locator('header').getByLabel('Save project').click();
 		const download = await downloadPromise;
 
 		// Verify file was downloaded

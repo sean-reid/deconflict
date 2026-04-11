@@ -26,23 +26,20 @@ test.describe('Solver', () => {
 		expect(statusText).toContain('ms');
 	});
 
-	test('solver panel shows results after solving', async ({ page }) => {
+	test('results panel shows results after solving', async ({ page }) => {
 		// Place 2 APs
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 		await canvas.click({ position: { x: 400, y: 300 } });
 		await page.waitForTimeout(200);
 
-		// Switch to select, then Solver tab
-		await page.getByRole('tab', { name: 'Solver' }).click();
-		await page.waitForTimeout(200);
-
-		// Run solver from the panel (scope to sidebar to avoid toolbar button)
-		await page
-			.getByRole('complementary')
-			.getByRole('button', { name: 'Solve', exact: true })
-			.click();
+		// Click Solve in toolbar
+		await page.getByRole('button', { name: 'Solve', exact: true }).click();
 		await page.waitForTimeout(1500);
+
+		// Switch to Results tab
+		await page.getByRole('tab', { name: 'Results' }).click();
+		await page.waitForTimeout(200);
 
 		// Should see results section
 		await expect(page.getByText('Colors used')).toBeVisible();

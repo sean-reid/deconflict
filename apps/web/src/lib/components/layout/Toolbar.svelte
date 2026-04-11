@@ -9,9 +9,37 @@
 	import Tooltip from '$components/shared/Tooltip.svelte';
 	import HelpDialog from '$components/dialogs/HelpDialog.svelte';
 	import NewProjectDialog from '$components/dialogs/NewProjectDialog.svelte';
+	import { downloadJson, importJson } from '$lib/export/json.js';
 
 	let helpOpen = $state(false);
 	let newProjectOpen = $state(false);
+	let fileInputEl: HTMLInputElement;
+	let importError = $state<string | null>(null);
+
+	function handleSaveProject() {
+		downloadJson();
+	}
+
+	function handleOpenClick() {
+		importError = null;
+		fileInputEl.click();
+	}
+
+	async function handleFileSelect(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		try {
+			await importJson(file);
+			importError = null;
+		} catch (err) {
+			importError = err instanceof Error ? err.message : 'Failed to import project';
+		}
+
+		// Reset input so the same file can be selected again
+		target.value = '';
+	}
 
 	const bandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
@@ -46,6 +74,34 @@
 				<Icon name="file" size={14} />
 			</button>
 		</Tooltip>
+
+		<Tooltip text="Save project" position="bottom">
+			<button
+				class="tool-btn"
+				onclick={handleSaveProject}
+				aria-label="Save project"
+			>
+				<Icon name="download" size={14} />
+			</button>
+		</Tooltip>
+
+		<Tooltip text="Open project" position="bottom">
+			<button
+				class="tool-btn"
+				onclick={handleOpenClick}
+				aria-label="Open project"
+			>
+				<Icon name="upload" size={14} />
+			</button>
+		</Tooltip>
+
+		<input
+			bind:this={fileInputEl}
+			type="file"
+			accept=".json,.deconflict.json"
+			class="hidden-input"
+			onchange={handleFileSelect}
+		/>
 
 		<div class="separator"></div>
 
@@ -210,6 +266,10 @@
 	.view-btn:focus-visible {
 		outline: 2px solid var(--accent-primary);
 		outline-offset: 1px;
+	}
+
+	.hidden-input {
+		display: none;
 	}
 
 	@media (max-width: 768px) {

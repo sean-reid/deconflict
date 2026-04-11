@@ -20,7 +20,7 @@
 		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.png' },
 		{ name: 'House (120sqm)', file: '/samples/house-120sqm.png' },
 		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.png' },
-		{ name: 'West Wing (SVG)', file: '/samples/west-wing.svg' }
+		{ name: 'West Wing (1580sqft)', file: '/samples/west-wing.svg' }
 	];
 
 	let scaleDisplay = $derived(
@@ -248,9 +248,9 @@
 
 <style>
 	.floorplan-controls {
-		margin-bottom: var(--space-4);
-		padding-bottom: var(--space-4);
-		border-bottom: 1px solid var(--border-subtle);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
 	}
 
 	.drop-zone {
