@@ -1,10 +1,8 @@
 <script lang="ts">
 	import Button from '$components/shared/Button.svelte';
-	import Select from '$components/shared/Select.svelte';
 	import { projectState } from '$state/project.svelte';
 	import { clearHistory } from '$state/history.svelte';
 	import { clearSavedState } from '$state/persistence.svelte';
-	import type { Band } from '@deconflict/channels';
 
 	let {
 		open = $bindable(false),
@@ -15,20 +13,13 @@
 	} = $props();
 
 	let projectName = $state('Untitled Project');
-	let band = $state<string>('5ghz');
-
-	const bandOptions = [
-		{ value: '2.4ghz', label: '2.4 GHz' },
-		{ value: '5ghz', label: '5 GHz' },
-		{ value: '6ghz', label: '6 GHz' }
-	];
 
 	function handleConfirm() {
 		if (projectState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(projectState.floorplanUrl);
 		}
 		projectState.name = projectName;
-		projectState.band = band as Band;
+		projectState.band = '5ghz';
 		projectState.channelWidth = 20;
 		projectState.regulatoryDomain = 'fcc';
 		projectState.aps = [];
@@ -67,7 +58,6 @@
 	$effect(() => {
 		if (open) {
 			projectName = 'Untitled Project';
-			band = '5ghz';
 		}
 	});
 </script>
@@ -96,15 +86,6 @@
 					placeholder="Untitled Project"
 				/>
 			</label>
-
-			<div class="field">
-				<span class="field-label">Band</span>
-				<Select
-					value={band}
-					options={bandOptions}
-					onchange={(val) => { band = val; }}
-				/>
-			</div>
 
 			<div class="actions">
 				<Button variant="ghost" onclick={handleCancel}>Cancel</Button>

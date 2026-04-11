@@ -1,4 +1,6 @@
 import { projectState } from '$state/project.svelte.js';
+import { appState } from '$state/app.svelte.js';
+import { clearSelection } from '$state/canvas.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
 
 interface ProjectFile {
@@ -130,6 +132,15 @@ export function deserialize(json: string): void {
 		interferenceRadius: ap.interferenceRadius ?? 150,
 		power: ap.power ?? 20
 	}));
+
+	// Show the right sidebar tab and clear selection
+	clearSelection();
+	if (data.aps.length > 0) {
+		appState.sidebarPanel = 'aps';
+		appState.sidebarOpen = true;
+	} else if (data.floorplanImage) {
+		appState.sidebarPanel = 'floorplan';
+	}
 }
 
 export async function downloadJson(): Promise<void> {
