@@ -111,13 +111,9 @@ export async function detectWalls(
 	}
 	const darkBg = edgeSum / edgeCount < 128;
 
-	// Use Otsu's method to find optimal threshold from image histogram
-	const threshold = otsuThreshold(gray, w * h);
-
-	const binary = new Uint8Array(w * h);
-	for (let i = 0; i < w * h; i++) {
-		binary[i] = darkBg ? (gray[i]! > threshold ? 1 : 0) : gray[i]! < threshold ? 1 : 0;
-	}
+	// Adaptive local thresholding: compare each pixel to its neighborhood average.
+	// Catches thin/faint wall lines that global threshold misses.
+	const binary = adaptiveThreshold(gray, w, h, darkBg);
 
 	// Step 3: Remove small disconnected blobs (noise, dots, thin text remnants)
 	const minBlobPx = Math.max(30, Math.round(w * h * 0.0003));
@@ -543,6 +539,55 @@ function maskWords(
 	}
 
 	ctx.putImageData(imgData, 0, 0);
+}
+
+/** Adaptive local threshold using integral image for O(1) per-pixel mean.
+ *  Each pixel is compared to the mean of a KxK neighborhood.
+ *  For dark backgrounds: pixel brighter than localMean + C → wall.
+ *  For light backgrounds: pixel darker than localMean - C → wall. */
+function adaptiveThreshold(gray: Uint8Array, w: number, h: number, darkBg: boolean): Uint8Array {
+	// Build integral image for fast local mean computation
+	const integral = new Float64Array((w + 1) * (h + 1));
+	for (let y = 0; y < h; y++) {
+		let rowSum = 0;
+		for (let x = 0; x < w; x++) {
+			rowSum += gray[y * w + x]!;
+			integral[(y + 1) * (w + 1) + (x + 1)] = rowSum + integral[y * (w + 1) + (x + 1)]!;
+		}
+	}
+
+	function localMean(x: number, y: number, r: number): number {
+		const x0 = Math.max(0, x - r);
+		const y0 = Math.max(0, y - r);
+		const x1 = Math.min(w, x + r + 1);
+		const y1 = Math.min(h, y + r + 1);
+		const stride = w + 1;
+		const sum =
+			integral[y1 * stride + x1]! -
+			integral[y0 * stride + x1]! -
+			integral[y1 * stride + x0]! +
+			integral[y0 * stride + x0]!;
+		return sum / ((x1 - x0) * (y1 - y0));
+	}
+
+	const binary = new Uint8Array(w * h);
+	const radius = Math.max(8, Math.round(Math.max(w, h) * 0.03));
+	// C: how much a pixel must differ from local mean to be "wall"
+	const C = darkBg ? 15 : -15;
+
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			const val = gray[y * w + x]!;
+			const mean = localMean(x, y, radius);
+			if (darkBg) {
+				binary[y * w + x] = val > mean + C ? 1 : 0;
+			} else {
+				binary[y * w + x] = val < mean + C ? 1 : 0;
+			}
+		}
+	}
+
+	return binary;
 }
 
 /** Otsu's method: find the threshold that minimizes intra-class variance */
