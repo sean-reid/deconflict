@@ -15,6 +15,7 @@ interface OptimizeMessage {
 	maskHeight: number;
 	wallAttenuation: number;
 	iterations: number;
+	boundary: Array<{ x: number; y: number }>;
 }
 
 interface CancelMessage {
@@ -38,11 +39,29 @@ self.onmessage = (event: MessageEvent<InMessage>) => {
 };
 
 function runOptimization(msg: OptimizeMessage): void {
-	const { aps, wallMask: maskArr, maskWidth: w, maskHeight: h, wallAttenuation, iterations } = msg;
+	const {
+		aps,
+		wallMask: maskArr,
+		maskWidth: w,
+		maskHeight: h,
+		wallAttenuation,
+		iterations,
+		boundary
+	} = msg;
 	const mask = new Uint8Array(maskArr);
 
-	// Step 1: Compute interior mask (non-wall, non-exterior pixels inside building)
-	const interior = computeInterior(mask, w, h);
+	// Step 1: Compute interior using the building boundary polygon
+	// A pixel is interior if it's inside the boundary polygon and not a wall
+	const interior = new Uint8Array(w * h);
+	if (boundary.length >= 3) {
+		for (let y = 0; y < h; y++) {
+			for (let x = 0; x < w; x++) {
+				if (!mask[y * w + x] && pointInPolygon(x, y, boundary)) {
+					interior[y * w + x] = 1;
+				}
+			}
+		}
+	}
 
 	// Collect interior pixel indices for sampling and position constraints
 	const interiorPixels: number[] = [];
@@ -65,12 +84,34 @@ function runOptimization(msg: OptimizeMessage): void {
 	const sampleIndices = sampleUniform(interiorPixels, sampleCount);
 	const samples = sampleIndices.map((idx) => ({ x: idx % w, y: Math.floor(idx / w) }));
 
-	// Step 3: Initialize positions
+	// Step 3: Initialize positions and snap to interior if needed
 	const positions = aps.map((a) => ({ id: a.id, x: a.x, y: a.y, radius: a.interferenceRadius }));
+
+	for (const ap of positions) {
+		const ix = Math.round(ap.x);
+		const iy = Math.round(ap.y);
+		if (ix < 0 || ix >= w || iy < 0 || iy >= h || !interior[iy * w + ix]) {
+			let bestDist = Infinity;
+			let bestIdx = interiorPixels[0]!;
+			for (const px of interiorPixels) {
+				const d = ((px % w) - ap.x) ** 2 + (Math.floor(px / w) - ap.y) ** 2;
+				if (d < bestDist) {
+					bestDist = d;
+					bestIdx = px;
+				}
+			}
+			ap.x = bestIdx % w;
+			ap.y = Math.floor(bestIdx / w);
+		}
+	}
 
 	// Evaluate initial score
 	let currentScore = evaluateCoverage(positions, samples, mask, w, h, wallAttenuation);
 	const initialScore = currentScore;
+
+	// Track the best configuration found (never return worse than this)
+	let bestScore = currentScore;
+	let bestPositions = positions.map((p) => ({ id: p.id, x: p.x, y: p.y }));
 
 	// Step 4: Simulated annealing
 	const T0 = 0.3;
@@ -78,7 +119,7 @@ function runOptimization(msg: OptimizeMessage): void {
 	const alpha = Math.pow(Tmin / T0, 1 / iterations);
 	let temperature = T0;
 
-	// Move radius: start at ~10% of mask dimension, shrink with temperature
+	// Move radius proportional to building size
 	const maxMoveRadius = Math.max(w, h) * 0.15;
 
 	for (let iter = 0; iter < iterations; iter++) {
@@ -93,8 +134,8 @@ function runOptimization(msg: OptimizeMessage): void {
 		const oldX = ap.x;
 		const oldY = ap.y;
 
-		// Propose a move (scaled by temperature for adaptive step size)
-		const moveR = maxMoveRadius * (temperature / T0);
+		// Propose a move (large early, fine-tuned late)
+		const moveR = maxMoveRadius * Math.max(0.02, temperature / T0);
 		const angle = Math.random() * 2 * Math.PI;
 		const dist = Math.random() * moveR;
 		const newX = Math.round(ap.x + Math.cos(angle) * dist);
@@ -113,10 +154,13 @@ function runOptimization(msg: OptimizeMessage): void {
 
 		const delta = newScore - currentScore;
 		if (delta > 0 || Math.random() < Math.exp(delta / temperature)) {
-			// Accept move
 			currentScore = newScore;
+			// Update best if improved
+			if (currentScore > bestScore) {
+				bestScore = currentScore;
+				bestPositions = positions.map((p) => ({ id: p.id, x: p.x, y: p.y }));
+			}
 		} else {
-			// Reject move
 			ap.x = oldX;
 			ap.y = oldY;
 		}
@@ -127,20 +171,20 @@ function runOptimization(msg: OptimizeMessage): void {
 		if (iter % 500 === 0) {
 			self.postMessage({
 				type: 'progress',
-				positions: positions.map((p) => ({ id: p.id, x: p.x, y: p.y })),
-				score: currentScore,
+				positions: bestPositions,
+				score: bestScore,
 				iteration: iter,
 				totalIterations: iterations
 			});
 		}
 	}
 
-	// Send final result
-	const improvement = initialScore > 0 ? ((currentScore - initialScore) / initialScore) * 100 : 0;
+	// Always return the best configuration found, never worse than initial
+	const improvement = initialScore > 0 ? ((bestScore - initialScore) / initialScore) * 100 : 0;
 	self.postMessage({
 		type: 'result',
-		positions: positions.map((p) => ({ id: p.id, x: p.x, y: p.y })),
-		score: currentScore,
+		positions: bestPositions,
+		score: bestScore,
 		improvement
 	});
 }
@@ -224,26 +268,59 @@ function countWallCrossings(
 	return crossings;
 }
 
-function computeInterior(mask: Uint8Array, w: number, h: number): Uint8Array {
-	// Morphological close to seal door gaps, then flood fill to find exterior
-	const dilateR = Math.max(5, Math.round(Math.max(w, h) * 0.02));
+/** Ray-casting point-in-polygon test */
+function pointInPolygon(x: number, y: number, polygon: Array<{ x: number; y: number }>): boolean {
+	let inside = false;
+	for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+		const xi = polygon[i]!.x,
+			yi = polygon[i]!.y;
+		const xj = polygon[j]!.x,
+			yj = polygon[j]!.y;
+		if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+			inside = !inside;
+		}
+	}
+	return inside;
+}
 
-	// Passable map: 1 = passable, 0 = wall
-	const passable = new Uint8Array(w * h);
-	for (let i = 0; i < w * h; i++) passable[i] = mask[i] ? 0 : 1;
+// Kept for reference but no longer used - boundary polygon approach is more reliable
+function _computeInterior(mask: Uint8Array, w: number, h: number): Uint8Array {
+	// Downsample for the expensive morph close, then upsample the result
+	const maxDim = 400;
+	const rs = Math.min(1, maxDim / Math.max(w, h));
+	const sw = Math.round(w * rs);
+	const sh = Math.round(h * rs);
+
+	// Downsample wall mask
+	const small = new Uint8Array(sw * sh);
+	for (let sy = 0; sy < sh; sy++) {
+		const oy = Math.min(h - 1, Math.round(sy / rs));
+		for (let sx = 0; sx < sw; sx++) {
+			const ox = Math.min(w - 1, Math.round(sx / rs));
+			small[sy * sw + sx] = mask[oy * w + ox]!;
+		}
+	}
+
+	// Must be large enough to close door gaps (~10-15px at this resolution)
+	// Erosion step restores wall thickness, so rooms aren't lost
+	const dilateR = Math.max(10, Math.round(sw * 0.04));
+
+	// Passable: 1 = can flood, 0 = wall
+	const passable = new Uint8Array(sw * sh);
+	for (let i = 0; i < sw * sh; i++) passable[i] = small[i] ? 0 : 1;
 
 	// Dilate walls (shrink passable)
 	const dilPass = new Uint8Array(passable);
-	for (let y = 0; y < h; y++) {
-		for (let x = 0; x < w; x++) {
-			if (!mask[y * w + x]) continue;
+	for (let y = 0; y < sh; y++) {
+		for (let x = 0; x < sw; x++) {
+			if (!small[y * sw + x]) continue;
 			const ylo = Math.max(0, y - dilateR),
-				yhi = Math.min(h - 1, y + dilateR);
+				yhi = Math.min(sh - 1, y + dilateR);
 			const xlo = Math.max(0, x - dilateR),
-				xhi = Math.min(w - 1, x + dilateR);
+				xhi = Math.min(sw - 1, x + dilateR);
 			for (let ny = ylo; ny <= yhi; ny++) {
 				for (let nx = xlo; nx <= xhi; nx++) {
-					dilPass[ny * w + nx] = 0;
+					dilPass[ny * sw + nx] = 0;
 				}
 			}
 		}
@@ -251,48 +328,61 @@ function computeInterior(mask: Uint8Array, w: number, h: number): Uint8Array {
 
 	// Erode walls back (dilate passable)
 	const closedPass = new Uint8Array(dilPass);
-	for (let y = 0; y < h; y++) {
-		for (let x = 0; x < w; x++) {
-			if (dilPass[y * w + x] !== 1) continue;
+	for (let y = 0; y < sh; y++) {
+		for (let x = 0; x < sw; x++) {
+			if (dilPass[y * sw + x] !== 1) continue;
 			const ylo = Math.max(0, y - dilateR),
-				yhi = Math.min(h - 1, y + dilateR);
+				yhi = Math.min(sh - 1, y + dilateR);
 			const xlo = Math.max(0, x - dilateR),
-				xhi = Math.min(w - 1, x + dilateR);
+				xhi = Math.min(sw - 1, x + dilateR);
 			for (let ny = ylo; ny <= yhi; ny++) {
 				for (let nx = xlo; nx <= xhi; nx++) {
-					closedPass[ny * w + nx] = 1;
+					closedPass[ny * sw + nx] = 1;
 				}
 			}
 		}
 	}
 
 	// Flood fill exterior from border
-	const exterior = new Uint8Array(w * h);
+	const exterior = new Uint8Array(sw * sh);
 	const queue: number[] = [];
-	for (let x = 0; x < w; x++) {
+	for (let x = 0; x < sw; x++) {
 		if (closedPass[x]) queue.push(x);
-		if (closedPass[(h - 1) * w + x]) queue.push((h - 1) * w + x);
+		if (closedPass[(sh - 1) * sw + x]) queue.push((sh - 1) * sw + x);
 	}
-	for (let y = 0; y < h; y++) {
-		if (closedPass[y * w]) queue.push(y * w);
-		if (closedPass[y * w + w - 1]) queue.push(y * w + w - 1);
+	for (let y = 0; y < sh; y++) {
+		if (closedPass[y * sw]) queue.push(y * sw);
+		if (closedPass[y * sw + sw - 1]) queue.push(y * sw + sw - 1);
 	}
 	while (queue.length > 0) {
 		const idx = queue.pop()!;
 		if (exterior[idx]) continue;
 		exterior[idx] = 1;
-		const x = idx % w,
-			y = Math.floor(idx / w);
-		if (y > 0 && !exterior[idx - w] && closedPass[idx - w]) queue.push(idx - w);
-		if (y < h - 1 && !exterior[idx + w] && closedPass[idx + w]) queue.push(idx + w);
+		const x = idx % sw,
+			y = Math.floor(idx / sw);
+		if (y > 0 && !exterior[idx - sw] && closedPass[idx - sw]) queue.push(idx - sw);
+		if (y < sh - 1 && !exterior[idx + sw] && closedPass[idx + sw]) queue.push(idx + sw);
 		if (x > 0 && !exterior[idx - 1] && closedPass[idx - 1]) queue.push(idx - 1);
-		if (x < w - 1 && !exterior[idx + 1] && closedPass[idx + 1]) queue.push(idx + 1);
+		if (x < sw - 1 && !exterior[idx + 1] && closedPass[idx + 1]) queue.push(idx + 1);
 	}
 
-	// Interior = not exterior AND not wall
+	// Small interior
+	const smallInterior = new Uint8Array(sw * sh);
+	for (let i = 0; i < sw * sh; i++) {
+		if (!exterior[i] && !small[i]) smallInterior[i] = 1;
+	}
+
+	// Upsample to full resolution
 	const interior = new Uint8Array(w * h);
-	for (let i = 0; i < w * h; i++) {
-		if (!exterior[i] && !mask[i]) interior[i] = 1;
+	for (let y = 0; y < h; y++) {
+		const sy = Math.min(sh - 1, Math.round(y * rs));
+		for (let x = 0; x < w; x++) {
+			const sx = Math.min(sw - 1, Math.round(x * rs));
+			// Interior at full res: upsampled interior AND not wall in original mask
+			if (smallInterior[sy * sw + sx] && !mask[y * w + x]) {
+				interior[y * w + x] = 1;
+			}
+		}
 	}
 	return interior;
 }

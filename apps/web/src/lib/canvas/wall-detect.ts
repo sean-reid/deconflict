@@ -18,6 +18,8 @@ async function getOCRWorker(): Promise<Worker | null> {
 	if (ocrWorker) return ocrWorker;
 	try {
 		ocrWorker = await createWorker('eng');
+		// Use sparse text mode to find labels scattered at any position
+		await ocrWorker.setParameters({ tessedit_pageseg_mode: '11' as any });
 		return ocrWorker;
 	} catch {
 		return null;
@@ -43,55 +45,42 @@ export async function detectWalls(
 	const ctx = canvas.getContext('2d')!;
 	ctx.drawImage(image, 0, 0, w, h);
 
-	// Step 1: OCR to find and mask text regions
+	// Step 1: OCR to find and mask text regions (horizontal + vertical)
 	try {
 		const worker = await getOCRWorker();
 		if (worker) {
-			const { data } = await worker.recognize(canvas);
-
-			// Sample border pixels for background color
-			const borderData = ctx.getImageData(0, 0, w, h).data;
-			let rSum = 0,
-				gSum = 0,
-				bSum = 0,
-				count = 0;
-			for (let x = 0; x < w; x++) {
-				const i1 = x * 4;
-				rSum += borderData[i1]!;
-				gSum += borderData[i1 + 1]!;
-				bSum += borderData[i1 + 2]!;
-				count++;
-				const i2 = ((h - 1) * w + x) * 4;
-				rSum += borderData[i2]!;
-				gSum += borderData[i2 + 1]!;
-				bSum += borderData[i2 + 2]!;
-				count++;
-			}
-			for (let y = 1; y < h - 1; y++) {
-				const i1 = y * w * 4;
-				rSum += borderData[i1]!;
-				gSum += borderData[i1 + 1]!;
-				bSum += borderData[i1 + 2]!;
-				count++;
-				const i2 = (y * w + w - 1) * 4;
-				rSum += borderData[i2]!;
-				gSum += borderData[i2 + 1]!;
-				bSum += borderData[i2 + 2]!;
-				count++;
-			}
-			const bgColor = `rgb(${Math.round(rSum / count)},${Math.round(gSum / count)},${Math.round(bSum / count)})`;
-
-			// Paint over text bounding boxes with background color + padding
+			const bgColor = sampleBorderColor(ctx, w, h);
 			const pad = Math.max(3, Math.round(w * 0.005));
 			ctx.fillStyle = bgColor;
-			if (data.blocks) {
-				for (const block of data.blocks) {
+
+			// Pass 1: detect horizontal/angled text with auto-rotation
+			const { data } = await worker.recognize(canvas, { rotateAuto: true });
+			maskWords(ctx, data, pad);
+
+			// Pass 2: rotate 90 degrees to catch vertical text
+			const rotCanvas = document.createElement('canvas');
+			rotCanvas.width = h;
+			rotCanvas.height = w;
+			const rotCtx = rotCanvas.getContext('2d')!;
+			rotCtx.translate(h, 0);
+			rotCtx.rotate(Math.PI / 2);
+			rotCtx.drawImage(canvas, 0, 0);
+
+			const { data: rotData } = await worker.recognize(rotCanvas, { rotateAuto: true });
+			// Map rotated bounding boxes back to original orientation
+			if (rotData.blocks) {
+				for (const block of rotData.blocks) {
 					for (const para of block.paragraphs) {
 						for (const line of para.lines) {
 							for (const word of line.words) {
 								if (word.confidence < 15) continue;
 								const { x0, y0, x1, y1 } = word.bbox;
-								ctx.fillRect(x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
+								// Rotate bbox back: rotated(rx,ry) -> original(ry, h-rx)
+								const ox0 = y0;
+								const oy0 = h - x1;
+								const ox1 = y1;
+								const oy1 = h - x0;
+								ctx.fillRect(ox0 - pad, oy0 - pad, ox1 - ox0 + 2 * pad, oy1 - oy0 + 2 * pad);
 							}
 						}
 					}
@@ -437,6 +426,54 @@ function removeExteriorBlobs(binary: Uint8Array, w: number, h: number): void {
 	for (let b = 0; b < blobPixels.length; b++) {
 		if (!blobTouchesInterior[b]) {
 			for (const idx of blobPixels[b]!) binary[idx] = 0;
+		}
+	}
+}
+
+/** Sample the average border color for background fill */
+function sampleBorderColor(ctx: CanvasRenderingContext2D, w: number, h: number): string {
+	const d = ctx.getImageData(0, 0, w, h).data;
+	let rSum = 0,
+		gSum = 0,
+		bSum = 0,
+		count = 0;
+	for (let x = 0; x < w; x++) {
+		const i1 = x * 4;
+		rSum += d[i1]!;
+		gSum += d[i1 + 1]!;
+		bSum += d[i1 + 2]!;
+		const i2 = ((h - 1) * w + x) * 4;
+		rSum += d[i2]!;
+		gSum += d[i2 + 1]!;
+		bSum += d[i2 + 2]!;
+		count += 2;
+	}
+	for (let y = 1; y < h - 1; y++) {
+		const i1 = y * w * 4;
+		rSum += d[i1]!;
+		gSum += d[i1 + 1]!;
+		bSum += d[i1 + 2]!;
+		const i2 = (y * w + w - 1) * 4;
+		rSum += d[i2]!;
+		gSum += d[i2 + 1]!;
+		bSum += d[i2 + 2]!;
+		count += 2;
+	}
+	return `rgb(${Math.round(rSum / count)},${Math.round(gSum / count)},${Math.round(bSum / count)})`;
+}
+
+/** Paint over detected OCR words with background color */
+function maskWords(ctx: CanvasRenderingContext2D, data: any, pad: number): void {
+	if (!data.blocks) return;
+	for (const block of data.blocks) {
+		for (const para of block.paragraphs) {
+			for (const line of para.lines) {
+				for (const word of line.words) {
+					if (word.confidence < 15) continue;
+					const { x0, y0, x1, y1 } = word.bbox;
+					ctx.fillRect(x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
+				}
+			}
 		}
 	}
 }

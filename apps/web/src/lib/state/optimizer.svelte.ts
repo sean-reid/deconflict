@@ -15,6 +15,7 @@ export const optimizerState = $state({
 export async function runOptimizer(): Promise<void> {
 	if (projectState.aps.length === 0) return;
 	if (!projectState.wallMask) return;
+	if (!projectState.floorplanBoundary || projectState.floorplanBoundary.length < 3) return;
 	if (optimizerState.isRunning) return;
 
 	optimizerState.isRunning = true;
@@ -33,6 +34,9 @@ export async function runOptimizer(): Promise<void> {
 			interferenceRadius: ap.interferenceRadius
 		}));
 
+		// Pass building boundary polygon so optimizer knows where the interior is
+		const boundary = projectState.floorplanBoundary ?? [];
+
 		const result = await bridge.optimize(
 			aps,
 			decoded.data,
@@ -41,6 +45,7 @@ export async function runOptimizer(): Promise<void> {
 			projectState.wallAttenuation,
 			{
 				iterations: 5000,
+				boundary,
 				onProgress: (p: OptimizeProgress) => {
 					optimizerState.progress = Math.round((p.iteration / p.totalIterations) * 100);
 					optimizerState.score = Math.round(p.score * 100);
