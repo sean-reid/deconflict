@@ -55,6 +55,9 @@ export function removeAp(id: string): void {
 	if (idx !== -1) {
 		pushState();
 		projectState.aps.splice(idx, 1);
+		if (projectState.aps.length === 0) {
+			nextApNumber = 1;
+		}
 	}
 }
 
@@ -62,6 +65,10 @@ export function removeAps(ids: string[]): void {
 	pushState();
 	const idSet = new Set(ids);
 	projectState.aps = projectState.aps.filter((ap) => !idSet.has(ap.id));
+	// Reset AP counter when all APs are removed
+	if (projectState.aps.length === 0) {
+		nextApNumber = 1;
+	}
 }
 
 export function updateAp(id: string, changes: Partial<AccessPoint>): void {
