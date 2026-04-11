@@ -346,10 +346,8 @@
 			// Zoom
 			if (pinchLastDist > 0) {
 				const factor = dist / pinchLastDist;
-				if (factor < 0.95 || factor > 1.05) {
-					const rect = engine.canvas.getBoundingClientRect();
-					engine.camera.zoomAt({ x: cx - rect.left, y: cy - rect.top }, factor);
-				}
+				const rect = engine.canvas.getBoundingClientRect();
+				engine.camera.zoomAt({ x: cx - rect.left, y: cy - rect.top }, factor);
 			}
 
 			// Pan
