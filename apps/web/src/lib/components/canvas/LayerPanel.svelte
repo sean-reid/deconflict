@@ -82,6 +82,19 @@
 		user-select: none;
 	}
 
+	@media (max-width: 768px) {
+		.layer-panel {
+			bottom: 4px;
+			left: 4px;
+			min-width: auto;
+			z-index: 10;
+		}
+
+		.panel-header {
+			padding: var(--space-2) var(--space-3);
+		}
+	}
+
 	.panel-header {
 		display: flex;
 		align-items: center;
