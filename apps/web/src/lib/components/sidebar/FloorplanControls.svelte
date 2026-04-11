@@ -93,15 +93,15 @@
 				onchange={handleInputChange}
 				hidden
 			/>
-			<div class="samples">
-				<span class="samples-label">or try a sample:</span>
-				<div class="sample-buttons">
-					{#each sampleFloorplans as sample}
-						<button class="sample-btn" onclick={() => loadSample(sample.file)}>
-							{sample.name}
-						</button>
-					{/each}
-				</div>
+		</div>
+		<div class="samples">
+			<span class="samples-label">or try a sample:</span>
+			<div class="sample-buttons">
+				{#each sampleFloorplans as sample}
+					<button class="sample-btn" onclick={() => loadSample(sample.file)}>
+						{sample.name}
+					</button>
+				{/each}
 			</div>
 		</div>
 	{:else}
