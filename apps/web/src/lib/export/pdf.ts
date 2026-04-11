@@ -51,12 +51,20 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	tempCtx.fillRect(0, 0, srcWidth, srcHeight);
 
 	// Render layers (skip grid and selection rect)
+	const dpr = scale;
 	const rc = {
 		ctx: tempCtx,
 		camera: engine.camera,
 		width: srcWidth,
 		height: srcHeight,
-		dpr: scale
+		dpr,
+		compositeOffscreen: (offscreen: HTMLCanvasElement, alpha = 1) => {
+			tempCtx.resetTransform();
+			tempCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			if (alpha < 1) tempCtx.globalAlpha = alpha;
+			tempCtx.drawImage(offscreen, 0, 0);
+			if (alpha < 1) tempCtx.globalAlpha = 1;
+		}
 	};
 	for (const layer of engine.layers) {
 		if (!layer.visible) continue;

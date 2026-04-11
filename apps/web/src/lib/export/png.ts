@@ -25,12 +25,20 @@ export async function exportPng(engine: CanvasEngine, options: PngOptions = {}):
 	ctx.fillRect(0, 0, width, height);
 
 	// Render selected layers
+	const dpr = scale;
 	const rc = {
 		ctx,
 		camera: engine.camera,
 		width,
 		height,
-		dpr: scale
+		dpr,
+		compositeOffscreen: (offscreen: HTMLCanvasElement, alpha = 1) => {
+			ctx.resetTransform();
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			if (alpha < 1) ctx.globalAlpha = alpha;
+			ctx.drawImage(offscreen, 0, 0);
+			if (alpha < 1) ctx.globalAlpha = 1;
+		}
 	};
 
 	for (const layer of engine.layers) {
