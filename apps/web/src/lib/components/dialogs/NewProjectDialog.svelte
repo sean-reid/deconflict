@@ -24,13 +24,21 @@
 	];
 
 	function handleConfirm() {
+		if (projectState.floorplanUrl?.startsWith('blob:')) {
+			URL.revokeObjectURL(projectState.floorplanUrl);
+		}
 		projectState.name = projectName;
 		projectState.band = band as Band;
 		projectState.channelWidth = 20;
 		projectState.regulatoryDomain = 'fcc';
 		projectState.aps = [];
 		projectState.floorplanUrl = null;
-		projectState.floorplanScale = 1;
+		projectState.floorplanScale = 0.4;
+		projectState.walls = [];
+		projectState.calibration = null;
+		projectState.floorplanBoundary = null;
+		projectState.ispSpeed = 0;
+		projectState.targetThroughput = 25;
 
 		clearHistory();
 		clearSavedState();
