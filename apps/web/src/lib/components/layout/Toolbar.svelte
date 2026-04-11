@@ -211,9 +211,4 @@
 		}
 	}
 
-	@media (max-width: 480px) {
-		.logo {
-			display: none;
-		}
-	}
 </style>
