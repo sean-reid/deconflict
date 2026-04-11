@@ -69,7 +69,9 @@
 		bottom: var(--space-3, 12px);
 		left: var(--space-3, 12px);
 		z-index: 5;
-		min-width: 160px;
+		min-width: 140px;
+		max-height: calc(100% - 80px);
+		overflow-y: auto;
 		background: rgba(30, 33, 48, 0.92);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-lg);

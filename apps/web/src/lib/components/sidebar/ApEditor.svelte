@@ -266,13 +266,13 @@
 		</div>
 
 		{#if neighbors.length > 0}
-			<div class="section-header">NEARBY ACCESS POINTS</div>
+			<div class="section-header">NEARBY ({neighbors.length})</div>
 			<div class="neighbors">
-				{#each neighbors as n}
+				{#each neighbors.slice(0, 3) as n}
 					<div class="neighbor-row">
 						<span class="neighbor-name">{n.name}</span>
 						<span class="neighbor-overlap" class:low={n.overlap < 0.3} class:med={n.overlap >= 0.3 && n.overlap < 0.6} class:high={n.overlap >= 0.6}>
-							{Math.round(n.overlap * 100)}% overlap
+							{Math.round(n.overlap * 100)}%
 						</span>
 						{#if n.sameChannel}
 							<span class="conflict-badge">conflict</span>
