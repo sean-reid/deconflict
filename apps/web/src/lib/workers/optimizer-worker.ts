@@ -57,43 +57,10 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		boundary
 	} = msg;
 
-	// Step 1: Compute interior - non-wall pixels within the building footprint.
-	// Use the bounding box of wall pixels as the building extent (tighter than
-	// the boundary polygon which can cover the entire SVG viewport).
-	let wallMinX = w,
-		wallMinY = h,
-		wallMaxX = 0,
-		wallMaxY = 0;
-	for (let y = 0; y < h; y++) {
-		for (let x = 0; x < w; x++) {
-			if (mask[y * w + x]) {
-				if (x < wallMinX) wallMinX = x;
-				if (x > wallMaxX) wallMaxX = x;
-				if (y < wallMinY) wallMinY = y;
-				if (y > wallMaxY) wallMaxY = y;
-			}
-		}
-	}
-
-	const interior = new Uint8Array(w * h);
-	const pad = Math.round(Math.max(w, h) * 0.02);
-	const bx0 = Math.max(0, wallMinX - pad);
-	const by0 = Math.max(0, wallMinY - pad);
-	const bx1 = Math.min(w - 1, wallMaxX + pad);
-	const by1 = Math.min(h - 1, wallMaxY + pad);
-
-	for (let y = by0; y <= by1; y++) {
-		for (let x = bx0; x <= bx1; x++) {
-			if (!mask[y * w + x]) {
-				// Additional check: use boundary polygon if available
-				if (boundary.length >= 3) {
-					if (pointInPolygon(x, y, boundary)) interior[y * w + x] = 1;
-				} else {
-					interior[y * w + x] = 1;
-				}
-			}
-		}
-	}
+	// Step 1: Compute interior using flood fill from exterior.
+	// Handles L-shapes correctly (bounding box would include empty corners).
+	// Morph-close walls to seal doors, flood fill from edges, interior = not reached.
+	const interior = computeInteriorFloodFill(mask, w, h);
 
 	// Collect interior pixel indices for sampling and position constraints
 	const interiorPixels: number[] = [];
@@ -298,6 +265,91 @@ function countWallCrossings(
 		}
 	}
 	return crossings;
+}
+
+/** Compute interior via morph-close + exterior flood fill at reduced resolution.
+ *  Handles L-shaped and irregular building footprints correctly. */
+function computeInteriorFloodFill(mask: Uint8Array, w: number, h: number): Uint8Array {
+	// Work at reduced resolution for the morph close
+	const maxDim = 200;
+	const rs = Math.min(1, maxDim / Math.max(w, h));
+	const sw = Math.max(1, Math.round(w * rs));
+	const sh = Math.max(1, Math.round(h * rs));
+
+	// Downsample
+	const small = new Uint8Array(sw * sh);
+	for (let sy = 0; sy < sh; sy++) {
+		const oy = Math.min(h - 1, Math.round(sy / rs));
+		for (let sx = 0; sx < sw; sx++) {
+			const ox = Math.min(w - 1, Math.round(sx / rs));
+			small[sy * sw + sx] = mask[oy * w + ox]!;
+		}
+	}
+
+	// Morph close: dilate walls to seal doors, then erode back
+	const dr = Math.max(4, Math.round(sw * 0.04));
+	const dilated = new Uint8Array(sw * sh);
+	for (let i = 0; i < sw * sh; i++) dilated[i] = small[i] ? 0 : 1; // passable
+
+	for (let y = 0; y < sh; y++) {
+		for (let x = 0; x < sw; x++) {
+			if (!small[y * sw + x]) continue;
+			const ylo = Math.max(0, y - dr),
+				yhi = Math.min(sh - 1, y + dr);
+			const xlo = Math.max(0, x - dr),
+				xhi = Math.min(sw - 1, x + dr);
+			for (let ny = ylo; ny <= yhi; ny++)
+				for (let nx = xlo; nx <= xhi; nx++) dilated[ny * sw + nx] = 0;
+		}
+	}
+	const closed = new Uint8Array(dilated);
+	for (let y = 0; y < sh; y++) {
+		for (let x = 0; x < sw; x++) {
+			if (dilated[y * sw + x] !== 1) continue;
+			const ylo = Math.max(0, y - dr),
+				yhi = Math.min(sh - 1, y + dr);
+			const xlo = Math.max(0, x - dr),
+				xhi = Math.min(sw - 1, x + dr);
+			for (let ny = ylo; ny <= yhi; ny++)
+				for (let nx = xlo; nx <= xhi; nx++) closed[ny * sw + nx] = 1;
+		}
+	}
+
+	// Flood fill exterior from border
+	const exterior = new Uint8Array(sw * sh);
+	const queue: number[] = [];
+	for (let x = 0; x < sw; x++) {
+		if (closed[x]) queue.push(x);
+		if (closed[(sh - 1) * sw + x]) queue.push((sh - 1) * sw + x);
+	}
+	for (let y = 0; y < sh; y++) {
+		if (closed[y * sw]) queue.push(y * sw);
+		if (closed[y * sw + sw - 1]) queue.push(y * sw + sw - 1);
+	}
+	while (queue.length > 0) {
+		const idx = queue.pop()!;
+		if (exterior[idx]) continue;
+		exterior[idx] = 1;
+		const x = idx % sw,
+			y = Math.floor(idx / sw);
+		if (y > 0 && !exterior[idx - sw] && closed[idx - sw]) queue.push(idx - sw);
+		if (y < sh - 1 && !exterior[idx + sw] && closed[idx + sw]) queue.push(idx + sw);
+		if (x > 0 && !exterior[idx - 1] && closed[idx - 1]) queue.push(idx - 1);
+		if (x < sw - 1 && !exterior[idx + 1] && closed[idx + 1]) queue.push(idx + 1);
+	}
+
+	// Upsample: interior = not exterior AND not wall
+	const interior = new Uint8Array(w * h);
+	for (let y = 0; y < h; y++) {
+		const sy = Math.min(sh - 1, Math.round(y * rs));
+		for (let x = 0; x < w; x++) {
+			const sx = Math.min(sw - 1, Math.round(x * rs));
+			if (!exterior[sy * sw + sx] && !mask[y * w + x]) {
+				interior[y * w + x] = 1;
+			}
+		}
+	}
+	return interior;
 }
 
 /** Ray-casting point-in-polygon test */
