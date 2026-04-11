@@ -96,6 +96,18 @@
 		}
 		const worldUnitsPerMeter = Math.sqrt(detectedWorldArea / realAreaSqm);
 		projectState.calibration = { worldUnitsPerMeter };
+
+		// Set realistic default radius for existing APs
+		// Typical indoor 5 GHz: ~15m, 2.4 GHz: ~30m
+		const defaultRadiusMeters = 15;
+		const defaultRadiusWorld = Math.round(defaultRadiusMeters * worldUnitsPerMeter);
+		for (const ap of projectState.aps) {
+			if (ap.interferenceRadius === 150) {
+				// Only adjust APs still at the uncalibrated default
+				ap.interferenceRadius = defaultRadiusWorld;
+			}
+		}
+
 		calibrationDone = true;
 		scheduleSave();
 	}

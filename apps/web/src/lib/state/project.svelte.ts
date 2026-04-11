@@ -55,7 +55,9 @@ export function addAp(x: number, y: number): AccessPoint {
 		channelWidth: projectState.channelWidth,
 		fixedChannel: null,
 		assignedChannel: null,
-		interferenceRadius: 150,
+		interferenceRadius: projectState.calibration
+			? Math.round(15 * projectState.calibration.worldUnitsPerMeter)
+			: 150,
 		power: 20
 	};
 	projectState.aps.push(ap);
