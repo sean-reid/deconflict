@@ -42,15 +42,17 @@
 		const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 		const mod = e.metaKey || e.ctrlKey;
 
-		if (mod && e.shiftKey && e.key === 'z') {
+		if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
 			e.preventDefault();
 			redo();
+			engine?.markDirty();
 			return;
 		}
 
-		if (mod && e.key === 'z') {
+		if (mod && (e.key === 'z' || e.key === 'Z')) {
 			e.preventDefault();
 			undo();
+			engine?.markDirty();
 			return;
 		}
 
@@ -195,7 +197,7 @@
 				apA.assignedChannel != null &&
 				apB.assignedChannel != null &&
 				apA.assignedChannel === apB.assignedChannel;
-			return { aId: edge.a, bId: edge.b, isConflict };
+			return { aId: edge.a, bId: edge.b, isConflict, overlapFraction: edge.overlapFraction };
 		});
 		conflictEdgeLayer.aps = aps;
 		engine.markDirty();

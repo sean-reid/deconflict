@@ -5,6 +5,7 @@ interface Edge {
 	aId: string;
 	bId: string;
 	isConflict: boolean;
+	overlapFraction: number;
 }
 
 export class ConflictEdgeLayer implements Layer {
@@ -43,13 +44,23 @@ export class ConflictEdgeLayer implements Layer {
 			ctx.lineTo(apB.x, apB.y);
 
 			if (edge.isConflict) {
-				// Red dashed line for conflicts
-				ctx.strokeStyle = 'rgba(255, 68, 68, 0.7)';
-				ctx.lineWidth = 2 / zoom;
+				// Red dashed line for same-channel conflicts
+				const opacity = 0.5 + 0.4 * edge.overlapFraction;
+				const width = 1.5 + 1.5 * edge.overlapFraction;
+				ctx.strokeStyle = `rgba(255, 68, 68, ${opacity.toFixed(2)})`;
+				ctx.lineWidth = width / zoom;
 				ctx.setLineDash([6 / zoom, 4 / zoom]);
+			} else if (edge.overlapFraction >= 0.3) {
+				// Amber/yellow warning line for high overlap, different channels
+				const opacity = 0.25 + 0.35 * edge.overlapFraction;
+				const width = 1 + 0.5 * edge.overlapFraction;
+				ctx.strokeStyle = `rgba(217, 164, 6, ${opacity.toFixed(2)})`;
+				ctx.lineWidth = width / zoom;
+				ctx.setLineDash([]);
 			} else {
-				// Subtle gray line for interference edges
-				ctx.strokeStyle = 'rgba(107, 113, 133, 0.2)';
+				// Subtle gray line for low-overlap interference edges
+				const opacity = 0.1 + 0.2 * edge.overlapFraction;
+				ctx.strokeStyle = `rgba(107, 113, 133, ${opacity.toFixed(2)})`;
 				ctx.lineWidth = 1 / zoom;
 				ctx.setLineDash([]);
 			}
