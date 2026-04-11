@@ -1,21 +1,25 @@
 # Deconflict
 
-Free, open-source wireless channel planning for network engineers.
+Free, open-source wireless channel planning tool.
 
-Drop access points onto a floorplan, define interference ranges, and get optimal channel assignments computed in real time using graph coloring algorithms.
+Place access points on a floorplan, see signal coverage as a heatmap, and get optimal channel assignments automatically. Supports 2.4/5/6 GHz bands with wall attenuation modeling.
 
 **[Try it live](https://deconflict.pages.dev)**
 
 ## Features
 
-- **Visual channel planning** - place access points on any floorplan image with drag-and-drop
+- **Smart interaction** - tap to place APs, drag to move, drag empty space to pan, pinch to zoom
+- **Signal heatmap** - visualize coverage quality across your entire floorplan with 5-band color coding
+- **Auto wall detection** - walls are extracted from floorplan images and affect signal propagation
+- **Auto channel solver** - channels assigned automatically using DSatur graph coloring as you place APs
+- **Floorplan calibration** - auto-detect building boundary and calibrate to real-world meters via area input
 - **Multi-band support** - 2.4 GHz, 5 GHz (including DFS), and 6 GHz with configurable channel widths
-- **Four solver algorithms** - Greedy, DSatur, Welsh-Powell, and Backtracking with constraint propagation
-- **Algorithm comparison** - run all solvers side by side to find the best channel assignment
-- **Real-time interference visualization** - see coverage rings, conflict edges, and channel colors on the canvas
-- **Export** - save projects as JSON, export layouts to PNG, generate PDF reports with AP schedules
-- **Offline-ready** - works entirely in the browser with no server, installable as a PWA
-- **Auto-save** - your work persists across browser sessions via localStorage
+- **Throughput estimation** - per-AP estimated Mbps based on band, channel width, and co-channel contention
+- **Export** - save projects as JSON, export layouts to PNG, generate PDF reports
+- **Sample floorplans** - built-in apartment, house, office, and West Wing samples with known areas
+- **Offline-ready** - works entirely in the browser, installable as a PWA
+- **Persistent** - floorplan, APs, walls, and calibration survive page reloads via localStorage
+- **Mobile-friendly** - responsive design with touch gestures, pinch-zoom, and mobile sidebar
 
 ## Getting Started
 
@@ -30,27 +34,23 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Quick Start
 
-1. Import a floorplan image (optional) or work on a blank canvas
-2. Press **P** to activate the place tool and click to add access points
-3. Press **V** to switch to select mode - click and drag APs to position them
-4. Click **Solve** to automatically assign channels
-5. Switch to the **Compare** tab to see how different algorithms perform
+1. Load a floorplan image or pick a sample from the Floorplan tab
+2. Enter the building's total area to calibrate the scale
+3. Tap the canvas to place access points
+4. Channels are assigned automatically
+5. Toggle the heatmap in the layer panel to see signal coverage
+6. Use File > Export to save as PNG or PDF
 
 ## Keyboard Shortcuts
 
-| Key                  | Action                |
-| -------------------- | --------------------- |
-| V                    | Select tool           |
-| P                    | Place AP tool         |
-| H                    | Pan tool              |
-| G                    | Toggle grid           |
-| R                    | Toggle range rings    |
-| E                    | Toggle conflict edges |
-| Space + drag         | Pan canvas            |
-| Scroll               | Zoom                  |
-| Ctrl/Cmd + Z         | Undo                  |
-| Ctrl/Cmd + Shift + Z | Redo                  |
-| Delete               | Remove selected APs   |
+| Key          | Action              |
+| ------------ | ------------------- |
+| G            | Toggle grid         |
+| W            | Toggle walls        |
+| H            | Toggle heatmap      |
+| Ctrl/Cmd + Z | Undo                |
+| Delete       | Remove selected APs |
+| Scroll       | Zoom                |
 
 ## Architecture
 
@@ -61,26 +61,24 @@ deconflict/
 ├── apps/web/          SvelteKit SPA with canvas-based editor
 ├── packages/solver/   Graph coloring algorithms + Web Worker
 ├── packages/geometry/ Spatial math + interference graph
-└── packages/channels/ WiFi band/channel definitions
+└── packages/channels/ WiFi band/channel definitions + throughput model
 ```
 
 ### Tech Stack
 
 - **Frontend**: Svelte 5, SvelteKit, TypeScript
 - **Canvas**: Raw HTML5 Canvas 2D with custom rendering engine
-- **Solvers**: DSatur, Greedy, Welsh-Powell, Backtracking (runs in a Web Worker)
+- **Solvers**: DSatur graph coloring (runs in a Web Worker)
+- **RF Model**: Indoor path loss + wall attenuation + co-channel contention
 - **Build**: Vite, Turborepo, pnpm workspaces
 - **Testing**: Vitest (unit), Playwright (E2E)
 - **Hosting**: Cloudflare Pages
 
-### How the Solver Works
+### How It Works
 
-The channel assignment problem maps to [graph coloring](https://en.wikipedia.org/wiki/Graph_coloring). Each access point is a node. Two nodes are connected by an edge if their coverage areas overlap. The solver assigns channels (colors) such that no two connected nodes share the same channel.
+The channel assignment problem maps to [graph coloring](https://en.wikipedia.org/wiki/Graph_coloring). Each access point is a node. Two nodes are connected if their coverage areas overlap. The solver assigns channels so no two overlapping APs share the same channel.
 
-- **Greedy** - assigns channels in node order, picking the smallest available
-- **DSatur** - prioritizes nodes with the most constrained neighbors
-- **Welsh-Powell** - processes nodes by descending degree
-- **Backtracking** - exhaustive search with pruning for optimal results
+The signal heatmap estimates throughput at every point based on distance to the nearest AP, wall crossings (each wall attenuates signal by ~5 dB), and the AP's band and channel width.
 
 ## Scripts
 
