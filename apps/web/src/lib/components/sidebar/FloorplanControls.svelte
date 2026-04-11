@@ -48,6 +48,7 @@
 				i.src = url;
 			});
 			const scaleFactor = FLOORPLAN_TARGET_WIDTH / originalImg.naturalWidth;
+			console.log('[DECONFLICT] origImg:', originalImg.naturalWidth, 'x', originalImg.naturalHeight, 'scaleFactor:', scaleFactor);
 
 			// For SVGs, strip text for cleaner boundary detection
 			const cleanImg = await prepareSvgForDetection(url);
@@ -69,6 +70,7 @@
 			// Wall detection uses ORIGINAL image so coordinates
 			// match FloorplanLayer exactly (same naturalWidth)
 			const walls = detectWalls(originalImg);
+			console.log('[DECONFLICT] walls:', walls.length, 'first:', walls[0] ? JSON.stringify(walls[0]) : 'none');
 			if (walls.length > 0) {
 				projectState.walls = walls.map((w) => ({
 					x1: w.x1 * scaleFactor,
