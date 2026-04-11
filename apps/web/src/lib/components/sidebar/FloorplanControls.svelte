@@ -39,8 +39,7 @@
 		projectState.floorplanBoundary = null;
 
 		try {
-			// Load the original image to get its actual dimensions
-			// (used for scaling to world coords, must match FloorplanLayer)
+			// Load the original image (same one FloorplanLayer renders)
 			const originalImg = await new Promise<HTMLImageElement>((resolve, reject) => {
 				const i = new Image();
 				i.onload = () => resolve(i);
@@ -49,22 +48,26 @@
 			});
 			const scaleFactor = FLOORPLAN_TARGET_WIDTH / originalImg.naturalWidth;
 
-			// For SVGs, strip text for cleaner detection
+			// For SVGs, strip text for cleaner boundary detection
 			const cleanImg = await prepareSvgForDetection(url);
 
-			// Boundary detection
+			// Boundary detection (uses cleaned image to avoid text noise)
 			const result = detectBoundary(cleanImg);
 			if (result && result.polygon.length >= 3) {
+				// Scale using clean image's own dimensions since detection
+				// returns coordinates relative to cleanImg
+				const cleanScaleFactor = FLOORPLAN_TARGET_WIDTH / cleanImg.naturalWidth;
 				const worldPolygon = result.polygon.map((p) => ({
-					x: p.x * scaleFactor,
-					y: p.y * scaleFactor
+					x: p.x * cleanScaleFactor,
+					y: p.y * cleanScaleFactor
 				}));
 				projectState.floorplanBoundary = worldPolygon;
 				detectedWorldArea = polygonArea(worldPolygon);
 			}
 
-			// Wall detection (same coordinate system as floorplan)
-			const walls = detectWalls(cleanImg);
+			// Wall detection uses ORIGINAL image so coordinates
+			// match FloorplanLayer exactly (same naturalWidth)
+			const walls = detectWalls(originalImg);
 			if (walls.length > 0) {
 				projectState.walls = walls.map((w) => ({
 					x1: w.x1 * scaleFactor,

@@ -127,7 +127,6 @@ export async function runSolver(): Promise<void> {
 		clearAssignments();
 		applyAssignments(result.assignment);
 		computeThroughput();
-		appState.showHeatmap = true;
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Solver failed';
 	} finally {
@@ -164,7 +163,6 @@ export async function runComparison(): Promise<void> {
 			clearAssignments();
 			applyAssignments(best.assignment);
 			computeThroughput();
-			appState.showHeatmap = true;
 		}
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Comparison failed';
