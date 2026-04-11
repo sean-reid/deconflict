@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { projectState } from '$state/project.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
+	import { detectWalls } from '$canvas/wall-detect.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
@@ -40,6 +41,8 @@
 		try {
 			// For SVGs, strip text elements before detection
 			const img = await prepareSvgForDetection(url);
+
+			// Boundary detection
 			const result = detectBoundary(img);
 			if (result && result.polygon.length >= 3) {
 				const scaleFactor = FLOORPLAN_TARGET_WIDTH / img.naturalWidth;
@@ -49,6 +52,21 @@
 				}));
 				projectState.floorplanBoundary = worldPolygon;
 				detectedWorldArea = polygonArea(worldPolygon);
+			}
+
+			// Wall detection
+			const walls = detectWalls(img);
+			if (walls.length > 0) {
+				const scaleFactor = FLOORPLAN_TARGET_WIDTH / img.naturalWidth;
+				projectState.walls = walls.map((w) => ({
+					x1: w.x1 * scaleFactor,
+					y1: w.y1 * scaleFactor,
+					x2: w.x2 * scaleFactor,
+					y2: w.y2 * scaleFactor,
+					thickness: w.thickness * scaleFactor,
+					material: 'drywall',
+					attenuation: 5
+				}));
 			}
 		} catch {
 			// Detection failed silently
