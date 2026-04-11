@@ -69,7 +69,9 @@ export class WallLayer implements Layer {
 
 		// Composite the offscreen canvas at reduced opacity
 		// This ensures overlapping walls don't accumulate alpha
+		// Use DPR scaling to match the engine's device-pixel canvas
 		ctx.resetTransform();
+		ctx.setTransform(rc.dpr, 0, 0, rc.dpr, 0, 0);
 		ctx.globalAlpha = 0.4;
 		ctx.drawImage(offscreen, 0, 0);
 		ctx.globalAlpha = 1;
