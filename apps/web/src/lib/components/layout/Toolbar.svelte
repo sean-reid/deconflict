@@ -370,8 +370,13 @@
 	}
 
 	@media (max-width: 768px) {
+		.logo,
+		.separator {
+			display: none;
+		}
+
 		.project-name {
-			max-width: 80px;
+			max-width: 100px;
 		}
 	}
 
