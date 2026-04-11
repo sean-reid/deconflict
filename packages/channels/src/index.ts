@@ -5,3 +5,5 @@ export { CHANNELS_6GHZ, PSC_CHANNELS_6GHZ } from './bands/band-6ghz.js';
 export { channelsInterfere, getFrequencyRange } from './overlap.js';
 export { getAvailableChannels } from './regulatory.js';
 export { channelColor } from './palette.js';
+export type { ThroughputEstimate, ThroughputInput, ThroughputOptions } from './throughput.js';
+export { estimateThroughput, getBaseRate } from './throughput.js';
