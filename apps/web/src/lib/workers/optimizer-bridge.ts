@@ -54,7 +54,7 @@ export class OptimizerBridge {
 
 	optimize(
 		aps: Array<{ id: string; x: number; y: number; interferenceRadius: number }>,
-		wallMask: Uint8Array,
+		wallMaskDataUrl: string,
 		maskWidth: number,
 		maskHeight: number,
 		wallAttenuation: number,
@@ -75,7 +75,7 @@ export class OptimizerBridge {
 			this.getWorker().postMessage({
 				type: 'optimize',
 				aps,
-				wallMask: Array.from(wallMask),
+				wallMaskDataUrl,
 				maskWidth,
 				maskHeight,
 				wallAttenuation,

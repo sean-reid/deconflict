@@ -10,7 +10,7 @@ interface ApInput {
 interface OptimizeMessage {
 	type: 'optimize';
 	aps: ApInput[];
-	wallMask: number[];
+	wallMaskDataUrl: string;
 	maskWidth: number;
 	maskHeight: number;
 	wallAttenuation: number;
@@ -38,17 +38,19 @@ self.onmessage = (event: MessageEvent<InMessage>) => {
 	}
 };
 
-function runOptimization(msg: OptimizeMessage): void {
+async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const {
 		aps,
-		wallMask: maskArr,
+		wallMaskDataUrl,
 		maskWidth: w,
 		maskHeight: h,
 		wallAttenuation,
 		iterations,
 		boundary
 	} = msg;
-	const mask = new Uint8Array(maskArr);
+
+	// Decode the wall mask data URL in the worker
+	const mask = await decodeMaskInWorker(wallMaskDataUrl, w, h);
 
 	// Step 1: Compute interior using the building boundary polygon
 	// A pixel is interior if it's inside the boundary polygon and not a wall
@@ -395,4 +397,20 @@ function sampleUniform(arr: number[], count: number): number[] {
 		result.push(arr[Math.floor(i * step)]!);
 	}
 	return result;
+}
+
+/** Decode a PNG data URL to a Uint8Array wall mask inside a worker */
+async function decodeMaskInWorker(dataUrl: string, w: number, h: number): Promise<Uint8Array> {
+	const response = await fetch(dataUrl);
+	const blob = await response.blob();
+	const bitmap = await createImageBitmap(blob);
+	const offscreen = new OffscreenCanvas(w, h);
+	const ctx = offscreen.getContext('2d')!;
+	ctx.drawImage(bitmap, 0, 0);
+	const imgData = ctx.getImageData(0, 0, w, h);
+	const mask = new Uint8Array(w * h);
+	for (let i = 0; i < mask.length; i++) {
+		mask[i] = imgData.data[i * 4]! > 128 ? 1 : 0;
+	}
+	return mask;
 }

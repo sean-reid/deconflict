@@ -71,8 +71,8 @@
 				detectedWorldArea = result.areaPx * cleanScaleFactor * cleanScaleFactor;
 			}
 
-			// Skip OCR for SVGs - prepareSvgForDetection already strips <text> elements
-			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH, { skipOcr: isSvg });
+			// Run OCR on all images - SVGs may have path-based text that prepareSvgForDetection can't strip
+			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH);
 			if (wallMask) {
 				projectState.wallMask = wallMask;
 				scheduleSave();

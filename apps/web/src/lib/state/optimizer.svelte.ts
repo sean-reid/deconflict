@@ -1,6 +1,5 @@
 import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
-import { decodeMask } from '$canvas/wall-detect.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
 
 const bridge = new OptimizerBridge();
@@ -31,7 +30,6 @@ export async function runOptimizer(): Promise<void> {
 
 	try {
 		const mask = projectState.wallMask;
-		const decoded = await decodeMask(mask.dataUrl, mask.width, mask.height);
 
 		const aps = projectState.aps.map((ap) => ({
 			id: ap.id,
@@ -40,12 +38,11 @@ export async function runOptimizer(): Promise<void> {
 			interferenceRadius: ap.interferenceRadius
 		}));
 
-		// Pass building boundary polygon so optimizer knows where the interior is
 		const boundary = projectState.floorplanBoundary ?? [];
 
 		const result = await bridge.optimize(
 			aps,
-			decoded.data,
+			mask.dataUrl,
 			mask.width,
 			mask.height,
 			projectState.wallAttenuation,
