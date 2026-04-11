@@ -14,12 +14,12 @@ export interface DecodedWallMask {
 
 let ocrWorker: Worker | null = null;
 
+let _debugCapture: ((stage: string, canvas: HTMLCanvasElement) => void) | null = null;
+
 async function getOCRWorker(): Promise<Worker | null> {
 	if (ocrWorker) return ocrWorker;
 	try {
 		ocrWorker = await createWorker('eng');
-		// Use sparse text mode to find labels scattered at any position
-		await ocrWorker.setParameters({ tessedit_pageseg_mode: '11' as any });
 		return ocrWorker;
 	} catch {
 		return null;
@@ -33,7 +33,8 @@ async function getOCRWorker(): Promise<Worker | null> {
  */
 export async function detectWalls(
 	image: HTMLImageElement,
-	displayWidth: number
+	displayWidth: number,
+	options?: { skipOcr?: boolean }
 ): Promise<WallMask | null> {
 	const displayScale = displayWidth / image.naturalWidth;
 	const w = displayWidth;
@@ -45,51 +46,54 @@ export async function detectWalls(
 	const ctx = canvas.getContext('2d')!;
 	ctx.drawImage(image, 0, 0, w, h);
 
-	// Step 1: OCR to find and mask text regions (horizontal + vertical)
-	try {
-		const worker = await getOCRWorker();
-		if (worker) {
-			const bgColor = sampleBorderColor(ctx, w, h);
-			const pad = Math.max(3, Math.round(w * 0.005));
-			ctx.fillStyle = bgColor;
+	// Step 1: OCR to find and mask text regions (raster images only)
+	// SVGs already have <text> stripped by prepareSvgForDetection - OCR would
+	// damage wall structure with aggressive bounding boxes
+	if (_debugCapture) _debugCapture('before-ocr', canvas);
 
-			// Pass 1: detect horizontal/angled text with auto-rotation
-			const { data } = await worker.recognize(canvas, { rotateAuto: true });
-			maskWords(ctx, data, pad);
+	if (!options?.skipOcr)
+		try {
+			const worker = await getOCRWorker();
+			if (worker) {
+				const [bgR, bgG, bgB] = sampleBorderRgb(ctx, w, h);
+				const pad = Math.max(2, Math.round(w * 0.003));
 
-			// Pass 2: rotate 90 degrees to catch vertical text
-			const rotCanvas = document.createElement('canvas');
-			rotCanvas.width = h;
-			rotCanvas.height = w;
-			const rotCtx = rotCanvas.getContext('2d')!;
-			rotCtx.translate(h, 0);
-			rotCtx.rotate(Math.PI / 2);
-			rotCtx.drawImage(canvas, 0, 0);
+				// Pass 1: detect horizontal/angled text with auto-rotation
+				const { data } = await worker.recognize(canvas, { rotateAuto: true }, { blocks: true });
+				maskWords(ctx, data, pad, bgR, bgG, bgB);
 
-			const { data: rotData } = await worker.recognize(rotCanvas, { rotateAuto: true });
-			// Map rotated bounding boxes back to original orientation
-			if (rotData.blocks) {
-				for (const block of rotData.blocks) {
-					for (const para of block.paragraphs) {
-						for (const line of para.lines) {
-							for (const word of line.words) {
-								if (word.confidence < 15) continue;
-								const { x0, y0, x1, y1 } = word.bbox;
-								// Rotate bbox back: rotated(rx,ry) -> original(ry, h-rx)
-								const ox0 = y0;
-								const oy0 = h - x1;
-								const ox1 = y1;
-								const oy1 = h - x0;
-								ctx.fillRect(ox0 - pad, oy0 - pad, ox1 - ox0 + 2 * pad, oy1 - oy0 + 2 * pad);
-							}
-						}
-					}
-				}
+				if (_debugCapture) _debugCapture('after-ocr-pass1', canvas);
+
+				// Pass 2: rotate 90 degrees to catch vertical text
+				const rotCanvas = document.createElement('canvas');
+				rotCanvas.width = h;
+				rotCanvas.height = w;
+				const rotCtx = rotCanvas.getContext('2d')!;
+				rotCtx.translate(h, 0);
+				rotCtx.rotate(Math.PI / 2);
+				rotCtx.drawImage(canvas, 0, 0);
+
+				const { data: rotData } = await worker.recognize(
+					rotCanvas,
+					{ rotateAuto: true },
+					{ blocks: true }
+				);
+				// For rotated pass, mask on the rotated canvas then draw back
+				maskWords(rotCtx, rotData, pad, bgR, bgG, bgB);
+				// Redraw the cleaned rotated image back onto the original canvas
+				ctx.save();
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.clearRect(0, 0, w, h);
+				ctx.translate(0, h);
+				ctx.rotate(-Math.PI / 2);
+				ctx.drawImage(rotCanvas, 0, 0);
+				ctx.restore();
+
+				if (_debugCapture) _debugCapture('after-ocr-pass2', canvas);
 			}
+		} catch (e) {
+			console.warn('[wall-detect] OCR failed:', e);
 		}
-	} catch {
-		// OCR unavailable - continue without text masking
-	}
 
 	// Step 2: Grayscale + threshold to binary (1 = wall pixel)
 	const imageData = ctx.getImageData(0, 0, w, h);
@@ -147,6 +151,18 @@ export async function detectWalls(
 		}
 	}
 	maskCtx.putImageData(maskImg, 0, 0);
+
+	// Debug: render mask on black background for visibility
+	if (_debugCapture) {
+		const debugCanvas = document.createElement('canvas');
+		debugCanvas.width = w;
+		debugCanvas.height = h;
+		const dc = debugCanvas.getContext('2d')!;
+		dc.fillStyle = '#000';
+		dc.fillRect(0, 0, w, h);
+		dc.drawImage(maskCanvas, 0, 0);
+		_debugCapture('final-mask', debugCanvas);
+	}
 
 	return { dataUrl: maskCanvas.toDataURL('image/png'), width: w, height: h };
 }
@@ -430,8 +446,12 @@ function removeExteriorBlobs(binary: Uint8Array, w: number, h: number): void {
 	}
 }
 
-/** Sample the average border color for background fill */
-function sampleBorderColor(ctx: CanvasRenderingContext2D, w: number, h: number): string {
+/** Sample the average border RGB for background fill */
+function sampleBorderRgb(
+	ctx: CanvasRenderingContext2D,
+	w: number,
+	h: number
+): [number, number, number] {
 	const d = ctx.getImageData(0, 0, w, h).data;
 	let rSum = 0,
 		gSum = 0,
@@ -459,21 +479,73 @@ function sampleBorderColor(ctx: CanvasRenderingContext2D, w: number, h: number):
 		bSum += d[i2 + 2]!;
 		count += 2;
 	}
-	return `rgb(${Math.round(rSum / count)},${Math.round(gSum / count)},${Math.round(bSum / count)})`;
+	return [Math.round(rSum / count), Math.round(gSum / count), Math.round(bSum / count)];
 }
 
-/** Paint over detected OCR words with background color */
-function maskWords(ctx: CanvasRenderingContext2D, data: any, pad: number): void {
-	if (!data.blocks) return;
-	for (const block of data.blocks) {
-		for (const para of block.paragraphs) {
-			for (const line of para.lines) {
-				for (const word of line.words) {
-					if (word.confidence < 15) continue;
-					const { x0, y0, x1, y1 } = word.bbox;
-					ctx.fillRect(x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
+function countWords(data: any): number {
+	let count = 0;
+	if (data.blocks) {
+		for (const block of data.blocks) {
+			for (const para of block.paragraphs) {
+				for (const line of para.lines) {
+					count += line.words.length;
 				}
 			}
 		}
 	}
+	return count;
+}
+
+/** Mask detected text by erasing only pixels that match text color within each word bbox.
+ *  This traces the actual text contour instead of painting crude rectangles. */
+function maskWords(
+	ctx: CanvasRenderingContext2D,
+	data: any,
+	pad: number,
+	bgR: number,
+	bgG: number,
+	bgB: number
+): void {
+	if (!data.blocks) return;
+	const w = ctx.canvas.width;
+	const h = ctx.canvas.height;
+	const imgData = ctx.getImageData(0, 0, w, h);
+	const px = imgData.data;
+	const bgBright = (bgR + bgG + bgB) / 3;
+	// Detect if text is darker or lighter than background
+	const darkBg = bgBright < 128;
+	// For light bg: text is darker → erase pixels below 75% of bg brightness
+	// For dark bg: text is lighter → erase pixels above 125% of bg brightness
+	const loThreshold = darkBg ? 0 : bgBright * 0.75;
+	const hiThreshold = darkBg ? bgBright + (255 - bgBright) * 0.25 : 256;
+
+	for (const block of data.blocks) {
+		for (const para of block.paragraphs) {
+			for (const line of para.lines) {
+				for (const word of line.words) {
+					if (word.confidence < 20 || word.text.length < 2) continue;
+					const { x0, y0, x1, y1 } = word.bbox;
+					const bx0 = Math.max(0, x0 - pad);
+					const by0 = Math.max(0, y0 - pad);
+					const bx1 = Math.min(w - 1, x1 + pad);
+					const by1 = Math.min(h - 1, y1 + pad);
+
+					for (let y = by0; y <= by1; y++) {
+						for (let x = bx0; x <= bx1; x++) {
+							const i = (y * w + x) * 4;
+							const bright = (px[i]! + px[i + 1]! + px[i + 2]!) / 3;
+							// Erase pixels that contrast with background (i.e., text-colored)
+							if (darkBg ? bright > hiThreshold : bright < loThreshold) {
+								px[i] = bgR;
+								px[i + 1] = bgG;
+								px[i + 2] = bgB;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	ctx.putImageData(imgData, 0, 0);
 }

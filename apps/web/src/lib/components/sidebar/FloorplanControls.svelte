@@ -34,7 +34,7 @@
 		return `1px = ${mPerPx.toFixed(2)}m`;
 	});
 
-	async function runBoundaryDetection(url: string) {
+	async function runBoundaryDetection(url: string, isSvg = false) {
 		detecting = true;
 		calibrationDone = false;
 		detectedWorldArea = null;
@@ -71,8 +71,8 @@
 				detectedWorldArea = result.areaPx * cleanScaleFactor * cleanScaleFactor;
 			}
 
-			// Wall detection with OCR text removal, at display resolution
-			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH);
+			// Skip OCR for SVGs - prepareSvgForDetection already strips <text> elements
+			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH, { skipOcr: isSvg });
 			if (wallMask) {
 				projectState.wallMask = wallMask;
 				scheduleSave();
@@ -129,7 +129,7 @@
 			const blob = await response.blob();
 			const blobUrl = URL.createObjectURL(blob);
 			projectState.floorplanUrl = blobUrl;
-			await runBoundaryDetection(blobUrl);
+			await runBoundaryDetection(blobUrl, url.endsWith('.svg'));
 
 			// Auto-calibrate if we know the area
 			if (knownAreaSqm && detectedWorldArea && detectedWorldArea > 0) {
@@ -150,7 +150,7 @@
 		}
 		const blobUrl = URL.createObjectURL(file);
 		projectState.floorplanUrl = blobUrl;
-		runBoundaryDetection(blobUrl);
+		runBoundaryDetection(blobUrl, file.type === 'image/svg+xml');
 	}
 
 	function handleInputChange(e: Event) {
