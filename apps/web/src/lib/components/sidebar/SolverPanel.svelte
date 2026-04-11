@@ -13,6 +13,8 @@
 		{ value: 'backtracking', label: 'Backtracking' }
 	];
 
+	let showAdvanced = $state(false);
+
 	function handleAlgorithmChange(val: string) {
 		solverState.algorithm = val as typeof solverState.algorithm;
 	}
@@ -42,18 +44,6 @@
 
 <div class="solver-panel">
 	<div class="section">
-		<Tooltip text="The method used to assign channels. DSatur works well for most layouts. Backtracking finds the optimal solution but takes longer." position="left">
-			<div class="section-header">ALGORITHM</div>
-		</Tooltip>
-		<Select
-			value={solverState.algorithm}
-			options={algorithmOptions}
-			onchange={handleAlgorithmChange}
-			class="full-width"
-		/>
-	</div>
-
-	<div class="section">
 		<Button
 			variant="primary"
 			disabled={solverState.isRunning}
@@ -72,7 +62,7 @@
 		<Tooltip text="Automatically re-run the solver whenever you move or add access points." position="left">
 			<Toggle
 				bind:checked={solverState.autoSolve}
-				label="Re-run when APs change"
+				label="Auto-solve on changes"
 			/>
 		</Tooltip>
 	</div>
@@ -122,6 +112,26 @@
 			<Button variant="ghost" onclick={handleClear}>
 				Clear Assignments
 			</Button>
+		</div>
+	{/if}
+
+	<div class="section advanced-toggle">
+		<button class="toggle-link" onclick={() => { showAdvanced = !showAdvanced; }}>
+			{showAdvanced ? 'Hide' : 'Show'} advanced options
+		</button>
+	</div>
+
+	{#if showAdvanced}
+		<div class="section">
+			<Tooltip text="DSatur works well for most layouts. Backtracking finds the optimal solution but takes longer." position="left">
+				<div class="section-header">ALGORITHM</div>
+			</Tooltip>
+			<Select
+				value={solverState.algorithm}
+				options={algorithmOptions}
+				onchange={handleAlgorithmChange}
+				class="full-width"
+			/>
 		</div>
 	{/if}
 </div>
@@ -231,5 +241,19 @@
 
 	:global(.full-width select) {
 		width: 100%;
+	}
+
+	.toggle-link {
+		background: none;
+		border: none;
+		color: var(--text-tertiary);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		padding: 0;
+		text-align: left;
+	}
+
+	.toggle-link:hover {
+		color: var(--text-secondary);
 	}
 </style>
