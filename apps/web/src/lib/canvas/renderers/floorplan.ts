@@ -1,12 +1,24 @@
 import type { Layer, RenderContext } from '../types.js';
 
+// Target floorplan width in world units (pixels at 1x zoom)
+const TARGET_WIDTH = 800;
+
 export class FloorplanLayer implements Layer {
 	id = 'floorplan';
 	visible = true;
 	private image: HTMLImageElement | null = null;
 	private imageReady = false;
 	private onReady: (() => void) | null = null;
+	private drawWidth = 0;
+	private drawHeight = 0;
 	opacity = 0.8;
+
+	get imageWidth(): number {
+		return this.drawWidth;
+	}
+	get imageHeight(): number {
+		return this.drawHeight;
+	}
 
 	loadImage(url: string, onReady?: () => void): void {
 		this.clearImage();
@@ -14,6 +26,17 @@ export class FloorplanLayer implements Layer {
 		this.image = new Image();
 		this.image.onload = () => {
 			this.imageReady = true;
+			// Scale to a reasonable world size
+			const natW = this.image!.naturalWidth || this.image!.width;
+			const natH = this.image!.naturalHeight || this.image!.height;
+			if (natW > 0 && natH > 0) {
+				const s = TARGET_WIDTH / natW;
+				this.drawWidth = natW * s;
+				this.drawHeight = natH * s;
+			} else {
+				this.drawWidth = TARGET_WIDTH;
+				this.drawHeight = TARGET_WIDTH;
+			}
 			if (this.onReady) this.onReady();
 		};
 		this.image.src = url;
@@ -26,6 +49,8 @@ export class FloorplanLayer implements Layer {
 		this.image = null;
 		this.imageReady = false;
 		this.onReady = null;
+		this.drawWidth = 0;
+		this.drawHeight = 0;
 	}
 
 	render(rc: RenderContext): void {
@@ -35,7 +60,7 @@ export class FloorplanLayer implements Layer {
 		const [a, b, c, d, e, f] = transform;
 		ctx.transform(a, b, c, d, e, f);
 		ctx.globalAlpha = this.opacity;
-		ctx.drawImage(this.image, 0, 0);
+		ctx.drawImage(this.image, 0, 0, this.drawWidth, this.drawHeight);
 		ctx.globalAlpha = 1;
 	}
 }
