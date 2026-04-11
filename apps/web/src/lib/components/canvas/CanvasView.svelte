@@ -21,7 +21,30 @@
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
+	import { importFloorplanFile } from '$canvas/import-floorplan.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
+
+	let canvasDragOver = $state(false);
+
+	function handleCanvasDrop(e: DragEvent) {
+		e.preventDefault();
+		canvasDragOver = false;
+		const file = e.dataTransfer?.files[0];
+		if (file) {
+			importFloorplanFile(file);
+			appState.sidebarPanel = 'floorplan';
+			appState.sidebarOpen = true;
+		}
+	}
+
+	function handleCanvasDragOver(e: DragEvent) {
+		e.preventDefault();
+		canvasDragOver = true;
+	}
+
+	function handleCanvasDragLeave() {
+		canvasDragOver = false;
+	}
 
 	let canvasEl: HTMLCanvasElement;
 	let containerEl: HTMLDivElement;
@@ -516,7 +539,15 @@
 	}
 </script>
 
-<div class="canvas-container" bind:this={containerEl}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="canvas-container"
+	class:drag-over={canvasDragOver}
+	bind:this={containerEl}
+	ondrop={handleCanvasDrop}
+	ondragover={handleCanvasDragOver}
+	ondragleave={handleCanvasDragLeave}
+>
 	<canvas
 		bind:this={canvasEl}
 		role="application"
@@ -545,6 +576,11 @@
 		overflow: hidden;
 		background: var(--canvas-bg);
 		position: relative;
+	}
+
+	.canvas-container.drag-over {
+		outline: 3px dashed var(--accent-primary);
+		outline-offset: -3px;
 	}
 
 	canvas {
