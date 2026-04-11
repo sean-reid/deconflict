@@ -72,7 +72,7 @@
 		min-width: 140px;
 		max-height: calc(100% - 80px);
 		overflow-y: auto;
-		background: rgba(30, 33, 48, 0.92);
+		background: var(--bg-secondary, #1e2130);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow-md);
