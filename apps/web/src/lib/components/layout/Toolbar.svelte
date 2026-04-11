@@ -378,13 +378,20 @@
 		}
 
 		.project-name {
-			max-width: 120px;
+			max-width: 100px;
 			font-size: var(--text-sm);
 		}
 
 		.project-name-input {
-			width: 120px;
+			width: 100px;
 			font-size: var(--text-sm);
+		}
+
+		.undo-redo,
+		.band-select,
+		.unit-btn,
+		.dropdown-label {
+			display: none;
 		}
 	}
 
