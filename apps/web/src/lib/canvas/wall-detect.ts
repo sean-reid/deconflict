@@ -19,6 +19,8 @@ async function getOCRWorker(): Promise<Worker | null> {
 	if (ocrWorker) return ocrWorker;
 	try {
 		ocrWorker = await createWorker('eng');
+		// Set DPI to suppress "Estimating resolution" warnings
+		await ocrWorker.setParameters({ user_defined_dpi: '150' });
 		return ocrWorker;
 	} catch {
 		return null;

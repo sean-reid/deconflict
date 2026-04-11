@@ -100,22 +100,69 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		}
 	}
 
-	// Evaluate initial score
-	let currentScore = evaluateCoverage(positions, samples, mask, w, h, wallAttenuation);
-	const initialScore = currentScore;
+	// Step 4: Incremental simulated annealing
+	// Cache per-sample signal from each AP to avoid full recalculation every iteration.
+	// When one AP moves, only recalculate that AP's contribution to each sample.
+	const numAps = positions.length;
+	const numSamples = samples.length;
 
-	// Track the best configuration found (never return worse than this)
+	// signalGrid[sampleIdx * numAps + apIdx] = signal from AP apIdx at sample sampleIdx
+	const signalGrid = new Float32Array(numSamples * numAps);
+	const bestPerSample = new Float32Array(numSamples);
+
+	function computeApSignals(apIdx: number): void {
+		const ap = positions[apIdx]!;
+		for (let s = 0; s < numSamples; s++) {
+			const sample = samples[s]!;
+			const dx = sample.x - ap.x;
+			const dy = sample.y - ap.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			let signal = signalStrength(dist, ap.radius);
+			if (signal > 0.001) {
+				const crossings = countWallCrossings(mask, w, h, ap.x, ap.y, sample.x, sample.y);
+				if (crossings > 0) {
+					signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
+				}
+			}
+			signalGrid[s * numAps + apIdx] = signal;
+		}
+	}
+
+	function recomputeBest(): void {
+		for (let s = 0; s < numSamples; s++) {
+			let best = 0;
+			for (let a = 0; a < numAps; a++) {
+				const sig = signalGrid[s * numAps + a]!;
+				if (sig > best) best = sig;
+			}
+			bestPerSample[s] = best;
+		}
+	}
+
+	function totalScore(): number {
+		let sum = 0;
+		for (let s = 0; s < numSamples; s++) sum += bestPerSample[s]!;
+		return sum / numSamples;
+	}
+
+	// Initialize signal grid for all APs
+	for (let a = 0; a < numAps; a++) computeApSignals(a);
+	recomputeBest();
+
+	let currentScore = totalScore();
+	const initialScore = currentScore;
 	let bestScore = currentScore;
 	let bestPositions = positions.map((p) => ({ id: p.id, x: p.x, y: p.y }));
 
-	// Step 4: Simulated annealing
 	const T0 = 0.3;
 	const Tmin = 0.001;
 	const alpha = Math.pow(Tmin / T0, 1 / iterations);
 	let temperature = T0;
-
-	// Move radius proportional to building size
 	const maxMoveRadius = Math.max(w, h) * 0.15;
+
+	// Temp buffer for rollback
+	const savedSignals = new Float32Array(numSamples);
+	const savedBest = new Float32Array(numSamples);
 
 	for (let iter = 0; iter < iterations; iter++) {
 		if (cancelled) {
@@ -123,47 +170,71 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 			return;
 		}
 
-		// Pick a random AP
-		const apIdx = Math.floor(Math.random() * positions.length);
+		const apIdx = Math.floor(Math.random() * numAps);
 		const ap = positions[apIdx]!;
 		const oldX = ap.x;
 		const oldY = ap.y;
 
-		// Propose a move (large early, fine-tuned late)
 		const moveR = maxMoveRadius * Math.max(0.02, temperature / T0);
 		const angle = Math.random() * 2 * Math.PI;
 		const dist = Math.random() * moveR;
 		const newX = Math.round(ap.x + Math.cos(angle) * dist);
 		const newY = Math.round(ap.y + Math.sin(angle) * dist);
 
-		// Reject if outside interior
 		if (newX < 0 || newX >= w || newY < 0 || newY >= h || !interior[newY * w + newX]) {
 			temperature *= alpha;
 			continue;
 		}
 
-		// Apply move and evaluate
+		// Save old signals for this AP and old bestPerSample for rollback
+		for (let s = 0; s < numSamples; s++) {
+			savedSignals[s] = signalGrid[s * numAps + apIdx]!;
+			savedBest[s] = bestPerSample[s]!;
+		}
+
+		// Move AP and recompute only its signals
 		ap.x = newX;
 		ap.y = newY;
-		const newScore = evaluateCoverage(positions, samples, mask, w, h, wallAttenuation);
+		computeApSignals(apIdx);
 
+		// Update bestPerSample incrementally
+		for (let s = 0; s < numSamples; s++) {
+			const newSig = signalGrid[s * numAps + apIdx]!;
+			if (newSig > bestPerSample[s]!) {
+				bestPerSample[s] = newSig;
+			} else if (savedSignals[s]! >= bestPerSample[s]!) {
+				// Old signal was the best - need to find new best
+				let best = 0;
+				for (let a = 0; a < numAps; a++) {
+					const sig = signalGrid[s * numAps + a]!;
+					if (sig > best) best = sig;
+				}
+				bestPerSample[s] = best;
+			}
+		}
+
+		const newScore = totalScore();
 		const delta = newScore - currentScore;
+
 		if (delta > 0 || Math.random() < Math.exp(delta / temperature)) {
 			currentScore = newScore;
-			// Update best if improved
 			if (currentScore > bestScore) {
 				bestScore = currentScore;
 				bestPositions = positions.map((p) => ({ id: p.id, x: p.x, y: p.y }));
 			}
 		} else {
+			// Rollback
 			ap.x = oldX;
 			ap.y = oldY;
+			for (let s = 0; s < numSamples; s++) {
+				signalGrid[s * numAps + apIdx] = savedSignals[s]!;
+				bestPerSample[s] = savedBest[s]!;
+			}
 		}
 
 		temperature *= alpha;
 
-		// Send progress every 500 iterations
-		if (iter % 500 === 0) {
+		if (iter % 1000 === 0) {
 			self.postMessage({
 				type: 'progress',
 				positions: bestPositions,
@@ -174,7 +245,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		}
 	}
 
-	// Always return the best configuration found, never worse than initial
 	const improvement = initialScore > 0 ? ((bestScore - initialScore) / initialScore) * 100 : 0;
 	self.postMessage({
 		type: 'result',
@@ -182,36 +252,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		score: bestScore,
 		improvement
 	});
-}
-
-function evaluateCoverage(
-	aps: Array<{ x: number; y: number; radius: number }>,
-	samples: Array<{ x: number; y: number }>,
-	mask: Uint8Array,
-	w: number,
-	h: number,
-	wallAttenuation: number
-): number {
-	let totalSignal = 0;
-	for (const sample of samples) {
-		let bestSignal = 0;
-		for (const ap of aps) {
-			const dx = sample.x - ap.x;
-			const dy = sample.y - ap.y;
-			const dist = Math.sqrt(dx * dx + dy * dy);
-			// Use tighter falloff: signal within 1x radius, not 3x
-			let signal = signalStrength(dist, ap.radius);
-			if (signal > 0.001) {
-				const crossings = countWallCrossings(mask, w, h, ap.x, ap.y, sample.x, sample.y);
-				if (crossings > 0) {
-					signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
-				}
-			}
-			if (signal > bestSignal) bestSignal = signal;
-		}
-		totalSignal += bestSignal;
-	}
-	return totalSignal / samples.length;
 }
 
 function signalStrength(distance: number, radius: number): number {
