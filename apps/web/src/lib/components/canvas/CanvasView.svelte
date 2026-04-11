@@ -281,16 +281,24 @@
 
 	// Track pending placement vs pan gesture
 	const DRAG_THRESHOLD = 5;
+	const TOUCH_DELAY = 50; // ms to wait for second finger before processing
 	let pendingPlace = false;
 	let pendingPan = false;
 	let pointerStartX = 0;
 	let pointerStartY = 0;
-	let activeTouches = 0; // when 2+, pointer events are suppressed for pinch-zoom
+	let activeTouches = 0;
+	let deferredPointerDown: PointerEvent | null = null;
+	let deferTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleTouchStart(e: TouchEvent) {
 		activeTouches = e.touches.length;
 		if (activeTouches >= 2) {
-			// Cancel any pending single-finger action
+			// Second finger arrived - cancel any deferred or pending action
+			if (deferTimer) {
+				clearTimeout(deferTimer);
+				deferTimer = null;
+			}
+			deferredPointerDown = null;
 			pendingPlace = false;
 			pendingPan = false;
 			dragHandler.handlePointerUp();
@@ -301,35 +309,52 @@
 		activeTouches = e.touches.length;
 	}
 
-	function handlePointerDown(e: PointerEvent) {
+	function processPointerDown(e: PointerEvent) {
 		if (!engine) return;
-		if (e.button === 1) return;
-		if (activeTouches >= 2) return; // multitouch in progress, let pan-zoom handle it
+		if (activeTouches >= 2) return;
 
 		const rect = engine.canvas.getBoundingClientRect();
 		const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 		const hit = hitTest(screenPoint, engine.camera, projectState.aps);
 
 		if (hit) {
-			// Clicked an existing AP: select and start drag
 			selectHandler.handlePointerDown(e);
 			dragHandler.handlePointerDown(e);
 			pendingPlace = false;
 			pendingPan = false;
 		} else if (e.shiftKey) {
-			// Shift+click on empty: box select
 			selectHandler.handlePointerDown(e);
 			pendingPlace = false;
 			pendingPan = false;
 		} else {
-			// Clicked empty space: could be a tap (place) or drag (pan)
-			// Defer the decision until we see movement or release
 			pendingPlace = true;
 			pendingPan = false;
 			pointerStartX = e.clientX;
 			pointerStartY = e.clientY;
 			clearSelection();
 			engine.markDirty();
+		}
+	}
+
+	function handlePointerDown(e: PointerEvent) {
+		if (!engine) return;
+		if (e.button === 1) return;
+		if (activeTouches >= 2) return;
+
+		// For touch input, defer processing to allow second finger to arrive
+		if (e.pointerType === 'touch') {
+			deferredPointerDown = e;
+			if (deferTimer) clearTimeout(deferTimer);
+			deferTimer = setTimeout(() => {
+				if (deferredPointerDown && activeTouches < 2) {
+					processPointerDown(deferredPointerDown);
+				}
+				deferredPointerDown = null;
+				deferTimer = null;
+			}, TOUCH_DELAY);
+		} else {
+			// Mouse: process immediately
+			processPointerDown(e);
 		}
 	}
 
