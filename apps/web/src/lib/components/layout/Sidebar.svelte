@@ -51,12 +51,14 @@
 <style>
 	.sidebar {
 		width: 320px;
+		height: 100%;
 		display: flex;
 		flex-direction: column;
 		background: var(--bg-secondary);
 		border-left: 1px solid var(--border-subtle);
 		z-index: var(--z-sidebar);
 		overflow: hidden;
+		min-height: 0;
 	}
 
 	.tab-bar {
