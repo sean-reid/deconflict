@@ -222,13 +222,6 @@
 		align-items: center;
 		gap: 4px;
 		min-width: 0;
-		overflow-x: auto;
-		overflow-y: hidden;
-		scrollbar-width: none;
-	}
-
-	.toolbar-left::-webkit-scrollbar {
-		display: none;
 	}
 
 	.toolbar-right {
@@ -375,8 +368,16 @@
 			display: none;
 		}
 
+		.dropdown-label {
+			display: none;
+		}
+
 		.project-name {
 			max-width: 100px;
+		}
+
+		.toolbar-left {
+			gap: 2px;
 		}
 	}
 
