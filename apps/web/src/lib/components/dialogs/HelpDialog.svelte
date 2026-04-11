@@ -83,6 +83,15 @@
 						</div>
 					</div>
 				</section>
+
+				<section class="section footer-section">
+					<p class="credit">
+						Created by <a href="https://sean-reid.github.io" target="_blank" rel="noopener">Sean Reid</a>
+					</p>
+					<p class="credit">
+						<a href="https://github.com/sean-reid/deconflict" target="_blank" rel="noopener">Source on GitHub</a>
+					</p>
+				</section>
 			</div>
 		</div>
 	</div>
@@ -255,5 +264,26 @@
 	.band-desc {
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
+	}
+
+	.footer-section {
+		border-top: 1px solid var(--border-subtle);
+		padding-top: var(--space-3, 12px);
+	}
+
+	.credit {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		margin: 0;
+		line-height: 1.6;
+	}
+
+	.credit a {
+		color: var(--accent-primary);
+		text-decoration: none;
+	}
+
+	.credit a:hover {
+		text-decoration: underline;
 	}
 </style>

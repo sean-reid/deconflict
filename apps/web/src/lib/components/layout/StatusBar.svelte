@@ -35,7 +35,19 @@
 	function handleFit() {
 		const engine = getEngineRef();
 		if (!engine) return;
+
+		// Collect all points: APs + floorplan corners
 		const points = projectState.aps.map((ap) => ({ x: ap.x, y: ap.y }));
+
+		// Include floorplan bounds if loaded
+		const fp = engine.layers.find((l) => l.id === 'floorplan') as any;
+		if (fp && fp.imageWidth > 0) {
+			points.push({ x: 0, y: 0 });
+			points.push({ x: fp.imageWidth, y: fp.imageHeight });
+		}
+
+		if (points.length === 0) return;
+
 		const rect = engine.canvas.getBoundingClientRect();
 		engine.camera.fitToBounds(points, rect.width, rect.height);
 		engine.markDirty();
@@ -55,7 +67,6 @@
 			>{canvasState.zoom === 1 ? '100' : Math.round(canvasState.zoom * 100)}%</span
 		>
 		<button class="zoom-btn" onclick={handleFit} aria-label="Fit to view">Fit</button>
-		<button class="zoom-btn" onclick={handleReset} aria-label="Reset view">Reset</button>
 	</div>
 	<span
 		class="status-item center"
@@ -124,6 +135,16 @@
 	.zoom-btn:hover {
 		color: var(--text-secondary);
 		background: var(--bg-hover);
+	}
+
+	.reset-btn {
+		color: var(--color-error-dim);
+		border-color: var(--color-error-dim);
+	}
+
+	.reset-btn:hover {
+		color: var(--color-error);
+		background: rgba(255, 68, 68, 0.1);
 	}
 
 	.mono {
