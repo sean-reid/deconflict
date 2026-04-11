@@ -2,6 +2,7 @@
 	import { projectState, removeAps } from '$state/project.svelte';
 	import { canvasState, selectAp, selectAps, clearSelection } from '$state/canvas.svelte';
 	import { solverState } from '$state/solver.svelte';
+	import { optimizerState, runOptimizer, cancelOptimizer } from '$state/optimizer.svelte';
 	import { channelColor } from '@deconflict/channels';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
@@ -102,6 +103,25 @@
 					{/if}
 				</button>
 			{/each}
+		</div>
+	{/if}
+
+	{#if projectState.aps.length >= 1 && projectState.wallMask}
+		<div class="optimize-section">
+			{#if optimizerState.isRunning}
+				<div class="optimize-progress">
+					<span class="optimize-status">Optimizing... {optimizerState.progress}%</span>
+					<button class="action-btn" onclick={cancelOptimizer}>Cancel</button>
+				</div>
+			{:else}
+				<Button variant="secondary" size="sm" onclick={runOptimizer}>
+					<Icon name="sparkles" size={14} />
+					Optimize Placement
+				</Button>
+				{#if optimizerState.score > 0}
+					<span class="optimize-score">Coverage: {optimizerState.score}%</span>
+				{/if}
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -295,5 +315,37 @@
 
 	.throughput.below-target {
 		color: var(--color-error);
+	}
+
+	.optimize-section {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+		padding-top: var(--space-3);
+		margin-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.optimize-section :global(.btn) {
+		width: 100%;
+	}
+
+	.optimize-progress {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-2);
+	}
+
+	.optimize-status {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		font-style: italic;
+	}
+
+	.optimize-score {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--color-success, #4ade80);
 	}
 </style>

@@ -61,14 +61,16 @@
 		eye:
 			'M1 8s3-5.5 7-5.5S15 8 15 8s-3 5.5-7 5.5S1 8 1 8z',
 		'eye-off':
-			'M2.5 2.5l11 11M6.7 6.7a2 2 0 002.6 2.6M1 8s3-5.5 7-5.5c1.2 0 2.3.4 3.2.9M15 8s-3 5.5-7 5.5c-1.2 0-2.3-.4-3.2-.9'
+			'M2.5 2.5l11 11M6.7 6.7a2 2 0 002.6 2.6M1 8s3-5.5 7-5.5c1.2 0 2.3.4 3.2.9M15 8s-3 5.5-7 5.5c-1.2 0-2.3-.4-3.2-.9',
+		sparkles:
+			'M8 1l1.5 3.5L13 6l-3.5 1.5L8 11 6.5 7.5 3 6l3.5-1.5zM3 11l.75 1.75L5.5 13.5l-1.75.75L3 16l-.75-1.75L.5 13.5l1.75-.75z'
 	};
 
 	const strokeIcons = new Set([
 		'cursor', 'crosshair', 'hand', 'chart', 'download', 'trash',
 		'grid', 'radio', 'link', 'tag', 'plus', 'minus', 'file',
 		'upload', 'settings', 'keyboard', 'chevron-down', 'undo', 'redo',
-		'sidebar', 'help', 'eye', 'eye-off'
+		'sidebar', 'help', 'eye', 'eye-off', 'sparkles'
 	]);
 </script>
 
