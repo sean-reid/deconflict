@@ -74,8 +74,9 @@
 			</div>
 
 			<p class="description">
-				Plan your WiFi network by placing access points on a floorplan
-				and finding the best channel assignments to avoid interference.
+				Plan your WiFi network by placing access points on a floorplan.
+				Walls are detected automatically, channels are assigned in real time,
+				and you can optimize AP placement for best coverage.
 			</p>
 
 			<div class="steps-section">
@@ -83,19 +84,19 @@
 				<ol class="steps">
 					<li>
 						<span class="step-number">1</span>
-						<span>Import a floorplan image (optional)</span>
+						<span>Drop a floorplan image or pick a sample</span>
 					</li>
 					<li>
 						<span class="step-number">2</span>
-						<span>Place access points where you want WiFi coverage</span>
+						<span>Tap the canvas to place access points</span>
 					</li>
 					<li>
 						<span class="step-number">3</span>
-						<span>Click Solve to assign channels automatically</span>
+						<span>Toggle the heatmap to see signal coverage</span>
 					</li>
 					<li>
 						<span class="step-number">4</span>
-						<span>Export your plan as an image or PDF</span>
+						<span>Use Optimize Placement to improve coverage</span>
 					</li>
 				</ol>
 			</div>
