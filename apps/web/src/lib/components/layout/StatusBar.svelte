@@ -3,6 +3,7 @@
 	import { canvasState } from '$state/canvas.svelte';
 	import { solverState } from '$state/solver.svelte';
 	import { persistenceState } from '$state/persistence.svelte';
+	import { getEngineRef } from '$canvas/engine-ref.js';
 
 	let apCount = $derived(projectState.aps.length);
 	let apLabel = $derived(apCount === 1 ? '1 access point' : `${apCount} access points`);
@@ -11,7 +12,8 @@
 
 	let centerMessage = $derived.by(() => {
 		if (apCount === 0) return { text: 'Add access points to get started', style: 'neutral' };
-		if (!hasSolved) return { text: `${apLabel} - click Solve to assign channels`, style: 'neutral' };
+		if (!hasSolved)
+			return { text: `${apLabel} - click Solve to assign channels`, style: 'neutral' };
 		if (conflictCount === 0) return { text: `${apLabel} - all channels clear`, style: 'success' };
 		const conflictLabel = conflictCount === 1 ? '1 conflict' : `${conflictCount} conflicts`;
 		return { text: `${apLabel} - ${conflictLabel} detected`, style: 'warning' };
@@ -24,22 +26,52 @@
 		if (persistenceState.lastSaved) {
 			showSaved = true;
 			if (fadeTimer) clearTimeout(fadeTimer);
-			fadeTimer = setTimeout(() => { showSaved = false; }, 2000);
+			fadeTimer = setTimeout(() => {
+				showSaved = false;
+			}, 2000);
 		}
 	});
+
+	function handleFit() {
+		const engine = getEngineRef();
+		if (!engine) return;
+		const points = projectState.aps.map((ap) => ({ x: ap.x, y: ap.y }));
+		const rect = engine.canvas.getBoundingClientRect();
+		engine.camera.fitToBounds(points, rect.width, rect.height);
+		engine.markDirty();
+	}
+
+	function handleReset() {
+		const engine = getEngineRef();
+		if (!engine) return;
+		engine.camera.reset();
+		engine.markDirty();
+	}
 </script>
 
 <footer class="status-bar">
-	<span class="status-item zoom">{canvasState.zoom === 1 ? '100' : Math.round(canvasState.zoom * 100)}%</span>
-	<span class="status-item center" class:status-success={centerMessage.style === 'success'} class:status-warning={centerMessage.style === 'warning'}>{centerMessage.text}</span>
-	{#if showSaved}
-		<span class="saved-indicator">Saved</span>
-	{/if}
-	<span class="status-item right mono">
-		{#if solverState.lastResult}
-			{solverState.lastTiming.toFixed(1)}ms
+	<div class="status-left">
+		<span class="status-item zoom"
+			>{canvasState.zoom === 1 ? '100' : Math.round(canvasState.zoom * 100)}%</span
+		>
+		<button class="zoom-btn" onclick={handleFit} aria-label="Fit to view">Fit</button>
+		<button class="zoom-btn" onclick={handleReset} aria-label="Reset view">Reset</button>
+	</div>
+	<span
+		class="status-item center"
+		class:status-success={centerMessage.style === 'success'}
+		class:status-warning={centerMessage.style === 'warning'}>{centerMessage.text}</span
+	>
+	<div class="status-right">
+		{#if showSaved}
+			<span class="saved-indicator">Saved</span>
 		{/if}
-	</span>
+		<span class="status-item mono">
+			{#if solverState.lastResult}
+				{solverState.lastTiming.toFixed(1)}ms
+			{/if}
+		</span>
+	</div>
 </footer>
 
 <style>
@@ -53,6 +85,20 @@
 		border-top: 1px solid var(--border-subtle);
 	}
 
+	.status-left {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.status-right {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 80px;
+		justify-content: flex-end;
+	}
+
 	.status-item {
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
@@ -60,11 +106,24 @@
 
 	.zoom {
 		font-family: var(--font-mono);
+		min-width: 32px;
 	}
 
-	.right {
-		min-width: 60px;
-		text-align: right;
+	.zoom-btn {
+		font-size: 10px;
+		color: var(--text-tertiary);
+		background: none;
+		border: 1px solid var(--border-subtle);
+		border-radius: 3px;
+		padding: 0 4px;
+		cursor: pointer;
+		line-height: 16px;
+		transition: all var(--transition-fast);
+	}
+
+	.zoom-btn:hover {
+		color: var(--text-secondary);
+		background: var(--bg-hover);
 	}
 
 	.mono {

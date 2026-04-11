@@ -67,6 +67,40 @@ export class Camera {
 		this.invalidateCache();
 	}
 
+	/** Fit the camera to show all points within the given viewport size */
+	fitToBounds(points: Point[], viewWidth: number, viewHeight: number, padding = 60): void {
+		if (points.length === 0) {
+			this.reset();
+			return;
+		}
+
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+
+		for (const p of points) {
+			if (p.x < minX) minX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y > maxY) maxY = p.y;
+		}
+
+		const boundsWidth = maxX - minX || 1;
+		const boundsHeight = maxY - minY || 1;
+		const centerX = (minX + maxX) / 2;
+		const centerY = (minY + maxY) / 2;
+
+		const scaleX = (viewWidth - padding * 2) / boundsWidth;
+		const scaleY = (viewHeight - padding * 2) / boundsHeight;
+		const zoom = Math.max(0.1, Math.min(10, Math.min(scaleX, scaleY)));
+
+		this.state.zoom = zoom;
+		this.state.x = viewWidth / (2 * zoom) - centerX;
+		this.state.y = viewHeight / (2 * zoom) - centerY;
+		this.invalidateCache();
+	}
+
 	getZoomPercent(): number {
 		return Math.round(this.state.zoom * 100);
 	}
