@@ -169,6 +169,12 @@
 	});
 
 	$effect(() => {
+		if (!gridLayer) return;
+		gridLayer.worldUnitsPerMeter = projectState.calibration?.worldUnitsPerMeter ?? null;
+		engine.markDirty();
+	});
+
+	$effect(() => {
 		if (!heatmapLayer) return;
 		heatmapLayer.visible = appState.showHeatmap;
 		engine.markDirty();
