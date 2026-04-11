@@ -50,14 +50,22 @@
 
 	let batchRadius = $state(150);
 
-	let radiusDisplay = $derived(
-		singleAp
-			? projectState.calibration
-				? (singleAp.interferenceRadius / projectState.calibration.worldUnitsPerMeter).toFixed(1)
-				: String(singleAp.interferenceRadius)
-			: ''
+	let radiusDisplay = $derived.by(() => {
+		if (!singleAp) return '';
+		if (!projectState.calibration) return String(singleAp.interferenceRadius);
+		const meters = singleAp.interferenceRadius / projectState.calibration.worldUnitsPerMeter;
+		if (projectState.unitSystem === 'imperial') {
+			return (meters * 3.28084).toFixed(1);
+		}
+		return meters.toFixed(1);
+	});
+	let radiusUnit = $derived(
+		projectState.calibration
+			? projectState.unitSystem === 'imperial'
+				? 'ft'
+				: 'm'
+			: 'px'
 	);
-	let radiusUnit = $derived(projectState.calibration ? 'm' : 'px');
 
 	$effect(() => {
 		if (selectedAps.length > 0) {
@@ -234,7 +242,7 @@
 				label={radiusUnit}
 			/>
 			{#if projectState.calibration}
-				<span class="radius-converted">~{radiusDisplay}m</span>
+				<span class="radius-converted">~{radiusDisplay}{radiusUnit}</span>
 			{/if}
 		</div>
 
@@ -291,7 +299,10 @@
 	</div>
 {:else if multiSelect}
 	<div class="editor">
-		<div class="section-header">{selectedAps.length} APs SELECTED</div>
+		<div class="multi-header">
+			<div class="section-header">{selectedAps.length} APs SELECTED</div>
+			<button class="deselect-link" onclick={() => clearSelection()}>Deselect</button>
+		</div>
 
 		<div class="field">
 			<Tooltip text="The WiFi frequency band. 2.4 GHz has longer range but fewer channels. 5 GHz is faster with more channels. 6 GHz is newest and least congested." position="left">
@@ -504,6 +515,25 @@
 	}
 
 	.back-link:hover {
+		text-decoration: underline;
+	}
+
+	.multi-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.deselect-link {
+		background: none;
+		border: none;
+		color: var(--accent-primary);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		padding: 0;
+	}
+
+	.deselect-link:hover {
 		text-decoration: underline;
 	}
 </style>

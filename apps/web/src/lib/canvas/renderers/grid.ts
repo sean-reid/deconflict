@@ -4,12 +4,15 @@ const MINOR_COLOR = '#1a1d27';
 const MAJOR_COLOR = '#252838';
 const LABEL_COLOR = '#3a3f52';
 
+const FEET_PER_METER = 3.28084;
+
 export class GridLayer implements Layer {
 	id = 'grid';
 	visible = true;
 
 	// When set, grid snaps to real-world units
 	worldUnitsPerMeter: number | null = null;
+	unitSystem: 'imperial' | 'metric' = 'imperial';
 
 	render(rc: RenderContext): void {
 		const { ctx, camera, width, height } = rc;
@@ -20,19 +23,39 @@ export class GridLayer implements Layer {
 		let minor: number;
 		let major: number;
 		let unitLabel = '';
+		let unitScale = 1; // world units per display unit
 
 		if (this.worldUnitsPerMeter && this.worldUnitsPerMeter > 0) {
-			// Calibrated: use metric grid
 			const wupm = this.worldUnitsPerMeter;
-			minor = wupm; // 1 meter
-			major = wupm * 5; // 5 meters
-			unitLabel = 'm';
 
-			// If zoomed out a lot, use 5m/25m instead
-			const screenMinor = minor * zoom;
-			if (screenMinor < 8) {
-				minor = wupm * 5;
-				major = wupm * 25;
+			if (this.unitSystem === 'imperial') {
+				// Imperial: grid in feet
+				const wupf = wupm / FEET_PER_METER; // world units per foot
+				unitScale = wupf;
+				unitLabel = 'ft';
+				minor = wupf * 5; // 5 feet
+				major = wupf * 25; // 25 feet
+
+				const screenMinor = minor * zoom;
+				if (screenMinor < 8) {
+					minor = wupf * 25;
+					major = wupf * 100;
+				} else if (screenMinor > 60) {
+					minor = wupf; // 1 foot
+					major = wupf * 5;
+				}
+			} else {
+				// Metric: grid in meters
+				unitScale = wupm;
+				unitLabel = 'm';
+				minor = wupm; // 1 meter
+				major = wupm * 5; // 5 meters
+
+				const screenMinor = minor * zoom;
+				if (screenMinor < 8) {
+					minor = wupm * 5;
+					major = wupm * 25;
+				}
 			}
 		} else {
 			// Uncalibrated: use pixel grid
@@ -91,18 +114,17 @@ export class GridLayer implements Layer {
 		ctx.stroke();
 
 		// Scale labels on major grid lines (when calibrated)
-		if (unitLabel && this.worldUnitsPerMeter) {
+		if (unitLabel && unitScale > 0) {
 			ctx.fillStyle = LABEL_COLOR;
 			const fontSize = 10 / zoom;
 			ctx.font = `${fontSize}px sans-serif`;
 			ctx.textAlign = 'left';
 			ctx.textBaseline = 'top';
 
-			const wupm = this.worldUnitsPerMeter;
 			for (let x = majorStartX; x <= majorEndX; x += major) {
-				const meters = Math.round(x / wupm);
-				if (meters === 0) continue;
-				ctx.fillText(`${meters}${unitLabel}`, x + 2 / zoom, topLeft.y + 2 / zoom);
+				const units = Math.round(x / unitScale);
+				if (units === 0) continue;
+				ctx.fillText(`${units}${unitLabel}`, x + 2 / zoom, topLeft.y + 2 / zoom);
 			}
 		}
 	}

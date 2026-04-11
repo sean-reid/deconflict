@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { appState } from '$state/app.svelte';
 	import { projectState } from '$state/project.svelte';
+	import { scheduleSave } from '$state/persistence.svelte';
 	import type { Band } from '@deconflict/channels';
 	import Icon from '$components/shared/Icon.svelte';
 	import Select from '$components/shared/Select.svelte';
@@ -87,6 +88,19 @@
 				aria-label="WiFi band"
 			/>
 		</div>
+
+		<Tooltip text="Toggle between imperial (ft) and metric (m) units" position="bottom">
+			<button
+				class="unit-btn"
+				onclick={() => {
+					projectState.unitSystem = projectState.unitSystem === 'imperial' ? 'metric' : 'imperial';
+					scheduleSave();
+				}}
+				aria-label="Toggle units"
+			>
+				{projectState.unitSystem === 'imperial' ? 'ft' : 'm'}
+			</button>
+		</Tooltip>
 	</div>
 
 	<div class="toolbar-right">
@@ -163,6 +177,31 @@
 
 	.band-select {
 		margin-left: 4px;
+	}
+
+	.unit-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 28px;
+		height: 28px;
+		padding: 0 6px;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-sm);
+		background: var(--bg-surface);
+		color: var(--text-secondary);
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		margin-left: 4px;
+	}
+
+	.unit-btn:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+		border-color: var(--accent-primary-dim);
 	}
 
 	.tool-btn {
