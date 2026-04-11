@@ -6,7 +6,6 @@
 	import { GridLayer } from '$canvas/renderers/grid.js';
 	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
-	import { RangeRingLayer } from '$canvas/renderers/range-ring.js';
 	import { WallLayer } from '$canvas/renderers/walls.js';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
@@ -20,7 +19,7 @@
 	import { solverState, runSolver } from '$state/solver.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
-	import { scheduleSave, restoreFromStorage } from '$state/persistence.svelte.js';
+	import { restoreFromStorage } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 
 	let canvasEl: HTMLCanvasElement;
@@ -36,7 +35,6 @@
 	let heatmapLayer: HeatmapLayer;
 	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
-	let rangeRingLayer: RangeRingLayer;
 	let wallLayer: WallLayer;
 	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
 	let showEmptyHint = $derived(projectState.aps.length === 0 && !projectState.floorplanUrl);
@@ -75,10 +73,6 @@
 			case 'G':
 				appState.showGrid = !appState.showGrid;
 				break;
-			case 'r':
-			case 'R':
-				appState.showRangeRings = !appState.showRangeRings;
-				break;
 			case 'w':
 			case 'W':
 				appState.showWalls = !appState.showWalls;
@@ -101,18 +95,16 @@
 		boundaryLayer = new BoundaryLayer();
 		gridLayer = new GridLayer();
 		heatmapLayer = new HeatmapLayer();
-		rangeRingLayer = new RangeRingLayer();
 		wallLayer = new WallLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
 
-		// Add layers in draw order: floorplan, boundary, grid, walls, heatmap, range rings, APs, selection rect
+		// Add layers in draw order: floorplan, boundary, grid, walls, heatmap, APs, selection rect
 		engine.addLayer(floorplanLayer);
 		engine.addLayer(boundaryLayer);
 		engine.addLayer(gridLayer);
 		engine.addLayer(wallLayer);
 		engine.addLayer(heatmapLayer);
-		engine.addLayer(rangeRingLayer);
 		engine.addLayer(apLayer);
 		engine.addLayer(selectionRectLayer);
 
@@ -171,12 +163,6 @@
 	});
 
 	$effect(() => {
-		if (!rangeRingLayer) return;
-		rangeRingLayer.aps = projectState.aps;
-		engine.markDirty();
-	});
-
-	$effect(() => {
 		if (!gridLayer) return;
 		gridLayer.visible = appState.showGrid;
 		engine.markDirty();
@@ -192,12 +178,6 @@
 		if (!heatmapLayer) return;
 		heatmapLayer.aps = projectState.aps;
 		heatmapLayer.ispSpeed = projectState.ispSpeed;
-		engine.markDirty();
-	});
-
-	$effect(() => {
-		if (!rangeRingLayer) return;
-		rangeRingLayer.visible = appState.showRangeRings;
 		engine.markDirty();
 	});
 
@@ -309,17 +289,6 @@
 		}, 500);
 	});
 
-	// Auto-save: debounce saves when project state changes
-	$effect(() => {
-		// Touch reactive state we want to track
-		const _aps = projectState.aps;
-		const _name = projectState.name;
-		const _band = projectState.band;
-		const _channelWidth = projectState.channelWidth;
-		const _regulatoryDomain = projectState.regulatoryDomain;
-		const _floorplanScale = projectState.floorplanScale;
-		scheduleSave();
-	});
 
 	// Track pending placement vs pan gesture
 	const DRAG_THRESHOLD = 5; // px - beyond this, it's a drag/pan, not a tap

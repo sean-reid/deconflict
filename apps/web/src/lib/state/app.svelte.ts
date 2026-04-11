@@ -4,7 +4,6 @@ export const appState = $state({
 	sidebarPanel: 'aps' as SidebarPanel,
 	sidebarOpen: true,
 	showGrid: true,
-	showRangeRings: true,
 	showLabels: true,
 	showHeatmap: false,
 	showFloorplan: true,

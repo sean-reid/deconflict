@@ -59,7 +59,8 @@
 					<h3 class="section-heading">KEYBOARD SHORTCUTS</h3>
 					<div class="shortcuts">
 						<div class="shortcut-row"><kbd>G</kbd><span>Toggle grid</span></div>
-						<div class="shortcut-row"><kbd>R</kbd><span>Toggle range rings</span></div>
+						<div class="shortcut-row"><kbd>W</kbd><span>Toggle walls</span></div>
+						<div class="shortcut-row"><kbd>H</kbd><span>Toggle heatmap</span></div>
 						<div class="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
 						<div class="shortcut-row"><kbd>Delete</kbd><span>Remove selected</span></div>
 					</div>

@@ -161,6 +161,7 @@
 		projectState.floorplanUrl = null;
 		projectState.floorplanBoundary = null;
 		projectState.calibration = null;
+		projectState.walls = [];
 		detectedWorldArea = null;
 		calibrationDone = false;
 		areaInput = '';
@@ -265,18 +266,6 @@
 		</div>
 	{/if}
 
-	<div class="network-settings">
-		<span class="settings-label">Internet Plan (Mbps)</span>
-		<input
-			type="number"
-			class="speed-input"
-			placeholder="e.g. 500"
-			bind:value={projectState.ispSpeed}
-			min="0"
-			step="50"
-		/>
-		<span class="settings-hint">Your ISP download speed - leave 0 for no limit</span>
-	</div>
 </div>
 
 <style>
@@ -479,38 +468,4 @@
 		font-family: var(--font-mono);
 	}
 
-	.network-settings {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-1);
-		margin-top: var(--space-2);
-		padding-top: var(--space-2);
-		border-top: 1px solid var(--border-subtle);
-	}
-
-	.settings-label {
-		font-size: var(--text-xs);
-		color: var(--text-secondary);
-	}
-
-	.speed-input {
-		height: 28px;
-		background: var(--bg-surface);
-		border: 1px solid var(--border-default);
-		border-radius: var(--radius-md);
-		color: var(--text-primary);
-		font-family: var(--font-mono);
-		font-size: var(--text-sm);
-		padding: 0 var(--space-2);
-		outline: none;
-	}
-
-	.speed-input:focus {
-		border-color: var(--accent-primary);
-	}
-
-	.settings-hint {
-		font-size: var(--text-xs);
-		color: var(--text-tertiary);
-	}
 </style>

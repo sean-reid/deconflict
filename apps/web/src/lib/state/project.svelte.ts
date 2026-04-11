@@ -1,5 +1,6 @@
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
 import { pushState } from './history.svelte.js';
+import { scheduleSave } from './persistence.svelte.js';
 
 export interface AccessPoint {
 	id: string;
@@ -58,6 +59,7 @@ export function addAp(x: number, y: number): AccessPoint {
 		power: 20
 	};
 	projectState.aps.push(ap);
+	scheduleSave();
 	return ap;
 }
 
@@ -69,6 +71,7 @@ export function removeAp(id: string): void {
 		if (projectState.aps.length === 0) {
 			nextApNumber = 1;
 		}
+		scheduleSave();
 	}
 }
 
@@ -76,10 +79,10 @@ export function removeAps(ids: string[]): void {
 	pushState();
 	const idSet = new Set(ids);
 	projectState.aps = projectState.aps.filter((ap) => !idSet.has(ap.id));
-	// Reset AP counter when all APs are removed
 	if (projectState.aps.length === 0) {
 		nextApNumber = 1;
 	}
+	scheduleSave();
 }
 
 export function updateAp(id: string, changes: Partial<AccessPoint>): void {
