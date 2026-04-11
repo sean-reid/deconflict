@@ -146,7 +146,7 @@
 		border-radius: var(--radius-sm);
 		background: transparent;
 		color: var(--text-tertiary);
-		font-size: 18px;
+		font-size: var(--text-xl);
 		cursor: pointer;
 		transition: all var(--transition-fast);
 	}

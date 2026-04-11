@@ -347,6 +347,11 @@
 		border-color: var(--accent-primary-dim);
 	}
 
+	.sample-btn:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
 	.loaded-controls {
 		display: flex;
 		flex-direction: column;
@@ -454,6 +459,11 @@
 		border-color: var(--accent-primary-dim);
 	}
 
+	.unit-toggle:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
 	.apply-btn {
 		height: 28px;
 		padding: 0 var(--space-2);
@@ -471,6 +481,11 @@
 		opacity: 0.9;
 	}
 
+	.apply-btn:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
 	.skip-link {
 		background: none;
 		border: none;
@@ -484,6 +499,11 @@
 
 	.skip-link:hover {
 		color: var(--text-secondary);
+	}
+
+	.skip-link:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
 	}
 
 	.calibration-confirmed {

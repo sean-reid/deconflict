@@ -121,7 +121,7 @@
 	}
 
 	.zoom-btn {
-		font-size: 10px;
+		font-size: var(--text-xs);
 		color: var(--text-tertiary);
 		background: none;
 		border: 1px solid var(--border-subtle);

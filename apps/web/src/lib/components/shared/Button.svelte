@@ -98,7 +98,7 @@
 
 	.btn-danger {
 		background: var(--color-error-dim);
-		color: #fff;
+		color: var(--text-on-accent, #fff);
 		border-color: var(--color-error-dim);
 	}
 

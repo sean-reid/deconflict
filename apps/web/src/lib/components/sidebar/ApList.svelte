@@ -183,6 +183,11 @@
 		color: var(--text-secondary);
 	}
 
+	.action-btn:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
 	.action-btn.delete {
 		color: var(--color-error-dim);
 		border-color: var(--color-error-dim);
@@ -200,22 +205,6 @@
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		font-weight: 500;
-	}
-
-	.count {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 18px;
-		height: 18px;
-		padding: 0 5px;
-		background: var(--bg-surface);
-		border: 1px solid var(--border-subtle);
-		border-radius: 9999px;
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--text-secondary);
-		line-height: 1;
 	}
 
 	.list {

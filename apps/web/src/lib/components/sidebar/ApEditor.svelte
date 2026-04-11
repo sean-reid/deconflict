@@ -515,6 +515,11 @@
 		text-decoration: underline;
 	}
 
+	.back-link:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
 	.multi-header {
 		display: flex;
 		align-items: center;
@@ -532,5 +537,10 @@
 
 	.deselect-link:hover {
 		text-decoration: underline;
+	}
+
+	.deselect-link:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
 	}
 </style>

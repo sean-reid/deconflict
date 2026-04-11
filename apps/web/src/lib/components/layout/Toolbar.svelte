@@ -233,7 +233,7 @@
 
 	.logo {
 		font-family: var(--font-mono);
-		font-size: 13px;
+		font-size: var(--text-base);
 		font-weight: 600;
 		color: var(--accent-primary);
 		user-select: none;
@@ -241,14 +241,14 @@
 
 	.separator {
 		color: var(--text-disabled);
-		font-size: 13px;
+		font-size: var(--text-base);
 		margin: 0 4px;
 		user-select: none;
 	}
 
 	.project-name {
 		font-family: var(--font-sans);
-		font-size: 13px;
+		font-size: var(--text-base);
 		color: var(--text-secondary);
 		cursor: default;
 		max-width: 180px;
@@ -267,7 +267,7 @@
 
 	.project-name-input {
 		font-family: var(--font-sans);
-		font-size: 13px;
+		font-size: var(--text-base);
 		color: var(--text-primary);
 		background: var(--bg-surface);
 		border: 1px solid var(--accent-primary);
@@ -304,7 +304,7 @@
 		background: var(--bg-surface);
 		color: var(--text-secondary);
 		font-family: var(--font-mono);
-		font-size: 11px;
+		font-size: var(--text-xs);
 		font-weight: 600;
 		cursor: pointer;
 		transition: all var(--transition-fast);
@@ -315,6 +315,11 @@
 		background: var(--bg-hover);
 		color: var(--text-primary);
 		border-color: var(--accent-primary-dim);
+	}
+
+	.unit-btn:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
 	}
 
 	.tool-btn {
@@ -374,12 +379,12 @@
 
 		.project-name {
 			max-width: 120px;
-			font-size: 12px;
+			font-size: var(--text-sm);
 		}
 
 		.project-name-input {
 			width: 120px;
-			font-size: 12px;
+			font-size: var(--text-sm);
 		}
 	}
 
