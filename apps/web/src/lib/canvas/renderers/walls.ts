@@ -25,7 +25,7 @@ export class WallLayer implements Layer {
 
 	render(rc: RenderContext): void {
 		if (this.walls.length === 0) return;
-		const { ctx, camera, width, height } = rc;
+		const { camera, width, height } = rc;
 		const transform = camera.getTransform();
 		const zoom = camera.state.zoom;
 

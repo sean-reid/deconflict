@@ -66,7 +66,7 @@ export class HeatmapLayer implements Layer {
 	render(rc: RenderContext): void {
 		if (this.aps.length === 0) return;
 
-		const { ctx, camera, width, height, dpr } = rc;
+		const { camera, width, height } = rc;
 		const key = this.getCacheKey(camera);
 
 		if (key !== this.cacheKey || !this.cache) {
