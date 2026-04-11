@@ -2,14 +2,16 @@
 	import { appState } from '$state/app.svelte';
 	import { projectState } from '$state/project.svelte';
 	import type { Band } from '@deconflict/channels';
-	import { solverState, runSolver } from '$state/solver.svelte';
 	import Icon from '$components/shared/Icon.svelte';
-	import Button from '$components/shared/Button.svelte';
 	import Select from '$components/shared/Select.svelte';
+	import Dropdown from '$components/shared/Dropdown.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
 	import HelpDialog from '$components/dialogs/HelpDialog.svelte';
 	import NewProjectDialog from '$components/dialogs/NewProjectDialog.svelte';
 	import { downloadJson, importJson } from '$lib/export/json.js';
+	import { exportPng } from '$lib/export/png.js';
+	import { exportPdf } from '$lib/export/pdf.js';
+	import { getEngineRef } from '$canvas/engine-ref.js';
 
 	let helpOpen = $state(false);
 	let newProjectOpen = $state(false);
@@ -37,78 +39,54 @@
 			importError = err instanceof Error ? err.message : 'Failed to import project';
 		}
 
-		// Reset input so the same file can be selected again
 		target.value = '';
 	}
+
+	async function handleExportPng() {
+		const engine = getEngineRef();
+		if (!engine) return;
+		await exportPng(engine, { scale: 2, includeGrid: false });
+	}
+
+	async function handleExportPdf() {
+		const engine = getEngineRef();
+		if (!engine) return;
+		await exportPdf(engine);
+	}
+
+	const fileMenuItems = [
+		{ label: 'New Project', action: () => { newProjectOpen = true; }, shortcut: '' },
+		{ label: 'Open Project...', action: handleOpenClick, shortcut: '' },
+		{ label: 'Save Project', action: handleSaveProject, shortcut: '' },
+		{ separator: true, label: '', action: () => {} },
+		{ label: 'Export as PNG', action: handleExportPng, shortcut: '' },
+		{ label: 'Export as PDF', action: handleExportPdf, shortcut: '' }
+	];
 
 	const bandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
 		{ value: '5ghz', label: '5 GHz' },
 		{ value: '6ghz', label: '6 GHz' }
 	];
-
 </script>
 
 <header class="toolbar">
 	<div class="toolbar-left">
 		<span class="logo">Deconflict</span>
 
-		<div class="separator"></div>
+		<Dropdown items={fileMenuItems}>
+			<Icon name="file" size={14} />
+			<span class="dropdown-label">File</span>
+		</Dropdown>
 
-		<Tooltip text="New project" position="bottom">
-			<button
-				class="tool-btn"
-				onclick={() => { newProjectOpen = true; }}
-				aria-label="New project"
-			>
-				<Icon name="file" size={14} />
-			</button>
-		</Tooltip>
-
-		<Tooltip text="Save project" position="bottom">
-			<button
-				class="tool-btn"
-				onclick={handleSaveProject}
-				aria-label="Save project"
-			>
-				<Icon name="download" size={14} />
-			</button>
-		</Tooltip>
-
-		<Tooltip text="Open project" position="bottom">
-			<button
-				class="tool-btn"
-				onclick={handleOpenClick}
-				aria-label="Open project"
-			>
-				<Icon name="upload" size={14} />
-			</button>
-		</Tooltip>
-
-		<input
-			bind:this={fileInputEl}
-			type="file"
-			accept=".json,.deconflict.json"
-			class="hidden-input"
-			onchange={handleFileSelect}
-		/>
-
-		<div class="separator"></div>
-
-		<Select
-			value={projectState.band}
-			options={bandOptions}
-			onchange={(val) => { projectState.band = val as Band; }}
-			aria-label="WiFi band"
-		/>
-
-		<div class="separator"></div>
-
-		<Button variant="primary" size="sm" disabled={solverState.isRunning} onclick={() => runSolver()}>
-			<Icon name="play" size={12} />
-			Solve
-		</Button>
-
+		<div class="band-select">
+			<Select
+				value={projectState.band}
+				options={bandOptions}
+				onchange={(val) => { projectState.band = val as Band; }}
+				aria-label="WiFi band"
+			/>
+		</div>
 	</div>
 
 	<div class="toolbar-right">
@@ -134,6 +112,13 @@
 	</div>
 </header>
 
+<input
+	bind:this={fileInputEl}
+	type="file"
+	accept=".json,.deconflict.json"
+	class="hidden-input"
+	onchange={handleFileSelect}
+/>
 <HelpDialog bind:open={helpOpen} />
 <NewProjectDialog bind:open={newProjectOpen} />
 
@@ -152,7 +137,7 @@
 	.toolbar-left {
 		display: flex;
 		align-items: center;
-		gap: var(--space-2);
+		gap: 4px;
 	}
 
 	.toolbar-right {
@@ -164,18 +149,19 @@
 
 	.logo {
 		font-family: var(--font-mono);
-		font-size: var(--text-sm);
+		font-size: 13px;
 		font-weight: 600;
 		color: var(--accent-primary);
 		user-select: none;
+		margin-right: 8px;
 	}
 
-	.separator {
-		width: 1px;
-		height: 20px;
-		background: var(--border-subtle);
-		margin: 0 var(--space-1);
-		flex-shrink: 0;
+	.dropdown-label {
+		font-size: var(--text-sm);
+	}
+
+	.band-select {
+		margin-left: 4px;
 	}
 
 	.tool-btn {
@@ -226,10 +212,6 @@
 
 	@media (max-width: 480px) {
 		.logo {
-			display: none;
-		}
-
-		.separator:first-of-type {
 			display: none;
 		}
 	}

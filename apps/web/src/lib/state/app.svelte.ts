@@ -1,4 +1,4 @@
-export type SidebarPanel = 'floorplan' | 'aps' | 'results';
+export type SidebarPanel = 'floorplan' | 'aps';
 
 export const appState = $state({
 	sidebarPanel: 'aps' as SidebarPanel,

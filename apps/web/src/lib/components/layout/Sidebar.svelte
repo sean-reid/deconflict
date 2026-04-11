@@ -5,12 +5,10 @@
 	import ApList from '$components/sidebar/ApList.svelte';
 	import ApEditor from '$components/sidebar/ApEditor.svelte';
 	import FloorplanControls from '$components/sidebar/FloorplanControls.svelte';
-	import ResultsPanel from '$components/sidebar/ResultsPanel.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
 		{ id: 'floorplan', label: 'Floorplan' },
-		{ id: 'aps', label: 'APs' },
-		{ id: 'results', label: 'Results' }
+		{ id: 'aps', label: 'APs' }
 	];
 
 	let hasSelection = $derived(canvasState.selectedApIds.length > 0);
@@ -39,8 +37,6 @@
 				{#if hasSelection}
 					<ApEditor />
 				{/if}
-			{:else if appState.sidebarPanel === 'results'}
-				<ResultsPanel />
 			{/if}
 		</div>
 	</aside>
