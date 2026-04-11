@@ -38,7 +38,7 @@
 		grid-template-rows: 40px 1fr 24px;
 		grid-template-columns: 1fr auto;
 		width: 100vw;
-		height: 100vh;
+		height: 100dvh;
 		background: var(--bg-primary);
 		overflow: hidden;
 	}
