@@ -1,5 +1,6 @@
 import { buildInterferenceGraph } from '@deconflict/geometry';
-import { getAvailableChannels } from '@deconflict/channels';
+import { getAvailableChannels, estimateThroughput } from '@deconflict/channels';
+import type { ThroughputEstimate, ThroughputInput } from '@deconflict/channels';
 import type { SolverResult, ComparisonResult } from '@deconflict/solver';
 import { projectState, updateAp, clearAssignments } from './project.svelte.js';
 import { SolverBridge } from '../workers/solver-bridge.js';
@@ -15,7 +16,8 @@ export const solverState = $state({
 	comparisonResults: null as ComparisonResult | null,
 	lastTiming: 0,
 	error: null as string | null,
-	autoSolve: false
+	autoSolve: false,
+	throughputEstimates: [] as ThroughputEstimate[]
 });
 
 function buildSerializedGraph() {
@@ -65,6 +67,41 @@ function applyAssignments(assignment: Map<string, number>): void {
 	}
 }
 
+function computeThroughput(): void {
+	const positions = projectState.aps.map((ap) => ({
+		id: ap.id,
+		x: ap.x,
+		y: ap.y,
+		interferenceRadius: ap.interferenceRadius
+	}));
+	const { edges } = buildInterferenceGraph(positions);
+
+	const inputs: ThroughputInput[] = projectState.aps.map((ap) => {
+		// Find co-channel APs and their overlap fractions
+		const coChannelOverlaps: number[] = [];
+		for (const edge of edges) {
+			const otherId = edge.a === ap.id ? edge.b : edge.b === ap.id ? edge.a : null;
+			if (!otherId) continue;
+			const other = projectState.aps.find((a) => a.id === otherId);
+			if (other && other.assignedChannel === ap.assignedChannel && ap.assignedChannel !== null) {
+				coChannelOverlaps.push(edge.overlapFraction);
+			}
+		}
+		return {
+			apId: ap.id,
+			band: ap.band,
+			channelWidth: ap.channelWidth,
+			assignedChannel: ap.assignedChannel,
+			coChannelOverlaps
+		};
+	});
+
+	solverState.throughputEstimates = estimateThroughput(inputs, {
+		ispSpeed: projectState.ispSpeed,
+		targetThroughput: projectState.targetThroughput
+	});
+}
+
 export async function runSolver(): Promise<void> {
 	if (projectState.aps.length === 0) return;
 	if (solverState.isRunning) return;
@@ -88,6 +125,7 @@ export async function runSolver(): Promise<void> {
 		solverState.lastTiming = result.timeMs;
 		clearAssignments();
 		applyAssignments(result.assignment);
+		computeThroughput();
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Solver failed';
 	} finally {
@@ -123,6 +161,7 @@ export async function runComparison(): Promise<void> {
 			solverState.algorithm = best.algorithm as Algorithm;
 			clearAssignments();
 			applyAssignments(best.assignment);
+			computeThroughput();
 		}
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Comparison failed';

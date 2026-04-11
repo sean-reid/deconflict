@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { projectState, removeAps } from '$state/project.svelte';
 	import { canvasState, selectAp, selectAps, clearSelection } from '$state/canvas.svelte';
+	import { solverState } from '$state/solver.svelte';
 	import { channelColor } from '@deconflict/channels';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
@@ -10,6 +11,10 @@
 		'5ghz': '5G',
 		'6ghz': '6G'
 	};
+
+	let throughputMap = $derived(
+		new Map(solverState.throughputEstimates.map((e) => [e.apId, e]))
+	);
 
 	let hasSelection = $derived(canvasState.selectedApIds.length > 0);
 	let selectionCount = $derived(canvasState.selectedApIds.length);
@@ -61,7 +66,7 @@
 	{#if projectState.aps.length === 0}
 		<div class="empty-state">
 			<p class="empty-text">No access points yet</p>
-			<p class="empty-hint">Click the + button in the toolbar or press P to place your WiFi devices on the canvas</p>
+			<p class="empty-hint">Click the canvas to place access points</p>
 		</div>
 	{:else}
 		<div class="list">
@@ -90,6 +95,11 @@
 							Pending
 						{/if}
 					</span>
+					{#if throughputMap.has(ap.id)}
+						<span class="throughput" class:below-target={!throughputMap.get(ap.id)?.meetsTarget}>
+							{throughputMap.get(ap.id)?.cappedRate}Mbps
+						</span>
+					{/if}
 				</button>
 			{/each}
 		</div>
@@ -272,5 +282,18 @@
 		font-size: var(--text-xs);
 		color: var(--text-disabled);
 		margin: 0;
+	}
+
+	.throughput {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		flex-shrink: 0;
+		min-width: 48px;
+		text-align: right;
+	}
+
+	.throughput.below-target {
+		color: var(--color-error);
 	}
 </style>

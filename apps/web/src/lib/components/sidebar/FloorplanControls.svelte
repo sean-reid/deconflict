@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { projectState } from '$state/project.svelte.js';
-	import { detectBoundary, polygonArea } from '$canvas/boundary-detect.js';
+	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
@@ -29,7 +29,7 @@
 			: null
 	);
 
-	function runBoundaryDetection(url: string) {
+	async function runBoundaryDetection(url: string) {
 		detecting = true;
 		calibrationDone = false;
 		detectedWorldArea = null;
@@ -37,28 +37,23 @@
 		projectState.calibration = null;
 		projectState.floorplanBoundary = null;
 
-		const img = new Image();
-		img.onload = () => {
-			try {
-				const result = detectBoundary(img);
-				if (result && result.polygon.length >= 3) {
-					const scaleFactor = FLOORPLAN_TARGET_WIDTH / img.naturalWidth;
-					const worldPolygon = result.polygon.map((p) => ({
-						x: p.x * scaleFactor,
-						y: p.y * scaleFactor
-					}));
-					projectState.floorplanBoundary = worldPolygon;
-					detectedWorldArea = polygonArea(worldPolygon);
-				}
-			} catch {
-				// Detection failed silently
+		try {
+			// For SVGs, strip text elements before detection
+			const img = await prepareSvgForDetection(url);
+			const result = detectBoundary(img);
+			if (result && result.polygon.length >= 3) {
+				const scaleFactor = FLOORPLAN_TARGET_WIDTH / img.naturalWidth;
+				const worldPolygon = result.polygon.map((p) => ({
+					x: p.x * scaleFactor,
+					y: p.y * scaleFactor
+				}));
+				projectState.floorplanBoundary = worldPolygon;
+				detectedWorldArea = polygonArea(worldPolygon);
 			}
-			detecting = false;
-		};
-		img.onerror = () => {
-			detecting = false;
-		};
-		img.src = url;
+		} catch {
+			// Detection failed silently
+		}
+		detecting = false;
 	}
 
 	function applyCalibration() {
@@ -244,6 +239,19 @@
 			{/if}
 		</div>
 	{/if}
+
+	<div class="network-settings">
+		<span class="settings-label">Internet Speed (Mbps)</span>
+		<input
+			type="number"
+			class="speed-input"
+			placeholder="e.g. 500"
+			bind:value={projectState.ispSpeed}
+			min="0"
+			step="50"
+		/>
+		<span class="settings-hint">Leave 0 for no limit</span>
+	</div>
 </div>
 
 <style>
@@ -444,5 +452,40 @@
 		font-size: var(--text-xs);
 		color: var(--color-success, #4ade80);
 		font-family: var(--font-mono);
+	}
+
+	.network-settings {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.settings-label {
+		font-size: var(--text-xs);
+		color: var(--text-secondary);
+	}
+
+	.speed-input {
+		height: 28px;
+		background: var(--bg-surface);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-md);
+		color: var(--text-primary);
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		padding: 0 var(--space-2);
+		outline: none;
+	}
+
+	.speed-input:focus {
+		border-color: var(--accent-primary);
+	}
+
+	.settings-hint {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
 	}
 </style>

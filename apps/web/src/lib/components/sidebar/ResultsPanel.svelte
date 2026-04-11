@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { solverState } from '$state/solver.svelte';
-	import { clearAssignments } from '$state/project.svelte';
+	import { projectState, clearAssignments } from '$state/project.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Toggle from '$components/shared/Toggle.svelte';
 	import Select from '$components/shared/Select.svelte';
@@ -46,6 +46,10 @@
 
 	let hasResult = $derived(solverState.lastResult !== null);
 	let conflictCount = $derived(solverState.lastResult?.conflicts.length ?? 0);
+
+	function getApName(id: string): string {
+		return projectState.aps.find((a) => a.id === id)?.name ?? id;
+	}
 
 	let qualityLabel = $derived.by(() => {
 		if (!solverState.lastResult) return '';
@@ -112,6 +116,20 @@
 				Clear Assignments
 			</Button>
 		</div>
+
+		{#if solverState.throughputEstimates.length > 0}
+			<div class="section">
+				<div class="section-header">ESTIMATED THROUGHPUT</div>
+				{#each solverState.throughputEstimates as est}
+					<div class="throughput-row">
+						<span class="throughput-name">{getApName(est.apId)}</span>
+						<span class="throughput-value" class:below-target={!est.meetsTarget}>
+							{est.cappedRate} Mbps
+						</span>
+					</div>
+				{/each}
+			</div>
+		{/if}
 	{:else}
 		<div class="section">
 			<p class="hint">Place APs and click Solve</p>
@@ -256,5 +274,29 @@
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
 		margin: 0;
+	}
+
+	.throughput-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: var(--space-1) var(--space-2);
+		background: var(--bg-surface);
+		border-radius: var(--radius-md);
+	}
+
+	.throughput-name {
+		font-size: var(--text-sm);
+		color: var(--text-secondary);
+	}
+
+	.throughput-value {
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		color: var(--text-primary);
+	}
+
+	.throughput-value.below-target {
+		color: var(--color-error);
 	}
 </style>
