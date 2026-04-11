@@ -15,7 +15,7 @@ test.describe('Export', () => {
 		await page.locator('button[aria-label="Select (V)"]').click();
 
 		// Go to Export tab
-		await page.getByRole('button', { name: 'Export' }).click();
+		await page.getByRole('tab', { name: 'Export' }).click();
 
 		// All sections should be visible
 		await expect(page.getByText('PROJECT FILE')).toBeVisible();
@@ -36,7 +36,7 @@ test.describe('Export', () => {
 		await page.locator('button[aria-label="Select (V)"]').click();
 
 		// Go to Export tab
-		await page.getByRole('button', { name: 'Export' }).click();
+		await page.getByRole('tab', { name: 'Export' }).click();
 
 		// Intercept the download
 		const downloadPromise = page.waitForEvent('download');

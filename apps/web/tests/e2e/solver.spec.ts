@@ -38,7 +38,7 @@ test.describe('Solver', () => {
 
 		// Switch to select, then Solver tab
 		await page.locator('button[aria-label="Select (V)"]').click();
-		await page.getByRole('button', { name: 'Solver' }).click();
+		await page.getByRole('tab', { name: 'Solver' }).click();
 		await page.waitForTimeout(200);
 
 		// Run solver from the panel (scope to sidebar to avoid toolbar button)

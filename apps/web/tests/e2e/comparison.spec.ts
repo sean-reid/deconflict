@@ -16,7 +16,7 @@ test.describe('Algorithm Comparison', () => {
 
 		// Switch to Compare tab
 		await page.locator('button[aria-label="Select (V)"]').click();
-		await page.getByRole('button', { name: 'Compare' }).click();
+		await page.getByRole('tab', { name: 'Compare' }).click();
 
 		// Click Compare All
 		await page.getByRole('button', { name: 'Compare All' }).click();
