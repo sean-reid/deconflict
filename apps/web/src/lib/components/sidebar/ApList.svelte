@@ -118,7 +118,9 @@
 					<Icon name="sparkles" size={14} />
 					Optimize Placement
 				</Button>
-				{#if optimizerState.score > 0}
+				{#if optimizerState.error}
+					<span class="optimize-error">{optimizerState.error}</span>
+				{:else if optimizerState.score > 0}
 					<span class="optimize-score">Coverage: {optimizerState.score}%</span>
 				{/if}
 			{/if}
@@ -347,5 +349,10 @@
 		font-family: var(--font-mono);
 		font-size: var(--text-xs);
 		color: var(--color-success, #4ade80);
+	}
+
+	.optimize-error {
+		font-size: var(--text-xs);
+		color: var(--color-error);
 	}
 </style>

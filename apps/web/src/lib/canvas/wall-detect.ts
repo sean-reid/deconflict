@@ -14,8 +14,6 @@ export interface DecodedWallMask {
 
 let ocrWorker: Worker | null = null;
 
-let _debugCapture: ((stage: string, canvas: HTMLCanvasElement) => void) | null = null;
-
 async function getOCRWorker(): Promise<Worker | null> {
 	if (ocrWorker) return ocrWorker;
 	try {
@@ -49,8 +47,6 @@ export async function detectWalls(
 	// Step 1: OCR to find and mask text regions (raster images only)
 	// SVGs already have <text> stripped by prepareSvgForDetection - OCR would
 	// damage wall structure with aggressive bounding boxes
-	if (_debugCapture) _debugCapture('before-ocr', canvas);
-
 	if (!options?.skipOcr)
 		try {
 			const worker = await getOCRWorker();
@@ -61,8 +57,6 @@ export async function detectWalls(
 				// Pass 1: detect horizontal/angled text with auto-rotation
 				const { data } = await worker.recognize(canvas, { rotateAuto: true }, { blocks: true });
 				maskWords(ctx, data, pad, bgR, bgG, bgB);
-
-				if (_debugCapture) _debugCapture('after-ocr-pass1', canvas);
 
 				// Pass 2: rotate 90 degrees to catch vertical text
 				const rotCanvas = document.createElement('canvas');
@@ -88,8 +82,6 @@ export async function detectWalls(
 				ctx.rotate(-Math.PI / 2);
 				ctx.drawImage(rotCanvas, 0, 0);
 				ctx.restore();
-
-				if (_debugCapture) _debugCapture('after-ocr-pass2', canvas);
 			}
 		} catch (e) {
 			console.warn('[wall-detect] OCR failed:', e);
@@ -151,18 +143,6 @@ export async function detectWalls(
 		}
 	}
 	maskCtx.putImageData(maskImg, 0, 0);
-
-	// Debug: render mask on black background for visibility
-	if (_debugCapture) {
-		const debugCanvas = document.createElement('canvas');
-		debugCanvas.width = w;
-		debugCanvas.height = h;
-		const dc = debugCanvas.getContext('2d')!;
-		dc.fillStyle = '#000';
-		dc.fillRect(0, 0, w, h);
-		dc.drawImage(maskCanvas, 0, 0);
-		_debugCapture('final-mask', debugCanvas);
-	}
 
 	return { dataUrl: maskCanvas.toDataURL('image/png'), width: w, height: h };
 }
@@ -482,25 +462,20 @@ function sampleBorderRgb(
 	return [Math.round(rSum / count), Math.round(gSum / count), Math.round(bSum / count)];
 }
 
-function countWords(data: any): number {
-	let count = 0;
-	if (data.blocks) {
-		for (const block of data.blocks) {
-			for (const para of block.paragraphs) {
-				for (const line of para.lines) {
-					count += line.words.length;
-				}
-			}
-		}
-	}
-	return count;
+interface OcrWord {
+	confidence: number;
+	text: string;
+	bbox: { x0: number; y0: number; x1: number; y1: number };
+}
+interface OcrData {
+	blocks: Array<{ paragraphs: Array<{ lines: Array<{ words: OcrWord[] }> }> }> | null;
 }
 
 /** Mask detected text by erasing only pixels that match text color within each word bbox.
  *  This traces the actual text contour instead of painting crude rectangles. */
 function maskWords(
 	ctx: CanvasRenderingContext2D,
-	data: any,
+	data: OcrData,
 	pad: number,
 	bgR: number,
 	bgG: number,

@@ -14,7 +14,7 @@ export interface OptimizeProgress {
 export class OptimizerBridge {
 	private worker: Worker | null = null;
 	private pendingResolve: ((value: OptimizeResult) => void) | null = null;
-	private pendingReject: ((reason: any) => void) | null = null;
+	private pendingReject: ((reason: unknown) => void) | null = null;
 	private onProgress: ((progress: OptimizeProgress) => void) | null = null;
 
 	private getWorker(): Worker {

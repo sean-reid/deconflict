@@ -14,8 +14,14 @@ export const optimizerState = $state({
 
 export async function runOptimizer(): Promise<void> {
 	if (projectState.aps.length === 0) return;
-	if (!projectState.wallMask) return;
-	if (!projectState.floorplanBoundary || projectState.floorplanBoundary.length < 3) return;
+	if (!projectState.wallMask) {
+		optimizerState.error = 'Load a floorplan first';
+		return;
+	}
+	if (!projectState.floorplanBoundary || projectState.floorplanBoundary.length < 3) {
+		optimizerState.error = 'Building boundary not detected';
+		return;
+	}
 	if (optimizerState.isRunning) return;
 
 	optimizerState.isRunning = true;
