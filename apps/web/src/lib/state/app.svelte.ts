@@ -1,4 +1,4 @@
-export type SidebarPanel = 'aps' | 'solver' | 'compare' | 'export';
+export type SidebarPanel = 'aps' | 'solver' | 'export';
 
 export const appState = $state({
 	sidebarPanel: 'aps' as SidebarPanel,

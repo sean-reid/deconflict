@@ -5,14 +5,12 @@
 	import ApList from '$components/sidebar/ApList.svelte';
 	import ApEditor from '$components/sidebar/ApEditor.svelte';
 	import SolverPanel from '$components/sidebar/SolverPanel.svelte';
-	import ComparePanel from '$components/sidebar/ComparePanel.svelte';
 	import FloorplanControls from '$components/sidebar/FloorplanControls.svelte';
 	import ExportPanel from '$components/sidebar/ExportPanel.svelte';
 
 	const tabs: Array<{ id: SidebarPanel; label: string }> = [
 		{ id: 'aps', label: 'APs' },
 		{ id: 'solver', label: 'Solver' },
-		{ id: 'compare', label: 'Compare' },
 		{ id: 'export', label: 'Export' }
 	];
 
@@ -43,8 +41,6 @@
 				{/if}
 			{:else if appState.sidebarPanel === 'solver'}
 				<SolverPanel />
-			{:else if appState.sidebarPanel === 'compare'}
-				<ComparePanel />
 			{:else if appState.sidebarPanel === 'export'}
 				<ExportPanel />
 			{/if}

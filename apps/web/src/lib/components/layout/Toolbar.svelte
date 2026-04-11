@@ -8,8 +8,10 @@
 	import Select from '$components/shared/Select.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
 	import HelpDialog from '$components/dialogs/HelpDialog.svelte';
+	import NewProjectDialog from '$components/dialogs/NewProjectDialog.svelte';
 
 	let helpOpen = $state(false);
+	let newProjectOpen = $state(false);
 
 	const bandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
@@ -32,6 +34,18 @@
 <header class="toolbar">
 	<div class="toolbar-left">
 		<span class="logo">Deconflict</span>
+
+		<div class="separator"></div>
+
+		<Tooltip text="New project" position="bottom">
+			<button
+				class="tool-btn"
+				onclick={() => { newProjectOpen = true; }}
+				aria-label="New project"
+			>
+				<Icon name="file" size={14} />
+			</button>
+		</Tooltip>
 
 		<div class="separator"></div>
 
@@ -91,6 +105,7 @@
 </header>
 
 <HelpDialog bind:open={helpOpen} />
+<NewProjectDialog bind:open={newProjectOpen} />
 
 <style>
 	.toolbar {
