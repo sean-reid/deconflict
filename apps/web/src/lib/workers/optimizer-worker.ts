@@ -57,13 +57,38 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		boundary
 	} = msg;
 
-	// Step 1: Compute interior using the building boundary polygon
-	// A pixel is interior if it's inside the boundary polygon and not a wall
+	// Step 1: Compute interior - non-wall pixels within the building footprint.
+	// Use the bounding box of wall pixels as the building extent (tighter than
+	// the boundary polygon which can cover the entire SVG viewport).
+	let wallMinX = w,
+		wallMinY = h,
+		wallMaxX = 0,
+		wallMaxY = 0;
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			if (mask[y * w + x]) {
+				if (x < wallMinX) wallMinX = x;
+				if (x > wallMaxX) wallMaxX = x;
+				if (y < wallMinY) wallMinY = y;
+				if (y > wallMaxY) wallMaxY = y;
+			}
+		}
+	}
+
 	const interior = new Uint8Array(w * h);
-	if (boundary.length >= 3) {
-		for (let y = 0; y < h; y++) {
-			for (let x = 0; x < w; x++) {
-				if (!mask[y * w + x] && pointInPolygon(x, y, boundary)) {
+	const pad = Math.round(Math.max(w, h) * 0.02);
+	const bx0 = Math.max(0, wallMinX - pad);
+	const by0 = Math.max(0, wallMinY - pad);
+	const bx1 = Math.min(w - 1, wallMaxX + pad);
+	const by1 = Math.min(h - 1, wallMaxY + pad);
+
+	for (let y = by0; y <= by1; y++) {
+		for (let x = bx0; x <= bx1; x++) {
+			if (!mask[y * w + x]) {
+				// Additional check: use boundary polygon if available
+				if (boundary.length >= 3) {
+					if (pointInPolygon(x, y, boundary)) interior[y * w + x] = 1;
+				} else {
 					interior[y * w + x] = 1;
 				}
 			}
