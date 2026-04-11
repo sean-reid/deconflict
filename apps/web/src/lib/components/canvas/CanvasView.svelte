@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import { CanvasEngine } from '$canvas/engine.js';
 	import { FloorplanLayer } from '$canvas/renderers/floorplan.js';
-	import { BoundaryLayer } from '$canvas/renderers/boundary.js';
 	import { GridLayer } from '$canvas/renderers/grid.js';
 	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
@@ -30,7 +29,6 @@
 	let dragHandler: DragHandler;
 	let placeHandler: PlaceHandler;
 	let floorplanLayer: FloorplanLayer;
-	let boundaryLayer: BoundaryLayer;
 	let gridLayer: GridLayer;
 	let heatmapLayer: HeatmapLayer;
 	let selectionRectLayer: SelectionRectLayer;
@@ -92,7 +90,6 @@
 
 		// Create layers
 		floorplanLayer = new FloorplanLayer();
-		boundaryLayer = new BoundaryLayer();
 		gridLayer = new GridLayer();
 		heatmapLayer = new HeatmapLayer();
 		wallLayer = new WallLayer();
@@ -101,7 +98,6 @@
 
 		// Add layers in draw order: floorplan, boundary, grid, walls, heatmap, APs, selection rect
 		engine.addLayer(floorplanLayer);
-		engine.addLayer(boundaryLayer);
 		engine.addLayer(gridLayer);
 		engine.addLayer(wallLayer);
 		engine.addLayer(heatmapLayer);
@@ -260,19 +256,6 @@
 		engine.markDirty();
 	});
 
-	// Sync boundary polygon to layer
-	$effect(() => {
-		if (!boundaryLayer) return;
-		const boundary = projectState.floorplanBoundary;
-		if (boundary && boundary.length >= 3) {
-			boundaryLayer.polygon = boundary;
-			boundaryLayer.visible = true;
-		} else {
-			boundaryLayer.polygon = [];
-			boundaryLayer.visible = false;
-		}
-		engine.markDirty();
-	});
 
 	// Auto-solve: debounce solver runs when APs change
 	// Auto-solve: only re-run when AP layout changes (count, positions, radii)

@@ -33,9 +33,10 @@
 			{#if appState.sidebarPanel === 'floorplan'}
 				<FloorplanControls />
 			{:else if appState.sidebarPanel === 'aps'}
-				<ApList />
 				{#if hasSelection}
 					<ApEditor />
+				{:else}
+					<ApList />
 				{/if}
 			{/if}
 		</div>

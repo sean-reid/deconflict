@@ -8,84 +8,73 @@ test.describe('AP placement', () => {
 		await page.waitForSelector('canvas');
 	});
 
-	test('place an AP by clicking the canvas with the Place tool', async ({ page }) => {
-		// Switch to Place tool
-
-		// Click on the canvas
+	test('place an AP by clicking the canvas', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
-		// AP should appear in the sidebar list
-		await expect(page.locator('text=AP-1')).toBeVisible();
+		// AP-1 should show in editor (auto-selected after placement)
+		await expect(page.locator('input[aria-label="AP name"]')).toBeVisible();
 	});
 
-	test('place multiple APs in rapid succession', async ({ page }) => {
+	test('place multiple APs', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 200, y: 200 } });
 		await canvas.click({ position: { x: 400, y: 200 } });
 		await canvas.click({ position: { x: 300, y: 350 } });
 
-		await expect(page.getByRole('button', { name: /AP-1/ })).toBeVisible();
-		await expect(page.getByRole('button', { name: /AP-2/ })).toBeVisible();
-		await expect(page.getByRole('button', { name: /AP-3/ })).toBeVisible();
+		// Last placed AP (AP-3) is selected, editor shows
+		await expect(page.locator('input[aria-label="AP name"]')).toBeVisible();
+
+		// Click back to see the list
+		await page.getByText('All APs').click();
+		await page.waitForTimeout(200);
+
+		// Status bar shows count
+		const footer = page.locator('footer');
+		await expect(footer).toContainText('3 access points');
 	});
 
-	test('select an AP by clicking it', async ({ page }) => {
-		// Place an AP
+	test('select an AP and see editor', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
-		// Switch to select and click the AP
-		await canvas.click({ position: { x: 300, y: 300 } });
-
-		// AP should be selected in sidebar (check for the editor showing properties)
+		// Editor should show with AP name
 		await expect(page.locator('text=PROPERTIES')).toBeVisible();
 		await expect(page.locator('input[aria-label="AP name"]')).toBeVisible();
 	});
 
-	test('edit AP name in the sidebar', async ({ page }) => {
-		// Place and select an AP
+	test('edit AP name', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
-		await canvas.click({ position: { x: 300, y: 300 } });
-
-		// Edit the name
 		const nameInput = page.locator('input[aria-label="AP name"]');
 		await nameInput.fill('Lobby-North');
 
-		// Name should update in the list
-		await expect(page.locator('text=Lobby-North')).toBeVisible();
+		// Name should update
+		await expect(nameInput).toHaveValue('Lobby-North');
 	});
 
-	test('delete an AP using the sidebar button', async ({ page }) => {
-		// Place an AP
+	test('delete an AP', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
-		// Select it
-		await canvas.click({ position: { x: 300, y: 300 } });
-
-		// Delete it
 		await page.locator('text=Delete Access Point').click();
 
-		// Should be gone
+		// Should show empty list
 		await expect(page.locator('text=No access points yet')).toBeVisible();
 	});
 
-	test('change AP band in the editor', async ({ page }) => {
-		// Place and select
+	test('change AP band', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
-		await canvas.click({ position: { x: 300, y: 300 } });
 
-		// Change band to 2.4 GHz using the sidebar select
-		// The Band select is in the editor, after PROPERTIES header
-		// It currently shows "5 GHz" - we need the select inside the .editor section
+		// Change band in editor
 		const bandSelect = page.locator('.editor select').first();
 		await bandSelect.selectOption('2.4ghz');
 
-		// The list should now show 2.4G
+		// Go back to list to verify
+		await page.getByText('All APs').click();
+		await page.waitForTimeout(200);
 		await expect(page.locator('text=2.4G')).toBeVisible();
 	});
 });

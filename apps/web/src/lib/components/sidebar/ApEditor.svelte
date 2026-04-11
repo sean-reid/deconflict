@@ -168,6 +168,9 @@
 
 {#if singleAp}
 	<div class="editor">
+		<button class="back-link" onclick={() => clearSelection()}>
+			&larr; All APs ({projectState.aps.length})
+		</button>
 		<div class="section-header">PROPERTIES</div>
 
 		<div class="field">
@@ -485,5 +488,22 @@
 
 	:global(.full-width select) {
 		width: 100%;
+	}
+
+	.back-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		background: none;
+		border: none;
+		color: var(--accent-primary);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		padding: 0;
+		margin-bottom: var(--space-2);
+	}
+
+	.back-link:hover {
+		text-decoration: underline;
 	}
 </style>
