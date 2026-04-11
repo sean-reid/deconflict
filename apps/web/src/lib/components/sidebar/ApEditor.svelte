@@ -3,6 +3,7 @@
 	import { canvasState, clearSelection } from '$state/canvas.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
+	import { buildInterferenceGraph } from '@deconflict/geometry';
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
@@ -63,6 +64,33 @@
 				}
 			}
 		}
+	});
+
+	let neighbors = $derived.by(() => {
+		if (!singleAp) return [];
+		const aps = projectState.aps;
+		const positions = aps.map(ap => ({
+			id: ap.id, x: ap.x, y: ap.y,
+			interferenceRadius: ap.interferenceRadius
+		}));
+		const { edges } = buildInterferenceGraph(positions);
+		return edges
+			.filter(e => e.a === singleAp.id || e.b === singleAp.id)
+			.map(e => {
+				const otherId = e.a === singleAp.id ? e.b : e.a;
+				const other = aps.find(a => a.id === otherId);
+				if (!other) return null;
+				const sameChannel = singleAp.assignedChannel !== null
+					&& other.assignedChannel !== null
+					&& singleAp.assignedChannel === other.assignedChannel;
+				return {
+					name: other.name,
+					overlap: e.overlapFraction,
+					sameChannel
+				};
+			})
+			.filter(Boolean)
+			.sort((a, b) => b!.overlap - a!.overlap);
 	});
 
 	let channelOptions = $derived.by(() => {
@@ -221,6 +249,23 @@
 			</div>
 		</div>
 
+		{#if neighbors.length > 0}
+			<div class="section-header">NEARBY ACCESS POINTS</div>
+			<div class="neighbors">
+				{#each neighbors as n}
+					<div class="neighbor-row">
+						<span class="neighbor-name">{n.name}</span>
+						<span class="neighbor-overlap" class:low={n.overlap < 0.3} class:med={n.overlap >= 0.3 && n.overlap < 0.6} class:high={n.overlap >= 0.6}>
+							{Math.round(n.overlap * 100)}% overlap
+						</span>
+						{#if n.sameChannel}
+							<span class="conflict-badge">conflict</span>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
+
 		<div class="delete-section">
 			<Button variant="danger" size="sm" onclick={handleDelete}>
 				<Icon name="trash" size={14} />
@@ -356,6 +401,58 @@
 		font-family: var(--font-mono);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
+	}
+
+	.neighbors {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.neighbor-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-1) var(--space-2);
+		background: var(--bg-surface);
+		border-radius: var(--radius-md);
+		font-size: var(--text-sm);
+	}
+
+	.neighbor-name {
+		flex: 1;
+		color: var(--text-secondary);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.neighbor-overlap {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		white-space: nowrap;
+	}
+
+	.neighbor-overlap.low {
+		color: var(--color-success);
+	}
+
+	.neighbor-overlap.med {
+		color: var(--color-warning);
+	}
+
+	.neighbor-overlap.high {
+		color: var(--color-error);
+	}
+
+	.conflict-badge {
+		font-size: var(--text-xs);
+		font-weight: 500;
+		color: var(--color-error);
+		background: var(--color-error-dim);
+		padding: 0 var(--space-1);
+		border-radius: var(--radius-full, 9999px);
+		white-space: nowrap;
 	}
 
 	.delete-section {

@@ -30,6 +30,14 @@
 
 	let hasResult = $derived(solverState.lastResult !== null);
 	let conflictCount = $derived(solverState.lastResult?.conflicts.length ?? 0);
+
+	let qualityLabel = $derived.by(() => {
+		if (!solverState.lastResult) return '';
+		const conflicts = solverState.lastResult.conflicts.length;
+		if (conflicts === 0) return 'Excellent';
+		if (conflicts <= 2) return 'Good';
+		return 'Needs attention';
+	});
 </script>
 
 <div class="solver-panel">
@@ -98,6 +106,15 @@
 			<div class="result-row">
 				<span class="result-label">Time</span>
 				<span class="result-value mono">{solverState.lastTiming.toFixed(1)}ms</span>
+			</div>
+
+			<div class="result-row">
+				<Tooltip text="Overall assessment of the channel plan based on the number of conflicts." position="left">
+					<span class="result-label">Quality</span>
+				</Tooltip>
+				<span class="result-value" class:quality-excellent={qualityLabel === 'Excellent'} class:quality-good={qualityLabel === 'Good'} class:quality-bad={qualityLabel === 'Needs attention'}>
+					{qualityLabel}
+				</span>
 			</div>
 		</div>
 
@@ -177,6 +194,18 @@
 	}
 
 	.conflict-bad {
+		color: var(--color-error);
+	}
+
+	.quality-excellent {
+		color: var(--color-success);
+	}
+
+	.quality-good {
+		color: var(--color-warning);
+	}
+
+	.quality-bad {
 		color: var(--color-error);
 	}
 
