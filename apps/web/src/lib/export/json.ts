@@ -2,11 +2,23 @@ import { projectState } from '$state/project.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
 
 interface ProjectFile {
-	version: 1;
+	version: 2;
 	name: string;
 	band: Band;
 	channelWidth: ChannelWidth;
 	regulatoryDomain: RegulatoryDomain;
+	floorplanImage?: string; // data URL of the floorplan image
+	floorplanScale: number;
+	calibration?: { worldUnitsPerMeter: number };
+	walls: Array<{
+		x1: number;
+		y1: number;
+		x2: number;
+		y2: number;
+		thickness: number;
+		material: string;
+		attenuation: number;
+	}>;
 	aps: Array<{
 		id: string;
 		name: string;
@@ -21,13 +33,45 @@ interface ProjectFile {
 	}>;
 }
 
-export function serialize(): string {
+async function floorplanToDataUrl(): Promise<string | undefined> {
+	const url = projectState.floorplanUrl;
+	if (!url) return undefined;
+
+	// If already a data URL, use it directly
+	if (url.startsWith('data:')) return url;
+
+	// Convert blob URL to data URL via canvas
+	try {
+		const img = new Image();
+		await new Promise<void>((resolve, reject) => {
+			img.onload = () => resolve();
+			img.onerror = reject;
+			img.src = url;
+		});
+		const canvas = document.createElement('canvas');
+		canvas.width = img.naturalWidth;
+		canvas.height = img.naturalHeight;
+		const ctx = canvas.getContext('2d')!;
+		ctx.drawImage(img, 0, 0);
+		return canvas.toDataURL('image/png');
+	} catch {
+		return undefined;
+	}
+}
+
+export async function serialize(): Promise<string> {
+	const floorplanImage = await floorplanToDataUrl();
+
 	const data: ProjectFile = {
-		version: 1,
+		version: 2,
 		name: projectState.name,
 		band: projectState.band,
 		channelWidth: projectState.channelWidth,
 		regulatoryDomain: projectState.regulatoryDomain,
+		floorplanImage,
+		floorplanScale: projectState.floorplanScale,
+		calibration: projectState.calibration ?? undefined,
+		walls: JSON.parse(JSON.stringify(projectState.walls)),
 		aps: projectState.aps.map((ap) => ({
 			id: ap.id,
 			name: ap.name,
@@ -52,7 +96,7 @@ export function deserialize(json: string): void {
 		throw new Error('Invalid JSON file');
 	}
 
-	if (!data.version || data.version !== 1) {
+	if (!data.version) {
 		throw new Error('Unsupported file version');
 	}
 	if (!Array.isArray(data.aps)) {
@@ -63,6 +107,17 @@ export function deserialize(json: string): void {
 	projectState.band = data.band || '5ghz';
 	projectState.channelWidth = data.channelWidth || 20;
 	projectState.regulatoryDomain = data.regulatoryDomain || 'fcc';
+	projectState.floorplanScale = data.floorplanScale ?? 0.4;
+	projectState.calibration = data.calibration ?? null;
+	projectState.walls = data.walls ?? [];
+
+	// Restore floorplan image
+	if (data.floorplanImage) {
+		projectState.floorplanUrl = data.floorplanImage;
+	} else {
+		projectState.floorplanUrl = null;
+	}
+
 	projectState.aps = data.aps.map((ap) => ({
 		id: ap.id || crypto.randomUUID(),
 		name: ap.name || 'AP',
@@ -77,8 +132,8 @@ export function deserialize(json: string): void {
 	}));
 }
 
-export function downloadJson(): void {
-	const json = serialize();
+export async function downloadJson(): Promise<void> {
+	const json = await serialize();
 	const blob = new Blob([json], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');

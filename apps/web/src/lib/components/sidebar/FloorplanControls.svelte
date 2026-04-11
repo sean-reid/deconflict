@@ -188,9 +188,11 @@
 		projectState.floorplanBoundary = null;
 		projectState.calibration = null;
 		projectState.walls = [];
+		projectState.aps = [];
 		detectedWorldArea = null;
 		calibrationDone = false;
 		areaInput = '';
+		scheduleSave();
 	}
 
 	function handleOpacityChange(e: Event) {

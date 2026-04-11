@@ -18,8 +18,8 @@
 	let fileInputEl: HTMLInputElement;
 	let importError = $state<string | null>(null);
 
-	function handleSaveProject() {
-		downloadJson();
+	async function handleSaveProject() {
+		await downloadJson();
 	}
 
 	function handleOpenClick() {
