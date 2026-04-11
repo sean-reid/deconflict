@@ -221,6 +221,14 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+		min-width: 0;
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: none;
+	}
+
+	.toolbar-left::-webkit-scrollbar {
+		display: none;
 	}
 
 	.toolbar-right {
@@ -362,35 +370,8 @@
 	}
 
 	@media (max-width: 768px) {
-		.toolbar-left {
-			overflow-x: auto;
-			overflow-y: hidden;
-			scrollbar-width: none;
-		}
-
-		.toolbar-left::-webkit-scrollbar {
-			display: none;
-		}
-
-		.logo,
-		.separator {
-			display: none;
-		}
-
 		.project-name {
-			max-width: 100px;
-			font-size: var(--text-sm);
-		}
-
-		.project-name-input {
-			width: 100px;
-			font-size: var(--text-sm);
-		}
-
-		.band-select,
-		.unit-btn,
-		.dropdown-label {
-			display: none;
+			max-width: 80px;
 		}
 	}
 
