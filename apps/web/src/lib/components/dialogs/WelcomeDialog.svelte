@@ -29,7 +29,7 @@
 
 	function handleKeyDown(e: KeyboardEvent) {
 		if (!open) return;
-		if (e.key === 'Escape') {
+		if (e.key === 'Escape' || e.key === 'Enter') {
 			handleGetStarted();
 		}
 	}
