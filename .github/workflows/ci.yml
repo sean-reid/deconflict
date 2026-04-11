@@ -45,6 +45,24 @@ jobs:
           path: packages/*/coverage/
           retention-days: 7
 
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: apps/web/build/
+          retention-days: 1
+
   test-e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
@@ -57,7 +75,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: apps/web/build/
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
       - run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
       - run: pnpm --filter @deconflict/web test:e2e
       - uses: actions/upload-artifact@v4
@@ -79,7 +105,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: apps/web/build/
       - name: Check for visual tests
         id: check-visual
         run: |
@@ -89,6 +118,11 @@ jobs:
             echo "has_tests=false" >> $GITHUB_OUTPUT
           fi
       - if: steps.check-visual.outputs.has_tests == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - if: steps.check-visual.outputs.has_tests == 'true'
         run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
       - if: steps.check-visual.outputs.has_tests == 'true'
         run: pnpm --filter @deconflict/web test:visual
@@ -97,24 +131,6 @@ jobs:
         with:
           name: visual-diffs
           path: apps/web/tests/visual/__snapshots__/
-          retention-days: 7
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: apps/web/build/
           retention-days: 7
 
   benchmark:
