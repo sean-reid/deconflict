@@ -22,6 +22,7 @@
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { scheduleSave, restoreFromStorage } from '$state/persistence.svelte.js';
+	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 
 	let canvasEl: HTMLCanvasElement;
 	let containerEl: HTMLDivElement;
@@ -419,6 +420,7 @@
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
 	></canvas>
+	<LayerPanel />
 	{#if showEmptyHint}
 		<div class="empty-hint">
 			<p>Drop a floorplan image here</p>

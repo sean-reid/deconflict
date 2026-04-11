@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { solverState, runSolver } from '$state/solver.svelte';
-	import { appState } from '$state/app.svelte';
 	import { projectState, clearAssignments } from '$state/project.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Toggle from '$components/shared/Toggle.svelte';
@@ -89,18 +88,6 @@
 			<p class="hint">Place APs and click Solve</p>
 		</div>
 	{/if}
-
-	<div class="divider"></div>
-
-	<div class="section">
-		<div class="section-header">LAYERS</div>
-		<Toggle bind:checked={appState.showHeatmap} label="Signal heatmap" />
-		<Toggle bind:checked={appState.showFloorplan} label="Floorplan" />
-		<Toggle bind:checked={appState.showAPs} label="Access points" />
-		<Toggle bind:checked={appState.showRangeRings} label="Coverage rings" />
-		<Toggle bind:checked={appState.showLabels} label="Labels" />
-		<Toggle bind:checked={appState.showGrid} label="Grid" />
-	</div>
 
 	<div class="divider"></div>
 

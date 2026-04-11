@@ -57,14 +57,18 @@
 		help:
 			'M8 15a7 7 0 110-14 7 7 0 010 14zM6.5 5.5a2 2 0 012.7-1.4c.8.3 1.3 1 1.3 1.9 0 1-1.5 1.3-1.5 2.5m0 2h.01',
 		heatmap:
-			'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z'
+			'M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z',
+		eye:
+			'M1 8s3-5.5 7-5.5S15 8 15 8s-3 5.5-7 5.5S1 8 1 8z',
+		'eye-off':
+			'M2.5 2.5l11 11M6.7 6.7a2 2 0 002.6 2.6M1 8s3-5.5 7-5.5c1.2 0 2.3.4 3.2.9M15 8s-3 5.5-7 5.5c-1.2 0-2.3-.4-3.2-.9'
 	};
 
 	const strokeIcons = new Set([
 		'cursor', 'crosshair', 'hand', 'chart', 'download', 'trash',
 		'grid', 'radio', 'link', 'tag', 'plus', 'minus', 'file',
 		'upload', 'settings', 'keyboard', 'chevron-down', 'undo', 'redo',
-		'sidebar', 'help'
+		'sidebar', 'help', 'eye', 'eye-off'
 	]);
 </script>
 
@@ -77,7 +81,16 @@
 	class={className}
 	aria-hidden="true"
 >
-	{#if name === 'heatmap'}
+	{#if name === 'eye'}
+		<path
+			d={paths[name]}
+			stroke="currentColor"
+			stroke-width="1.5"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
+		<circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5" />
+	{:else if name === 'heatmap'}
 		<rect x="1" y="1" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.9" />
 		<rect x="9" y="1" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.5" />
 		<rect x="1" y="9" width="6" height="6" rx="0.5" fill="currentColor" opacity="0.3" />
