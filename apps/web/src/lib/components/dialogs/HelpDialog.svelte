@@ -48,8 +48,8 @@
 				<section class="section">
 					<h3 class="section-heading">QUICK START</h3>
 					<ul class="quick-start">
-						<li>Press <kbd>P</kbd> to place access points</li>
-						<li>Press <kbd>V</kbd> to select and move them</li>
+						<li>Click the canvas to place access points</li>
+						<li>Click an AP to select it, drag to move</li>
 						<li>Hold <kbd>Space</kbd> + drag to pan the canvas</li>
 						<li>Scroll to zoom in and out</li>
 						<li>Click <strong>Solve</strong> to assign channels</li>
@@ -59,9 +59,6 @@
 				<section class="section">
 					<h3 class="section-heading">KEYBOARD SHORTCUTS</h3>
 					<div class="shortcuts">
-						<div class="shortcut-row"><kbd>V</kbd><span>Select tool</span></div>
-						<div class="shortcut-row"><kbd>P</kbd><span>Place AP tool</span></div>
-						<div class="shortcut-row"><kbd>H</kbd><span>Pan tool</span></div>
 						<div class="shortcut-row"><kbd>G</kbd><span>Toggle grid</span></div>
 						<div class="shortcut-row"><kbd>R</kbd><span>Toggle range rings</span></div>
 						<div class="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { appState } from '$state/app.svelte';
-	import type { Tool } from '$state/app.svelte';
 	import { projectState } from '$state/project.svelte';
 	import type { Band } from '@deconflict/channels';
 	import { solverState, runSolver } from '$state/solver.svelte';
@@ -18,12 +17,6 @@
 		{ value: '6ghz', label: '6 GHz' }
 	];
 
-	const tools: Array<{ id: Tool; icon: string; label: string }> = [
-		{ id: 'select', icon: 'cursor', label: 'Select (V)' },
-		{ id: 'place', icon: 'crosshair', label: 'Place AP (P)' },
-		{ id: 'pan', icon: 'hand', label: 'Pan (H)' }
-	];
-
 	const viewToggles: Array<{
 		key: 'showGrid' | 'showRangeRings' | 'showConflictEdges' | 'showLabels';
 		icon: string;
@@ -39,23 +32,6 @@
 <header class="toolbar">
 	<div class="toolbar-left">
 		<span class="logo">Deconflict</span>
-
-		<div class="separator"></div>
-
-		<div class="tool-group">
-			{#each tools as tool}
-				<Tooltip text={tool.label} position="bottom">
-					<button
-						class="tool-btn"
-						class:active={appState.activeTool === tool.id}
-						onclick={() => { appState.activeTool = tool.id; }}
-						aria-label={tool.label}
-					>
-						<Icon name={tool.icon} size={14} />
-					</button>
-				</Tooltip>
-			{/each}
-		</div>
 
 		<div class="separator"></div>
 
@@ -155,12 +131,6 @@
 		background: var(--border-subtle);
 		margin: 0 var(--space-1);
 		flex-shrink: 0;
-	}
-
-	.tool-group {
-		display: flex;
-		align-items: center;
-		gap: 2px;
 	}
 
 	.tool-btn {

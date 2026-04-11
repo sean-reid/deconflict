@@ -17,6 +17,7 @@
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
+	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { scheduleSave, restoreFromStorage } from '$state/persistence.svelte.js';
 
@@ -64,18 +65,6 @@
 		if (isInput || mod) return;
 
 		switch (e.key) {
-			case 'v':
-			case 'V':
-				appState.activeTool = 'select';
-				break;
-			case 'p':
-			case 'P':
-				appState.activeTool = 'place';
-				break;
-			case 'h':
-			case 'H':
-				appState.activeTool = 'pan';
-				break;
 			case 'g':
 			case 'G':
 				appState.showGrid = !appState.showGrid;
@@ -270,56 +259,35 @@
 		scheduleSave();
 	});
 
-	// Cursor based on active tool
-	$effect(() => {
-		if (!canvasEl) return;
-		switch (appState.activeTool) {
-			case 'place':
-				canvasEl.style.cursor = 'crosshair';
-				break;
-			case 'pan':
-				canvasEl.style.cursor = 'grab';
-				break;
-			case 'select':
-			default:
-				canvasEl.style.cursor = 'default';
-				break;
-		}
-	});
-
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
+		if (e.button === 1) return; // middle click handled by pan-zoom
 
-		// Let pan-zoom handle middle click / space internally
-		if (e.button === 1) return;
+		// Smart mode: hit test first, place if empty
+		const rect = engine.canvas.getBoundingClientRect();
+		const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+		const hit = hitTest(screenPoint, engine.camera, projectState.aps);
 
-		const tool = appState.activeTool;
-
-		if (tool === 'place') {
+		if (hit) {
+			// Tapped an existing AP: select and start drag
+			selectHandler.handlePointerDown(e);
+			dragHandler.handlePointerDown(e);
+		} else if (e.shiftKey) {
+			// Shift+click on empty: box select
+			selectHandler.handlePointerDown(e);
+		} else {
+			// Tapped empty space: place a new AP and start drag
 			placeHandler.handlePointerDown(e);
-		} else if (tool === 'select') {
-			// Try drag first (on already-selected AP)
-			if (!dragHandler.handlePointerDown(e)) {
-				// Select/deselect, then try drag again so click-and-drag works in one gesture
-				const consumed = selectHandler.handlePointerDown(e);
-				if (consumed) {
-					dragHandler.handlePointerDown(e);
-				}
-			}
+			dragHandler.handlePointerDown(e);
 		}
 	}
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!engine) return;
-
-		const tool = appState.activeTool;
-
-		if (tool === 'select') {
-			if (dragHandler.isDragging) {
-				dragHandler.handlePointerMove(e);
-			} else {
-				selectHandler.handlePointerMove(e);
-			}
+		if (dragHandler.isDragging) {
+			dragHandler.handlePointerMove(e);
+		} else {
+			selectHandler.handlePointerMove(e);
 		}
 	}
 
@@ -342,7 +310,7 @@
 	{#if showEmptyHint}
 		<div class="empty-hint">
 			<p>Drop a floorplan image here</p>
-			<p>or press <kbd>P</kbd> to start placing access points</p>
+			<p>or click the canvas to place access points</p>
 		</div>
 	{/if}
 </div>
@@ -378,14 +346,4 @@
 		opacity: 0.6;
 	}
 
-	.empty-hint kbd {
-		display: inline-block;
-		padding: 1px 6px;
-		font-family: var(--font-mono);
-		font-size: var(--text-sm);
-		color: var(--text-secondary);
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-default);
-		border-radius: var(--radius-sm);
-	}
 </style>

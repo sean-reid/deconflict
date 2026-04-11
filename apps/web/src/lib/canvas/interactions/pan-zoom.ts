@@ -1,5 +1,4 @@
 import type { CanvasEngine } from '../engine.js';
-import { appState } from '$state/app.svelte.js';
 
 export class PanZoomHandler {
 	private engine: CanvasEngine;
@@ -53,8 +52,7 @@ export class PanZoomHandler {
 
 	private onPointerDown = (e: PointerEvent): void => {
 		// Middle mouse button, space held, or pan tool active
-		const isPanTool = appState.activeTool === 'pan';
-		if (e.button === 1 || (e.button === 0 && (this.spaceHeld || isPanTool))) {
+		if (e.button === 1 || (e.button === 0 && this.spaceHeld)) {
 			this.isPanning = true;
 			this.lastX = e.clientX;
 			this.lastY = e.clientY;
@@ -76,8 +74,7 @@ export class PanZoomHandler {
 	private onPointerUp = (_e: PointerEvent): void => {
 		if (this.isPanning) {
 			this.isPanning = false;
-			const isPanTool = appState.activeTool === 'pan';
-			this.engine.canvas.style.cursor = isPanTool ? 'grab' : '';
+			this.engine.canvas.style.cursor = '';
 		}
 	};
 
