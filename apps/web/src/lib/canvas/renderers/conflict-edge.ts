@@ -10,8 +10,19 @@ interface Edge {
 export class ConflictEdgeLayer implements Layer {
 	id = 'conflict-edges';
 	visible = true;
-	aps: AccessPoint[] = [];
 	edges: Edge[] = [];
+
+	private _aps: AccessPoint[] = [];
+	private _apMap = new Map<string, AccessPoint>();
+
+	get aps(): AccessPoint[] {
+		return this._aps;
+	}
+
+	set aps(value: AccessPoint[]) {
+		this._aps = value;
+		this._apMap = new Map(value.map((ap) => [ap.id, ap]));
+	}
 
 	render(rc: RenderContext): void {
 		const { ctx, camera } = rc;
@@ -20,7 +31,7 @@ export class ConflictEdgeLayer implements Layer {
 		ctx.transform(a, b, c, d, e, f);
 
 		const zoom = camera.state.zoom;
-		const apMap = new Map(this.aps.map((ap) => [ap.id, ap]));
+		const apMap = this._apMap;
 
 		for (const edge of this.edges) {
 			const apA = apMap.get(edge.aId);

@@ -25,9 +25,10 @@ export class ApLayer implements Layer {
 		ctx.transform(a, b, c, d, e, f);
 
 		const screenScale = 1 / zoom;
+		const selectedSet = new Set(this.selectedIds);
 
 		for (const ap of this.aps) {
-			const isSelected = this.selectedIds.includes(ap.id);
+			const isSelected = selectedSet.has(ap.id);
 			const isHovered = this.hoveredId === ap.id;
 
 			const color =

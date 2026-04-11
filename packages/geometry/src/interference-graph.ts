@@ -1,4 +1,4 @@
-import { euclidean } from './distance.js';
+import { squaredEuclidean } from './distance.js';
 
 export interface ApPosition {
 	id: string;
@@ -23,8 +23,9 @@ export function buildInterferenceGraph(aps: ApPosition[]): {
 		for (let j = i + 1; j < aps.length; j++) {
 			const ai = aps[i]!;
 			const aj = aps[j]!;
-			const dist = euclidean({ x: ai.x, y: ai.y }, { x: aj.x, y: aj.y });
-			if (dist < ai.interferenceRadius + aj.interferenceRadius) {
+			const distSq = squaredEuclidean({ x: ai.x, y: ai.y }, { x: aj.x, y: aj.y });
+			const radiusSum = ai.interferenceRadius + aj.interferenceRadius;
+			if (distSq < radiusSum * radiusSum) {
 				edges.push({ a: ai.id, b: aj.id });
 			}
 		}

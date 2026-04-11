@@ -10,17 +10,29 @@ export interface CameraState {
 export class Camera {
 	state: CameraState = { x: 0, y: 0, zoom: 1 };
 
+	private _transform: Matrix2D | null = null;
+	private _inverse: Matrix2D | null = null;
+
+	private invalidateCache(): void {
+		this._transform = null;
+		this._inverse = null;
+	}
+
 	/** Get the world-to-screen transform matrix (in CSS-pixel space, no DPR). */
 	getTransform(): Matrix2D {
+		if (this._transform) return this._transform;
 		let m = identity();
 		m = scale(m, this.state.zoom, this.state.zoom);
 		m = translate(m, this.state.x, this.state.y);
+		this._transform = m;
 		return m;
 	}
 
 	/** Get screen-to-world transform (inverse) */
 	getInverseTransform(): Matrix2D {
-		return invert(this.getTransform());
+		if (this._inverse) return this._inverse;
+		this._inverse = invert(this.getTransform());
+		return this._inverse;
 	}
 
 	/** Convert screen coordinates to world coordinates */
@@ -36,19 +48,23 @@ export class Camera {
 	pan(dx: number, dy: number): void {
 		this.state.x += dx;
 		this.state.y += dy;
+		this.invalidateCache();
 	}
 
 	/** Zoom centered on a screen-space point */
 	zoomAt(screenPoint: Point, factor: number): void {
 		const worldBefore = this.screenToWorld(screenPoint);
 		this.state.zoom = Math.max(0.1, Math.min(10, this.state.zoom * factor));
+		this.invalidateCache();
 		const worldAfter = this.screenToWorld(screenPoint);
 		this.state.x += worldAfter.x - worldBefore.x;
 		this.state.y += worldAfter.y - worldBefore.y;
+		this.invalidateCache();
 	}
 
 	reset(): void {
 		this.state = { x: 0, y: 0, zoom: 1 };
+		this.invalidateCache();
 	}
 
 	getZoomPercent(): number {

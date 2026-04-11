@@ -8,6 +8,7 @@ export class CanvasEngine {
 	layers: Layer[] = [];
 
 	private dirty = true;
+	private running = false;
 	private animFrameId = 0;
 	private width = 0;
 	private height = 0;
@@ -34,6 +35,10 @@ export class CanvasEngine {
 
 	markDirty(): void {
 		this.dirty = true;
+		if (!this.running) {
+			this.running = true;
+			this.animFrameId = requestAnimationFrame(this.loop);
+		}
 	}
 
 	resize(width: number, height: number): void {
@@ -48,19 +53,23 @@ export class CanvasEngine {
 	}
 
 	start(): void {
-		const loop = (): void => {
-			if (this.dirty) {
-				this.render();
-				this.dirty = false;
-			}
-			this.animFrameId = requestAnimationFrame(loop);
-		};
-		this.animFrameId = requestAnimationFrame(loop);
+		this.markDirty();
 	}
 
 	stop(): void {
 		cancelAnimationFrame(this.animFrameId);
+		this.running = false;
 	}
+
+	private loop = (): void => {
+		if (this.dirty) {
+			this.render();
+			this.dirty = false;
+			this.animFrameId = requestAnimationFrame(this.loop);
+		} else {
+			this.running = false;
+		}
+	};
 
 	private render(): void {
 		const { ctx, camera, width, height, dpr } = this;

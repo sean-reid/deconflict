@@ -4,11 +4,18 @@ import { channelColor } from '@deconflict/channels';
 
 const UNASSIGNED_RING_COLOR = 'rgba(107, 113, 133, 0.15)';
 
+const hexToRgbaCache = new Map<string, string>();
+
 function hexToRgba(hex: string, alpha: number): string {
+	const key = hex + '|' + alpha;
+	const cached = hexToRgbaCache.get(key);
+	if (cached) return cached;
 	const r = parseInt(hex.slice(1, 3), 16);
 	const g = parseInt(hex.slice(3, 5), 16);
 	const b = parseInt(hex.slice(5, 7), 16);
-	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+	const result = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+	hexToRgbaCache.set(key, result);
+	return result;
 }
 
 export class RangeRingLayer implements Layer {
