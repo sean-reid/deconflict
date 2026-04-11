@@ -9,6 +9,7 @@ export class PanZoomHandler {
 	// Touch pinch-zoom state
 	private lastPinchDist = 0;
 	private lastPinchCenter = { x: 0, y: 0 };
+	private pinchStarted = false;
 
 	constructor(engine: CanvasEngine) {
 		this.engine = engine;
@@ -85,6 +86,7 @@ export class PanZoomHandler {
 				y: (t0.clientY + t1.clientY) / 2
 			};
 			this.isPanning = true;
+			this.pinchStarted = false; // skip the first move to avoid jump
 			this.lastX = this.lastPinchCenter.x;
 			this.lastY = this.lastPinchCenter.y;
 		}
@@ -96,18 +98,30 @@ export class PanZoomHandler {
 			const t0 = e.touches[0]!;
 			const t1 = e.touches[1]!;
 
-			// Pinch zoom
 			const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
 			const center = {
 				x: (t0.clientX + t1.clientX) / 2,
 				y: (t0.clientY + t1.clientY) / 2
 			};
 
+			if (!this.pinchStarted) {
+				// First move after pinch start: just record positions, don't apply
+				// This prevents the initial jump from finger settling
+				this.pinchStarted = true;
+				this.lastPinchDist = dist;
+				this.lastX = center.x;
+				this.lastY = center.y;
+				return;
+			}
+
+			// Pinch zoom
 			if (this.lastPinchDist > 0) {
 				const factor = dist / this.lastPinchDist;
+				// Clamp to prevent extreme jumps
+				const clampedFactor = Math.max(0.8, Math.min(1.2, factor));
 				const rect = this.engine.canvas.getBoundingClientRect();
 				const screenPoint = { x: center.x - rect.left, y: center.y - rect.top };
-				this.engine.camera.zoomAt(screenPoint, factor);
+				this.engine.camera.zoomAt(screenPoint, clampedFactor);
 			}
 
 			// Two-finger pan
@@ -126,5 +140,6 @@ export class PanZoomHandler {
 	private onTouchEnd = (_e: TouchEvent): void => {
 		this.lastPinchDist = 0;
 		this.isPanning = false;
+		this.pinchStarted = false;
 	};
 }
