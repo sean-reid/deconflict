@@ -19,9 +19,9 @@
 	let hasFloorplan = $derived(projectState.floorplanUrl !== null);
 
 	const sampleFloorplans = [
-		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.png', areaSqm: 48 },
-		{ name: 'House (120sqm)', file: '/samples/house-120sqm.png', areaSqm: 120 },
-		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.png', areaSqm: 300 },
+		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.svg', areaSqm: 48 },
+		{ name: 'House (120sqm)', file: '/samples/house-120sqm.svg', areaSqm: 120 },
+		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.svg', areaSqm: 300 },
 		{ name: 'West Wing (14000sqft)', file: '/samples/west-wing.svg', areaSqm: 1300 }
 	];
 

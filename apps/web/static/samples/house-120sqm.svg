@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 500" width="600" height="500">
+  <style>
+    .wall { stroke: #1a1a1a; stroke-width: 4; fill: none; }
+    .wall-thin { stroke: #1a1a1a; stroke-width: 3; fill: none; }
+    .door { stroke: #888; stroke-width: 2; stroke-dasharray: 4,3; fill: none; }
+    .label { font-family: sans-serif; font-size: 12px; fill: #999; text-anchor: middle; }
+    .dim { font-family: sans-serif; font-size: 10px; fill: #bbb; text-anchor: middle; }
+  </style>
+  <rect x="0" y="0" width="600" height="500" fill="#fff"/>
+
+  <!-- L-shaped outer walls -->
+  <polyline points="30,30 400,30 400,200 570,200 570,470 30,470" class="wall"/>
+  <line x1="30" y1="30" x2="30" y2="470" class="wall"/>
+
+  <!-- Garage (top-right extension) -->
+  <line x1="400" y1="30" x2="570" y2="30" class="wall"/>
+  <line x1="570" y1="30" x2="570" y2="200" class="wall"/>
+
+  <!-- Internal walls - top section -->
+  <line x1="220" y1="30" x2="220" y2="250" class="wall-thin"/>
+  <line x1="30" y1="250" x2="400" y2="250" class="wall-thin"/>
+
+  <!-- Kitchen/Dining divider -->
+  <line x1="220" y1="250" x2="220" y2="340" class="wall-thin"/>
+
+  <!-- Bottom section rooms -->
+  <line x1="30" y1="340" x2="400" y2="340" class="wall-thin"/>
+  <line x1="200" y1="340" x2="200" y2="470" class="wall-thin"/>
+  <line x1="400" y1="200" x2="400" y2="470" class="wall-thin"/>
+
+  <!-- Bathroom -->
+  <line x1="310" y1="340" x2="310" y2="470" class="wall-thin"/>
+
+  <!-- Upstairs hallway -->
+  <line x1="400" y1="340" x2="570" y2="340" class="wall-thin"/>
+
+  <!-- Labels -->
+  <text x="125" y="150" class="label">Living Room</text>
+  <text x="310" y="150" class="label">Master Bedroom</text>
+  <text x="485" y="120" class="label">Garage</text>
+  <text x="125" y="300" class="label">Kitchen</text>
+  <text x="310" y="300" class="label">Dining</text>
+  <text x="115" y="410" class="label">Bedroom 2</text>
+  <text x="255" y="410" class="label">Bath</text>
+  <text x="355" y="410" class="label">Laundry</text>
+  <text x="485" y="280" class="label">Family Room</text>
+  <text x="485" y="410" class="label">Study</text>
+
+  <!-- Dimensions -->
+  <text x="300" y="493" class="dim">12m x 10m = 120 sqm</text>
+</svg>
