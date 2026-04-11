@@ -33,7 +33,6 @@
 	let apLayer: ApLayer;
 	let rangeRingLayer: RangeRingLayer;
 	let conflictEdgeLayer: ConflictEdgeLayer;
-	let zoomPercent = $state(100);
 	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
 	let showEmptyHint = $derived(projectState.aps.length === 0 && !projectState.floorplanUrl);
 
@@ -137,7 +136,6 @@
 
 		// Track zoom for status bar
 		const zoomInterval = setInterval(() => {
-			zoomPercent = engine.camera.getZoomPercent();
 			canvasState.zoom = engine.camera.state.zoom;
 		}, 100);
 
@@ -217,12 +215,6 @@
 	$effect(() => {
 		if (!conflictEdgeLayer) return;
 		conflictEdgeLayer.visible = appState.showConflictEdges;
-		engine.markDirty();
-	});
-
-	$effect(() => {
-		if (!apLayer) return;
-		apLayer.visible = true;
 		engine.markDirty();
 	});
 

@@ -63,6 +63,7 @@
 			value={projectState.band}
 			options={bandOptions}
 			onchange={(val) => { projectState.band = val as Band; }}
+			aria-label="WiFi band"
 		/>
 
 		<div class="separator"></div>

@@ -50,6 +50,7 @@
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
+		if (!open) return;
 		if (e.key === 'Escape') {
 			open = false;
 		}
@@ -63,6 +64,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleKeyDown} />
+
 {#if open}
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
 	<div
@@ -70,9 +73,7 @@
 		role="dialog"
 		aria-modal="true"
 		aria-label="New Project"
-		tabindex="-1"
 		onclick={handleOverlayClick}
-		onkeydown={handleKeyDown}
 	>
 		<div class="dialog">
 			<h2 class="heading">New Project</h2>

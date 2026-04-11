@@ -87,7 +87,3 @@ export function clearAssignments(): void {
 		ap.assignedChannel = null;
 	}
 }
-
-export function getAp(id: string): AccessPoint | undefined {
-	return projectState.aps.find((a) => a.id === id);
-}

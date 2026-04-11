@@ -28,11 +28,14 @@
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
+		if (!open) return;
 		if (e.key === 'Escape') {
 			handleGetStarted();
 		}
 	}
 </script>
+
+<svelte:window onkeydown={handleKeyDown} />
 
 {#if open}
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions a11y_interactive_supports_focus -->
@@ -41,9 +44,7 @@
 		role="dialog"
 		aria-modal="true"
 		aria-label="Welcome to Deconflict"
-		tabindex="-1"
 		onclick={handleOverlayClick}
-		onkeydown={handleKeyDown}
 	>
 		<div class="dialog">
 			<div class="header">

@@ -20,18 +20,20 @@
 </script>
 
 {#if appState.sidebarOpen}
-	<aside class="sidebar">
-		<nav class="tab-bar">
+	<aside class="sidebar" aria-label="Sidebar">
+		<div class="tab-bar" role="tablist">
 			{#each tabs as tab}
 				<button
 					class="tab"
 					class:active={appState.sidebarPanel === tab.id}
+					role="tab"
+					aria-selected={appState.sidebarPanel === tab.id}
 					onclick={() => { appState.sidebarPanel = tab.id; }}
 				>
 					{tab.label}
 				</button>
 			{/each}
-		</nav>
+		</div>
 		<div class="panel-content">
 			{#if appState.sidebarPanel === 'aps'}
 				<FloorplanControls />
