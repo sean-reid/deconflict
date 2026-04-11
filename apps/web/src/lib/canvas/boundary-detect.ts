@@ -98,17 +98,39 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		}
 	}
 
-	// Step 4: Flood fill from border to mark exterior
+	// Step 3.5: Dilate walls to close door gaps before flood fill
+	// This prevents exterior flood from leaking into rooms through doorways
+	// Large dilation to close door/window openings so flood fill
+	// doesn't leak from exterior into rooms
+	const dilateR = Math.max(10, Math.round(w * 0.04));
+	const closed = new Uint8Array(binary);
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			if (binary[y * w + x] === 0) {
+				for (let dy = -dilateR; dy <= dilateR; dy++) {
+					for (let dx = -dilateR; dx <= dilateR; dx++) {
+						const nx = x + dx;
+						const ny = y + dy;
+						if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+							closed[ny * w + nx] = 0;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Step 4: Flood fill from border to mark exterior (using closed walls)
 	const exterior = new Uint8Array(w * h);
 	const queue: number[] = [];
 
 	for (let x = 0; x < w; x++) {
-		if (binary[x]) queue.push(x);
-		if (binary[(h - 1) * w + x]) queue.push((h - 1) * w + x);
+		if (closed[x]) queue.push(x);
+		if (closed[(h - 1) * w + x]) queue.push((h - 1) * w + x);
 	}
 	for (let y = 0; y < h; y++) {
-		if (binary[y * w]) queue.push(y * w);
-		if (binary[y * w + w - 1]) queue.push(y * w + w - 1);
+		if (closed[y * w]) queue.push(y * w);
+		if (closed[y * w + w - 1]) queue.push(y * w + w - 1);
 	}
 
 	while (queue.length > 0) {
@@ -117,10 +139,10 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		exterior[idx] = 1;
 		const x = idx % w;
 		const y = Math.floor(idx / w);
-		if (y > 0 && !exterior[idx - w] && binary[idx - w]) queue.push(idx - w);
-		if (y < h - 1 && !exterior[idx + w] && binary[idx + w]) queue.push(idx + w);
-		if (x > 0 && !exterior[idx - 1] && binary[idx - 1]) queue.push(idx - 1);
-		if (x < w - 1 && !exterior[idx + 1] && binary[idx + 1]) queue.push(idx + 1);
+		if (y > 0 && !exterior[idx - w] && closed[idx - w]) queue.push(idx - w);
+		if (y < h - 1 && !exterior[idx + w] && closed[idx + w]) queue.push(idx + w);
+		if (x > 0 && !exterior[idx - 1] && closed[idx - 1]) queue.push(idx - 1);
+		if (x < w - 1 && !exterior[idx + 1] && closed[idx + 1]) queue.push(idx + 1);
 	}
 
 	// Step 5: Interior = not exterior AND not wall

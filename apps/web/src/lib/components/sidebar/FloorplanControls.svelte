@@ -52,22 +52,32 @@
 			// For SVGs, strip text for cleaner boundary detection
 			const cleanImg = await prepareSvgForDetection(url);
 
-			// Boundary detection (uses cleaned image to avoid text noise)
+			// Boundary detection for area calculation
 			const result = detectBoundary(cleanImg);
 			if (result && result.polygon.length >= 3) {
-				// Scale using clean image's own dimensions since detection
-				// returns coordinates relative to cleanImg
 				const cleanScaleFactor = FLOORPLAN_TARGET_WIDTH / cleanImg.naturalWidth;
 				const worldPolygon = result.polygon.map((p) => ({
 					x: p.x * cleanScaleFactor,
 					y: p.y * cleanScaleFactor
 				}));
 				projectState.floorplanBoundary = worldPolygon;
-				detectedWorldArea = polygonArea(worldPolygon);
+
+				// Use bounding box of the polygon for area estimation
+				// This is more robust than pixel counting which can miss rooms
+				let pMinX = Infinity;
+				let pMinY = Infinity;
+				let pMaxX = -Infinity;
+				let pMaxY = -Infinity;
+				for (const p of worldPolygon) {
+					if (p.x < pMinX) pMinX = p.x;
+					if (p.y < pMinY) pMinY = p.y;
+					if (p.x > pMaxX) pMaxX = p.x;
+					if (p.y > pMaxY) pMaxY = p.y;
+				}
+				detectedWorldArea = (pMaxX - pMinX) * (pMaxY - pMinY);
 			}
 
-			// Wall detection uses ORIGINAL image so coordinates
-			// match FloorplanLayer exactly (same naturalWidth)
+			// Wall detection (uses original image for coordinate alignment)
 			const walls = detectWalls(originalImg);
 			if (walls.length > 0) {
 				projectState.walls = walls.map((w) => ({
