@@ -33,7 +33,11 @@ export class HeatmapLayer implements Layer {
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
 
-	private getCacheKey(camera: { state: { zoom: number; x: number; y: number } }): string {
+	private getCacheKey(
+		camera: { state: { zoom: number; x: number; y: number } },
+		width: number,
+		height: number
+	): string {
 		return (
 			this.aps
 				.map(
@@ -42,7 +46,8 @@ export class HeatmapLayer implements Layer {
 				)
 				.join('|') +
 			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|wa:${this.wallAttenuation}` +
-			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}`
+			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
+			`|${width}x${height}`
 		);
 	}
 
@@ -50,7 +55,7 @@ export class HeatmapLayer implements Layer {
 		if (this.aps.length === 0) return;
 
 		const { camera, width, height } = rc;
-		const key = this.getCacheKey(camera);
+		const key = this.getCacheKey(camera, width, height);
 
 		if (key !== this.cacheKey || !this.cache) {
 			this.cache = this.generateHeatmap(width, height, camera);
