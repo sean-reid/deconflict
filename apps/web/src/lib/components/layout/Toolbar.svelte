@@ -18,6 +18,31 @@
 	let newProjectOpen = $state(false);
 	let fileInputEl: HTMLInputElement;
 	let importError = $state<string | null>(null);
+	let editingName = $state(false);
+	let nameInputEl = $state<HTMLInputElement>();
+
+	function startRename() {
+		editingName = true;
+		// Focus after Svelte renders the input
+		setTimeout(() => {
+			nameInputEl?.select();
+			nameInputEl?.focus();
+		}, 0);
+	}
+
+	function commitRename() {
+		const trimmed = projectState.name.trim();
+		if (!trimmed) projectState.name = 'Untitled Project';
+		editingName = false;
+		scheduleSave();
+	}
+
+	function handleNameKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') commitRename();
+		if (e.key === 'Escape') {
+			editingName = false;
+		}
+	}
 
 	async function handleSaveProject() {
 		await downloadJson();
@@ -74,6 +99,26 @@
 <header class="toolbar">
 	<div class="toolbar-left">
 		<span class="logo">Deconflict</span>
+
+		<span class="separator">/</span>
+
+		{#if editingName}
+			<input
+				bind:this={nameInputEl}
+				class="project-name-input"
+				type="text"
+				bind:value={projectState.name}
+				onblur={commitRename}
+				onkeydown={handleNameKeydown}
+			/>
+		{:else}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<span
+				class="project-name"
+				ondblclick={startRename}
+				title="Double-click to rename"
+			>{projectState.name}</span>
+		{/if}
 
 		<Dropdown items={fileMenuItems}>
 			<Icon name="file" size={14} />
@@ -168,7 +213,46 @@
 		font-weight: 600;
 		color: var(--accent-primary);
 		user-select: none;
-		margin-right: 8px;
+	}
+
+	.separator {
+		color: var(--text-disabled);
+		font-size: 13px;
+		margin: 0 4px;
+		user-select: none;
+	}
+
+	.project-name {
+		font-family: var(--font-sans);
+		font-size: 13px;
+		color: var(--text-secondary);
+		cursor: default;
+		max-width: 180px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		padding: 2px 4px;
+		border-radius: var(--radius-sm);
+		margin-right: 4px;
+	}
+
+	.project-name:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.project-name-input {
+		font-family: var(--font-sans);
+		font-size: 13px;
+		color: var(--text-primary);
+		background: var(--bg-surface);
+		border: 1px solid var(--accent-primary);
+		border-radius: var(--radius-sm);
+		padding: 2px 6px;
+		height: 24px;
+		width: 160px;
+		outline: none;
+		margin-right: 4px;
 	}
 
 	.dropdown-label {
