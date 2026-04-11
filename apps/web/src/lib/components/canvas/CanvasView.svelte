@@ -237,10 +237,18 @@
 	});
 
 	// Auto-solve: debounce solver runs when APs change
+	// Auto-solve: only re-run when AP layout changes (count, positions, radii)
+	// NOT when channel assignments change (which would cause infinite loops)
+	let autoSolveKey = $derived(
+		projectState.aps
+			.map((ap) => `${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}`)
+			.join('|')
+	);
+
 	$effect(() => {
 		const auto = solverState.autoSolve;
-		const aps = projectState.aps;
-		if (!auto || aps.length === 0) return;
+		const _key = autoSolveKey;
+		if (!auto || projectState.aps.length === 0) return;
 		if (solverState.isRunning) return;
 
 		if (autoSolveTimeout) clearTimeout(autoSolveTimeout);
