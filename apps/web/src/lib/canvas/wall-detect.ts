@@ -462,17 +462,29 @@ function sampleBorderRgb(
 	return [Math.round(rSum / count), Math.round(gSum / count), Math.round(bSum / count)];
 }
 
+interface OcrBbox {
+	x0: number;
+	y0: number;
+	x1: number;
+	y1: number;
+}
+interface OcrSymbol {
+	bbox: OcrBbox;
+}
 interface OcrWord {
 	confidence: number;
 	text: string;
-	bbox: { x0: number; y0: number; x1: number; y1: number };
+	bbox: OcrBbox;
+	symbols?: OcrSymbol[];
 }
 interface OcrData {
-	blocks: Array<{ paragraphs: Array<{ lines: Array<{ words: OcrWord[] }> }> }> | null;
+	blocks: Array<{
+		paragraphs: Array<{ lines: Array<{ words: OcrWord[] }> }>;
+	}> | null;
 }
 
-/** Mask detected text by erasing only pixels that match text color within each word bbox.
- *  This traces the actual text contour instead of painting crude rectangles. */
+/** Mask text by erasing contrasting pixels within character-level bounding boxes.
+ *  Uses Tesseract's symbol (char) boxes for tight masking that preserves nearby walls. */
 function maskWords(
 	ctx: CanvasRenderingContext2D,
 	data: OcrData,
@@ -487,35 +499,40 @@ function maskWords(
 	const imgData = ctx.getImageData(0, 0, w, h);
 	const px = imgData.data;
 	const bgBright = (bgR + bgG + bgB) / 3;
-	// Detect if text is darker or lighter than background
 	const darkBg = bgBright < 128;
-	// For light bg: text is darker → erase pixels below 75% of bg brightness
-	// For dark bg: text is lighter → erase pixels above 125% of bg brightness
 	const loThreshold = darkBg ? 0 : bgBright * 0.75;
 	const hiThreshold = darkBg ? bgBright + (255 - bgBright) * 0.25 : 256;
+
+	function eraseContour(bbox: OcrBbox): void {
+		const bx0 = Math.max(0, bbox.x0 - pad);
+		const by0 = Math.max(0, bbox.y0 - pad);
+		const bx1 = Math.min(w - 1, bbox.x1 + pad);
+		const by1 = Math.min(h - 1, bbox.y1 + pad);
+		for (let y = by0; y <= by1; y++) {
+			for (let x = bx0; x <= bx1; x++) {
+				const i = (y * w + x) * 4;
+				const bright = (px[i]! + px[i + 1]! + px[i + 2]!) / 3;
+				if (darkBg ? bright > hiThreshold : bright < loThreshold) {
+					px[i] = bgR;
+					px[i + 1] = bgG;
+					px[i + 2] = bgB;
+				}
+			}
+		}
+	}
 
 	for (const block of data.blocks) {
 		for (const para of block.paragraphs) {
 			for (const line of para.lines) {
 				for (const word of line.words) {
 					if (word.confidence < 20 || word.text.length < 2) continue;
-					const { x0, y0, x1, y1 } = word.bbox;
-					const bx0 = Math.max(0, x0 - pad);
-					const by0 = Math.max(0, y0 - pad);
-					const bx1 = Math.min(w - 1, x1 + pad);
-					const by1 = Math.min(h - 1, y1 + pad);
-
-					for (let y = by0; y <= by1; y++) {
-						for (let x = bx0; x <= bx1; x++) {
-							const i = (y * w + x) * 4;
-							const bright = (px[i]! + px[i + 1]! + px[i + 2]!) / 3;
-							// Erase pixels that contrast with background (i.e., text-colored)
-							if (darkBg ? bright > hiThreshold : bright < loThreshold) {
-								px[i] = bgR;
-								px[i + 1] = bgG;
-								px[i + 2] = bgB;
-							}
+					// Use character-level boxes when available for tightest masking
+					if (word.symbols && word.symbols.length > 0) {
+						for (const sym of word.symbols) {
+							eraseContour(sym.bbox);
 						}
+					} else {
+						eraseContour(word.bbox);
 					}
 				}
 			}

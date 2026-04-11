@@ -20,6 +20,7 @@ interface SavedState {
 	targetThroughput: number;
 	wallMask?: { dataUrl: string; width: number; height: number } | null;
 	wallAttenuation?: number;
+	floorplanBoundary?: Array<{ x: number; y: number }> | null;
 	calibration: typeof projectState.calibration;
 }
 
@@ -41,6 +42,9 @@ function saveToStorage(): void {
 			targetThroughput: projectState.targetThroughput,
 			wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
 			wallAttenuation: projectState.wallAttenuation,
+			floorplanBoundary: projectState.floorplanBoundary
+				? JSON.parse(JSON.stringify(projectState.floorplanBoundary))
+				: null,
 			calibration: projectState.calibration
 				? JSON.parse(JSON.stringify(projectState.calibration))
 				: null
@@ -101,6 +105,7 @@ export function restoreFromStorage(): boolean {
 		projectState.targetThroughput = data.targetThroughput ?? 50;
 		projectState.wallMask = data.wallMask ?? null;
 		projectState.wallAttenuation = data.wallAttenuation ?? 5;
+		projectState.floorplanBoundary = data.floorplanBoundary ?? null;
 		projectState.calibration = data.calibration ?? null;
 
 		// Restore floorplan image

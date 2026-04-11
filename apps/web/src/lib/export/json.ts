@@ -13,6 +13,7 @@ interface ProjectFile {
 	floorplanImage?: string; // data URL of the floorplan image
 	floorplanScale: number;
 	calibration?: { worldUnitsPerMeter: number };
+	floorplanBoundary?: Array<{ x: number; y: number }> | null;
 	wallMask?: { dataUrl: string; width: number; height: number } | null;
 	wallAttenuation?: number;
 	aps: Array<{
@@ -68,6 +69,7 @@ export async function serialize(): Promise<string> {
 		floorplanImage,
 		floorplanScale: projectState.floorplanScale,
 		calibration: projectState.calibration ?? undefined,
+		floorplanBoundary: projectState.floorplanBoundary ?? undefined,
 		wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
 		wallAttenuation: projectState.wallAttenuation,
 		aps: projectState.aps.map((ap) => ({
@@ -108,6 +110,7 @@ export function deserialize(json: string): void {
 	projectState.unitSystem = data.unitSystem ?? 'imperial';
 	projectState.floorplanScale = data.floorplanScale ?? 0.4;
 	projectState.calibration = data.calibration ?? null;
+	projectState.floorplanBoundary = data.floorplanBoundary ?? null;
 	projectState.wallMask = data.wallMask ?? null;
 	projectState.wallAttenuation = data.wallAttenuation ?? 5;
 
