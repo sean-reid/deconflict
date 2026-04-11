@@ -1,5 +1,6 @@
 import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
+import { decodeMask } from '$canvas/wall-detect.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
 
 const bridge = new OptimizerBridge();
@@ -43,9 +44,12 @@ export async function runOptimizer(): Promise<void> {
 			? projectState.floorplanBoundary.map((p) => ({ x: p.x, y: p.y }))
 			: [];
 
+		// Decode mask on main thread (has canvas access) and send raw buffer
+		const decoded = await decodeMask(mask.dataUrl, mask.width, mask.height);
+
 		const result = await bridge.optimize(
 			aps,
-			mask.dataUrl,
+			decoded.data,
 			mask.width,
 			mask.height,
 			projectState.wallAttenuation,

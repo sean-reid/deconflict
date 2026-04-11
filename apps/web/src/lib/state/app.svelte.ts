@@ -1,7 +1,7 @@
 export type SidebarPanel = 'floorplan' | 'aps';
 
 export const appState = $state({
-	sidebarPanel: 'aps' as SidebarPanel,
+	sidebarPanel: 'floorplan' as SidebarPanel,
 	sidebarOpen: true,
 	showGrid: true,
 	showLabels: true,

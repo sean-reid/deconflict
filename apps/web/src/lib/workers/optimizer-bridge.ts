@@ -54,7 +54,7 @@ export class OptimizerBridge {
 
 	optimize(
 		aps: Array<{ id: string; x: number; y: number; interferenceRadius: number }>,
-		wallMaskDataUrl: string,
+		wallMask: Uint8Array,
 		maskWidth: number,
 		maskHeight: number,
 		wallAttenuation: number,
@@ -72,16 +72,19 @@ export class OptimizerBridge {
 			this.pendingReject = reject;
 			this.onProgress = options?.onProgress ?? null;
 
-			this.getWorker().postMessage({
-				type: 'optimize',
+			// Copy the mask so we can transfer it
+			const maskCopy = new Uint8Array(wallMask);
+			const msg = {
+				type: 'optimize' as const,
 				aps,
-				wallMaskDataUrl,
+				wallMask: maskCopy,
 				maskWidth,
 				maskHeight,
 				wallAttenuation,
 				iterations: options?.iterations ?? 5000,
 				boundary: options?.boundary ?? []
-			});
+			};
+			this.getWorker().postMessage(msg, [maskCopy.buffer]);
 		});
 	}
 
