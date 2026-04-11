@@ -54,7 +54,7 @@ export async function runOptimizer(): Promise<void> {
 			mask.height,
 			projectState.wallAttenuation,
 			{
-				iterations: 5000,
+				iterations: 10000,
 				boundary,
 				onProgress: (p: OptimizeProgress) => {
 					optimizerState.progress = Math.round((p.iteration / p.totalIterations) * 100);
@@ -63,13 +63,17 @@ export async function runOptimizer(): Promise<void> {
 			}
 		);
 
-		// Apply optimized positions
+		// Apply optimized positions - use Math.round to ensure integer coords
+		// that clearly differ from originals and trigger reactive updates
 		beginMove();
 		for (const pos of result.positions) {
-			updateAp(pos.id, { x: pos.x, y: pos.y });
+			updateAp(pos.id, { x: Math.round(pos.x), y: Math.round(pos.y) });
 		}
 		optimizerState.score = Math.round(result.score * 100);
 		scheduleSave();
+
+		// Force a small state mutation to guarantee canvas reactivity triggers
+		projectState.aps = [...projectState.aps];
 	} catch (err) {
 		if (err instanceof Error && err.message === 'Cancelled') {
 			// User cancelled - no error

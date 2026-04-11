@@ -203,6 +203,7 @@ function evaluateCoverage(
 			const dx = sample.x - ap.x;
 			const dy = sample.y - ap.y;
 			const dist = Math.sqrt(dx * dx + dy * dy);
+			// Use tighter falloff: signal within 1x radius, not 3x
 			let signal = signalStrength(dist, ap.radius);
 			if (signal > 0.001) {
 				const crossings = countWallCrossings(mask, w, h, ap.x, ap.y, sample.x, sample.y);
@@ -220,8 +221,10 @@ function evaluateCoverage(
 function signalStrength(distance: number, radius: number): number {
 	if (distance <= 0) return 1;
 	const ratio = distance / radius;
-	if (ratio >= 3) return 0;
-	return Math.pow(1 - ratio / 3, 2);
+	// Tighter than the heatmap model (1.5x radius max instead of 3x)
+	// to strongly incentivize spreading APs across the building
+	if (ratio >= 1.5) return 0;
+	return Math.pow(1 - ratio / 1.5, 2);
 }
 
 function countWallCrossings(
