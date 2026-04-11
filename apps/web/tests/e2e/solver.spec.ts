@@ -15,10 +15,13 @@ test.describe('Solver', () => {
 		await canvas.click({ position: { x: 350, y: 300 } });
 		await canvas.click({ position: { x: 325, y: 350 } });
 
-		// Auto-solve should run; wait for the status bar to show timing
+		// Auto-solve should run; go to AP list and check channels assigned
 		await page.waitForTimeout(2000);
-		const statusBar = page.locator('footer');
-		const statusText = await statusBar.textContent();
-		expect(statusText).toContain('ms');
+		await page.getByText('All APs').click();
+		await page.waitForTimeout(500);
+
+		// At least one AP should have a channel number visible
+		const apRows = page.locator('.row .channel:not(.unassigned)');
+		await expect(apRows.first()).toBeVisible();
 	});
 });

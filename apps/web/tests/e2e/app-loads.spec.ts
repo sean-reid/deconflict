@@ -14,6 +14,6 @@ test('app loads with dark theme and correct layout', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.locator('.logo')).toBeVisible();
 	await expect(page.locator('canvas')).toBeVisible();
+	await expect(page.getByRole('tab', { name: 'Floorplan' })).toBeVisible();
 	await expect(page.getByRole('tab', { name: 'APs' })).toBeVisible();
-	await expect(page.getByText('Add access points to get started')).toBeVisible();
 });

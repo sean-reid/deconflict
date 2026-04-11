@@ -29,9 +29,10 @@ test.describe('AP placement', () => {
 		await page.getByText('All APs').click();
 		await page.waitForTimeout(200);
 
-		// Status bar shows count
-		const footer = page.locator('footer');
-		await expect(footer).toContainText('3 access points');
+		// AP list shows all 3
+		await expect(page.locator('text=AP-1')).toBeVisible();
+		await expect(page.locator('text=AP-2')).toBeVisible();
+		await expect(page.locator('text=AP-3')).toBeVisible();
 	});
 
 	test('select an AP and see editor', async ({ page }) => {
