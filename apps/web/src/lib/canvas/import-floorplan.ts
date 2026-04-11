@@ -22,8 +22,6 @@ export async function importFloorplanFile(file: File): Promise<void> {
 	const isSvg = file.type === 'image/svg+xml';
 
 	try {
-		const originalImg = await loadImage(blobUrl);
-		const scaleFactor = FLOORPLAN_TARGET_WIDTH / originalImg.naturalWidth;
 		const cleanImg = await prepareSvgForDetection(blobUrl);
 
 		// Boundary detection
@@ -47,13 +45,4 @@ export async function importFloorplanFile(file: File): Promise<void> {
 	} catch (e) {
 		console.warn('Floorplan detection failed:', e);
 	}
-}
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-	return new Promise((resolve, reject) => {
-		const img = new Image();
-		img.onload = () => resolve(img);
-		img.onerror = reject;
-		img.src = url;
-	});
 }
