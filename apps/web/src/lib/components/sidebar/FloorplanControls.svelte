@@ -2,6 +2,7 @@
 	import { projectState } from '$state/project.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import { detectWalls } from '$canvas/wall-detect.js';
+	import { scheduleSave } from '$state/persistence.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
@@ -78,9 +79,10 @@
 					material: 'drywall',
 					attenuation: 5
 				}));
+				scheduleSave();
 			}
-		} catch {
-			// Detection failed silently
+		} catch (e) {
+			console.warn('Detection failed:', e);
 		}
 		detecting = false;
 	}
@@ -95,6 +97,7 @@
 		const worldUnitsPerMeter = Math.sqrt(detectedWorldArea / realAreaSqm);
 		projectState.calibration = { worldUnitsPerMeter };
 		calibrationDone = true;
+		scheduleSave();
 	}
 
 	function skipCalibration() {
