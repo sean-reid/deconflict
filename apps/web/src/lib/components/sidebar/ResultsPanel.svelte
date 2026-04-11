@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { solverState } from '$state/solver.svelte';
+	import { solverState, runSolver } from '$state/solver.svelte';
+	import { appState } from '$state/app.svelte';
 	import { projectState, clearAssignments } from '$state/project.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Toggle from '$components/shared/Toggle.svelte';
 	import Select from '$components/shared/Select.svelte';
-	import Tooltip from '$components/shared/Tooltip.svelte';
 	import { exportPng } from '$lib/export/png.js';
 	import { exportPdf } from '$lib/export/pdf.js';
 	import { getEngineRef } from '$canvas/engine-ref.js';
@@ -46,28 +46,17 @@
 
 	let hasResult = $derived(solverState.lastResult !== null);
 	let conflictCount = $derived(solverState.lastResult?.conflicts.length ?? 0);
-
-	function getApName(id: string): string {
-		return projectState.aps.find((a) => a.id === id)?.name ?? id;
-	}
-
-	let qualityLabel = $derived.by(() => {
-		if (!solverState.lastResult) return '';
-		const conflicts = solverState.lastResult.conflicts.length;
-		if (conflicts === 0) return 'Excellent';
-		if (conflicts <= 2) return 'Good';
-		return 'Needs attention';
-	});
 </script>
 
 <div class="results-panel">
 	<div class="section">
-		<Tooltip text="Automatically re-run the solver whenever you move or add access points." position="left">
-			<Toggle
-				bind:checked={solverState.autoSolve}
-				label="Auto-solve on changes"
-			/>
-		</Tooltip>
+		<Button variant="primary" disabled={solverState.isRunning} onclick={() => runSolver()}>
+			{solverState.isRunning ? 'Solving...' : 'Solve'}
+		</Button>
+		<Toggle
+			bind:checked={solverState.autoSolve}
+			label="Auto-solve on changes"
+		/>
 	</div>
 
 	{#if solverState.error}
@@ -78,58 +67,23 @@
 
 	{#if hasResult}
 		<div class="section">
-			<div class="section-header">RESULTS</div>
-
-			<div class="result-row">
-				<Tooltip text="The number of different channels assigned. Fewer is better since it means less spectrum used." position="left">
-					<span class="result-label">Colors used</span>
-				</Tooltip>
-				<span class="result-value accent">{solverState.lastResult?.colorCount}</span>
-			</div>
-
-			<div class="result-row">
-				<Tooltip text="Pairs of nearby access points on the same channel. Zero is the goal." position="left">
-					<span class="result-label">Conflicts</span>
-				</Tooltip>
-				<span class="result-value" class:conflict-zero={conflictCount === 0} class:conflict-bad={conflictCount > 0}>
-					{conflictCount}
+			<div class="quick-stats">
+				<span class="stat">
+					<span class="stat-value accent">{solverState.lastResult?.colorCount}</span> ch
+				</span>
+				<span class="stat-sep">/</span>
+				<span class="stat">
+					<span class="stat-value" class:conflict-zero={conflictCount === 0} class:conflict-bad={conflictCount > 0}>{conflictCount}</span> conflicts
+				</span>
+				<span class="stat-sep">/</span>
+				<span class="stat">
+					<span class="stat-value mono">{solverState.lastTiming.toFixed(1)}</span>ms
 				</span>
 			</div>
-
-			<div class="result-row">
-				<span class="result-label">Time</span>
-				<span class="result-value mono">{solverState.lastTiming.toFixed(1)}ms</span>
-			</div>
-
-			<div class="result-row">
-				<Tooltip text="Overall assessment of the channel plan based on the number of conflicts." position="left">
-					<span class="result-label">Quality</span>
-				</Tooltip>
-				<span class="result-value" class:quality-excellent={qualityLabel === 'Excellent'} class:quality-good={qualityLabel === 'Good'} class:quality-bad={qualityLabel === 'Needs attention'}>
-					{qualityLabel}
-				</span>
-			</div>
-		</div>
-
-		<div class="section">
 			<Button variant="ghost" onclick={handleClear}>
-				Clear Assignments
+				Clear assignments
 			</Button>
 		</div>
-
-		{#if solverState.throughputEstimates.length > 0}
-			<div class="section">
-				<div class="section-header">ESTIMATED THROUGHPUT</div>
-				{#each solverState.throughputEstimates as est}
-					<div class="throughput-row">
-						<span class="throughput-name">{getApName(est.apId)}</span>
-						<span class="throughput-value" class:below-target={!est.meetsTarget}>
-							{est.cappedRate} Mbps
-						</span>
-					</div>
-				{/each}
-			</div>
-		{/if}
 	{:else}
 		<div class="section">
 			<p class="hint">Place APs and click Solve</p>
@@ -139,7 +93,19 @@
 	<div class="divider"></div>
 
 	<div class="section">
-		<div class="section-header">IMAGE EXPORT</div>
+		<div class="section-header">LAYERS</div>
+		<Toggle bind:checked={appState.showHeatmap} label="Signal heatmap" />
+		<Toggle bind:checked={appState.showFloorplan} label="Floorplan" />
+		<Toggle bind:checked={appState.showAPs} label="Access points" />
+		<Toggle bind:checked={appState.showRangeRings} label="Coverage rings" />
+		<Toggle bind:checked={appState.showLabels} label="Labels" />
+		<Toggle bind:checked={appState.showGrid} label="Grid" />
+	</div>
+
+	<div class="divider"></div>
+
+	<div class="section">
+		<div class="section-header">EXPORT</div>
 		<div class="field-row">
 			<span class="field-label">Resolution</span>
 			<Select
@@ -149,18 +115,13 @@
 				aria-label="Export resolution"
 			/>
 		</div>
-		<Toggle bind:checked={includeGrid} label="Include Grid" />
+		<Toggle bind:checked={includeGrid} label="Include grid" />
 		<Button variant="primary" onclick={handleExportPng}>
 			Export PNG
 		</Button>
-	</div>
-
-	<div class="section">
-		<div class="section-header">PDF REPORT</div>
 		<Button variant="primary" onclick={handleExportPdf}>
-			Generate Report
+			Export PDF
 		</Button>
-		<p class="description">Canvas snapshot with AP schedule table</p>
 	</div>
 </div>
 
@@ -211,31 +172,39 @@
 		padding: var(--space-2);
 	}
 
-	.result-row {
+	.quick-stats {
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
-		padding: var(--space-1) var(--space-2);
+		justify-content: center;
+		gap: var(--space-2);
+		padding: var(--space-2);
 		background: var(--bg-surface);
 		border-radius: var(--radius-md);
-	}
-
-	.result-label {
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
 	}
 
-	.result-value {
+	.stat {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.stat-sep {
+		color: var(--text-tertiary);
+	}
+
+	.stat-value {
 		font-family: var(--font-mono);
-		font-size: var(--text-sm);
+		font-weight: 600;
 		color: var(--text-primary);
 	}
 
-	.result-value.accent {
+	.stat-value.accent {
 		color: var(--accent-primary);
 	}
 
-	.result-value.mono {
+	.stat-value.mono {
 		color: var(--text-secondary);
 	}
 
@@ -244,18 +213,6 @@
 	}
 
 	.conflict-bad {
-		color: var(--color-error);
-	}
-
-	.quality-excellent {
-		color: var(--color-success);
-	}
-
-	.quality-good {
-		color: var(--color-warning);
-	}
-
-	.quality-bad {
 		color: var(--color-error);
 	}
 
@@ -268,35 +225,5 @@
 	.field-label {
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
-	}
-
-	.description {
-		font-size: var(--text-xs);
-		color: var(--text-tertiary);
-		margin: 0;
-	}
-
-	.throughput-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: var(--space-1) var(--space-2);
-		background: var(--bg-surface);
-		border-radius: var(--radius-md);
-	}
-
-	.throughput-name {
-		font-size: var(--text-sm);
-		color: var(--text-secondary);
-	}
-
-	.throughput-value {
-		font-family: var(--font-mono);
-		font-size: var(--text-sm);
-		color: var(--text-primary);
-	}
-
-	.throughput-value.below-target {
-		color: var(--color-error);
 	}
 </style>

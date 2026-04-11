@@ -3,6 +3,7 @@ import { getAvailableChannels, estimateThroughput } from '@deconflict/channels';
 import type { ThroughputEstimate, ThroughputInput } from '@deconflict/channels';
 import type { SolverResult, ComparisonResult } from '@deconflict/solver';
 import { projectState, updateAp, clearAssignments } from './project.svelte.js';
+import { appState } from './app.svelte.js';
 import { SolverBridge } from '../workers/solver-bridge.js';
 
 type Algorithm = 'greedy' | 'dsatur' | 'welsh-powell' | 'backtracking';
@@ -126,6 +127,8 @@ export async function runSolver(): Promise<void> {
 		clearAssignments();
 		applyAssignments(result.assignment);
 		computeThroughput();
+		appState.showHeatmap = true;
+		appState.sidebarPanel = 'results';
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Solver failed';
 	} finally {
@@ -162,6 +165,8 @@ export async function runComparison(): Promise<void> {
 			clearAssignments();
 			applyAssignments(best.assignment);
 			computeThroughput();
+			appState.showHeatmap = true;
+			appState.sidebarPanel = 'results';
 		}
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Comparison failed';

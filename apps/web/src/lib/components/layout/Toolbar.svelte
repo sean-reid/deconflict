@@ -47,17 +47,6 @@
 		{ value: '6ghz', label: '6 GHz' }
 	];
 
-	const viewToggles: Array<{
-		key: 'showGrid' | 'showRangeRings' | 'showConflictEdges' | 'showLabels' | 'showHeatmap';
-		icon: string;
-		label: string;
-	}> = [
-		{ key: 'showGrid', icon: 'grid', label: 'Grid' },
-		{ key: 'showRangeRings', icon: 'radio', label: 'Range rings' },
-		{ key: 'showConflictEdges', icon: 'link', label: 'Conflict edges' },
-		{ key: 'showLabels', icon: 'tag', label: 'Labels' },
-		{ key: 'showHeatmap', icon: 'heatmap', label: 'Signal heatmap' }
-	];
 </script>
 
 <header class="toolbar">
@@ -120,22 +109,6 @@
 			{solverState.isRunning ? 'Solving...' : 'Solve'}
 		</Button>
 
-		<div class="separator"></div>
-
-		<div class="view-toggles">
-			{#each viewToggles as toggle}
-				<Tooltip text={toggle.label} position="bottom">
-					<button
-						class="view-btn"
-						class:active={appState[toggle.key]}
-						onclick={() => { appState[toggle.key] = !appState[toggle.key]; }}
-						aria-label={toggle.label}
-					>
-						<Icon name={toggle.icon} size={14} />
-					</button>
-				</Tooltip>
-			{/each}
-		</div>
 	</div>
 
 	<div class="toolbar-right">
@@ -235,40 +208,6 @@
 		outline-offset: 1px;
 	}
 
-	.view-toggles {
-		display: flex;
-		align-items: center;
-		gap: 2px;
-	}
-
-	.view-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		border: none;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		color: var(--text-tertiary);
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.view-btn:hover {
-		background: var(--bg-hover);
-		color: var(--text-secondary);
-	}
-
-	.view-btn.active {
-		color: var(--accent-primary);
-	}
-
-	.view-btn:focus-visible {
-		outline: 2px solid var(--accent-primary);
-		outline-offset: 1px;
-	}
-
 	.hidden-input {
 		display: none;
 	}
@@ -281,10 +220,6 @@
 		}
 
 		.toolbar-left::-webkit-scrollbar {
-			display: none;
-		}
-
-		.view-toggles {
 			display: none;
 		}
 	}

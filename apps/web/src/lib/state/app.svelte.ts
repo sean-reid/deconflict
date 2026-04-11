@@ -7,5 +7,7 @@ export const appState = $state({
 	showRangeRings: true,
 	showConflictEdges: true,
 	showLabels: true,
-	showHeatmap: false
+	showHeatmap: false,
+	showFloorplan: true,
+	showAPs: true
 });

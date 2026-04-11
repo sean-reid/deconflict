@@ -33,17 +33,12 @@ test.describe('Solver', () => {
 		await canvas.click({ position: { x: 400, y: 300 } });
 		await page.waitForTimeout(200);
 
-		// Click Solve in toolbar
+		// Click Solve in toolbar - this auto-switches to Results tab
 		await page.getByRole('button', { name: 'Solve', exact: true }).click();
 		await page.waitForTimeout(1500);
 
-		// Switch to Results tab
-		await page.getByRole('tab', { name: 'Results' }).click();
-		await page.waitForTimeout(200);
-
-		// Should see results section
-		await expect(page.getByText('Colors used')).toBeVisible();
-		await expect(page.getByText('Conflicts')).toBeVisible();
-		await expect(page.getByText('Time')).toBeVisible();
+		// Should see compact stats line with channels, conflicts, and timing
+		await expect(page.locator('.quick-stats')).toBeVisible();
+		await expect(page.getByText('conflicts')).toBeVisible();
 	});
 });

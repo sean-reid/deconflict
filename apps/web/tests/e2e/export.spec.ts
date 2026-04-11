@@ -15,11 +15,10 @@ test.describe('Export', () => {
 		// Go to Results tab
 		await page.getByRole('tab', { name: 'Results' }).click();
 
-		// Export sections should be visible in Results panel
-		await expect(page.getByText('IMAGE EXPORT')).toBeVisible();
-		await expect(page.getByText('PDF REPORT')).toBeVisible();
+		// Export section should be visible in Results panel
+		await expect(page.getByText('EXPORT', { exact: true })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Generate Report' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Export PDF' })).toBeVisible();
 
 		// Save and Open are now in the toolbar
 		await expect(page.locator('header').getByLabel('Save project')).toBeVisible();

@@ -2,25 +2,30 @@ import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/project.svelte.js';
 import { getBaseRate } from '@deconflict/channels';
 
-const CELL_SIZE = 8; // pixels per cell at 1x zoom (lower = more detail, slower)
+const CELL_SIZE = 8;
 
-// Simple indoor path loss: signal drops with distance
-// Returns a value 0.0 (no signal) to 1.0 (max signal)
+// Indoor signal model: signal attenuates with distance
+// Returns 0.0 (no usable signal) to 1.0 (max signal at AP)
+// Signal extends well beyond interferenceRadius but gets very weak
 function signalStrength(distance: number, radius: number): number {
 	if (distance <= 0) return 1;
-	if (distance >= radius) return 0;
-	// Inverse square-ish falloff, smoothed
+	// Use a smooth exponential-ish falloff
+	// At radius distance, signal is ~25% (still usable but weak)
+	// At 2x radius, signal is ~5% (very weak)
+	// At 3x radius, effectively zero
 	const ratio = distance / radius;
-	return Math.max(0, 1 - ratio * ratio);
+	if (ratio >= 3) return 0;
+	return Math.max(0, Math.pow(1 - ratio / 3, 2));
 }
 
-// Map throughput ratio (0-1) to heatmap color
+// 5-band discrete colors for quick zone identification
 function throughputColor(ratio: number): string {
-	if (ratio <= 0) return 'rgba(40, 40, 50, 0.4)'; // dead zone
-	if (ratio < 0.15) return `rgba(255, 68, 68, ${0.3 + ratio})`; // red
-	if (ratio < 0.4) return `rgba(255, 184, 0, ${0.25 + ratio * 0.5})`; // amber
-	if (ratio < 0.7) return `rgba(255, 230, 0, ${0.2 + ratio * 0.3})`; // yellow
-	return `rgba(0, 255, 136, ${0.15 + ratio * 0.2})`; // green
+	if (ratio <= 0) return 'rgba(60, 30, 30, 0.45)';
+	if (ratio < 0.1) return 'rgba(180, 40, 40, 0.50)';
+	if (ratio < 0.3) return 'rgba(220, 120, 20, 0.45)';
+	if (ratio < 0.55) return 'rgba(210, 190, 30, 0.40)';
+	if (ratio < 0.8) return 'rgba(100, 180, 80, 0.35)';
+	return 'rgba(40, 150, 40, 0.35)';
 }
 
 export class HeatmapLayer implements Layer {
@@ -29,7 +34,6 @@ export class HeatmapLayer implements Layer {
 	aps: AccessPoint[] = [];
 	ispSpeed = 0;
 
-	// Cache the offscreen canvas
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
 
@@ -41,7 +45,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|zoom:${camera.state.zoom}:x:${Math.round(camera.state.x)}:y:${Math.round(camera.state.y)}`
+			`|isp:${this.ispSpeed}|z:${camera.state.zoom.toFixed(2)}:x:${Math.round(camera.state.x)}:y:${Math.round(camera.state.y)}`
 		);
 	}
 
@@ -51,13 +55,11 @@ export class HeatmapLayer implements Layer {
 		const { ctx, camera, width, height } = rc;
 		const key = this.getCacheKey(camera);
 
-		// Regenerate cache if data changed
 		if (key !== this.cacheKey || !this.cache) {
 			this.cache = this.generateHeatmap(width, height, camera);
 			this.cacheKey = key;
 		}
 
-		// Draw cached heatmap (in screen space, not world space)
 		ctx.resetTransform();
 		ctx.drawImage(this.cache, 0, 0);
 	}
@@ -72,7 +74,7 @@ export class HeatmapLayer implements Layer {
 		const cols = Math.ceil(width / cellSize);
 		const rows = Math.ceil(height / cellSize);
 
-		// Find max possible throughput for normalization
+		// Max throughput for normalization
 		let maxThroughput = 0;
 		for (const ap of this.aps) {
 			const base = getBaseRate(ap.band, ap.channelWidth) * 0.5;
@@ -83,14 +85,13 @@ export class HeatmapLayer implements Layer {
 		}
 		if (maxThroughput <= 0) maxThroughput = 100;
 
-		// For each cell, compute throughput
 		for (let row = 0; row < rows; row++) {
 			for (let col = 0; col < cols; col++) {
 				const screenX = col * cellSize + cellSize / 2;
 				const screenY = row * cellSize + cellSize / 2;
 				const worldPoint = camera.screenToWorld({ x: screenX, y: screenY });
 
-				// Find signal from each AP at this point
+				// Find best signal from any AP at this point
 				let bestSignal = 0;
 				let bestAp: AccessPoint | null = null;
 
@@ -105,22 +106,17 @@ export class HeatmapLayer implements Layer {
 					}
 				}
 
-				if (bestAp && bestSignal > 0) {
-					// Base throughput for this AP
+				if (bestAp && bestSignal > 0.001) {
 					const base = getBaseRate(bestAp.band, bestAp.channelWidth) * 0.5;
-
-					// Reduce by distance (signal strength)
 					let throughput = base * bestSignal;
-
-					// Cap by ISP speed
 					if (this.ispSpeed > 0) {
 						throughput = Math.min(throughput, this.ispSpeed);
 					}
-
 					const ratio = throughput / maxThroughput;
 					ctx.fillStyle = throughputColor(ratio);
 				} else {
-					ctx.fillStyle = 'rgba(40, 40, 50, 0.3)';
+					// Dead zone - no signal from any AP
+					ctx.fillStyle = 'rgba(60, 30, 30, 0.45)';
 				}
 
 				ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);

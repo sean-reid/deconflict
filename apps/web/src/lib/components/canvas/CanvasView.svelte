@@ -240,6 +240,18 @@
 		engine.markDirty();
 	});
 
+	$effect(() => {
+		if (!floorplanLayer) return;
+		floorplanLayer.visible = appState.showFloorplan;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!apLayer) return;
+		apLayer.visible = appState.showAPs;
+		engine.markDirty();
+	});
+
 	// Sync floorplan image to layer
 	$effect(() => {
 		if (!floorplanLayer) return;
