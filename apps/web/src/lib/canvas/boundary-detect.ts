@@ -4,13 +4,11 @@ export interface BoundaryResult {
 }
 
 /**
- * For SVG URLs, strip text elements before rendering to avoid
- * text labels being detected as part of the building boundary.
+ * Strip text elements from SVG before rendering for cleaner detection.
  */
 export async function prepareSvgForDetection(url: string): Promise<HTMLImageElement> {
 	const img = new Image();
 
-	// Try to fetch and clean SVG text
 	try {
 		const response = await fetch(url);
 		const text = await response.text();
@@ -21,13 +19,9 @@ export async function prepareSvgForDetection(url: string): Promise<HTMLImageElem
 			const svg = doc.querySelector('svg');
 
 			if (svg) {
-				// Remove all text elements
-				const textElements = svg.querySelectorAll('text, tspan');
-				textElements.forEach((el) => el.remove());
-
-				// Also remove small circles/dots that might be legend markers
-				const circles = svg.querySelectorAll('circle');
-				circles.forEach((el) => {
+				// Remove text, tspan, and small decorative elements
+				svg.querySelectorAll('text, tspan').forEach((el) => el.remove());
+				svg.querySelectorAll('circle').forEach((el) => {
 					const r = parseFloat(el.getAttribute('r') || '0');
 					if (r < 5) el.remove();
 				});
@@ -47,10 +41,9 @@ export async function prepareSvgForDetection(url: string): Promise<HTMLImageElem
 			}
 		}
 	} catch {
-		// Fall through to loading original
+		// Fall through
 	}
 
-	// Fallback: load original image
 	return new Promise((resolve, reject) => {
 		img.onload = () => resolve(img);
 		img.onerror = reject;
@@ -76,13 +69,10 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 	// Step 1: Grayscale
 	const gray = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		const r = data[i * 4]!;
-		const g = data[i * 4 + 1]!;
-		const b = data[i * 4 + 2]!;
-		gray[i] = Math.round((r + g + b) / 3);
+		gray[i] = Math.round((data[i * 4]! + data[i * 4 + 1]! + data[i * 4 + 2]!) / 3);
 	}
 
-	// Step 2: Detect background color from edges
+	// Step 2: Detect background from edges
 	let edgeSum = 0;
 	let edgeCount = 0;
 	for (let x = 0; x < w; x++) {
@@ -95,110 +85,155 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		edgeSum += gray[y * w + w - 1]!;
 		edgeCount += 2;
 	}
-	const edgeAvg = edgeSum / edgeCount;
-	const darkBackground = edgeAvg < 128;
+	const darkBg = edgeSum / edgeCount < 128;
 
-	// Step 3: Threshold - mark wall/content pixels as 0, background as 1
-	const threshold = darkBackground ? 80 : 160;
+	// Step 3: Binary threshold (1 = passable/background, 0 = wall)
+	const threshold = darkBg ? 80 : 160;
 	const binary = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		if (darkBackground) {
+		if (darkBg) {
 			binary[i] = gray[i]! > threshold ? 0 : 1;
 		} else {
 			binary[i] = gray[i]! < threshold ? 0 : 1;
 		}
 	}
 
-	// Step 4: Find connected components of wall pixels (0)
-	// Keep only the largest component to discard text, labels, legends
-	const labels = new Int32Array(w * h);
-	labels.fill(-1);
-	const componentSizes: number[] = [];
-	let nextLabel = 0;
+	// Step 4: Flood fill from border to mark exterior
+	const exterior = new Uint8Array(w * h);
+	const queue: number[] = [];
+
+	for (let x = 0; x < w; x++) {
+		if (binary[x]) queue.push(x);
+		if (binary[(h - 1) * w + x]) queue.push((h - 1) * w + x);
+	}
+	for (let y = 0; y < h; y++) {
+		if (binary[y * w]) queue.push(y * w);
+		if (binary[y * w + w - 1]) queue.push(y * w + w - 1);
+	}
+
+	while (queue.length > 0) {
+		const idx = queue.pop()!;
+		if (exterior[idx]) continue;
+		exterior[idx] = 1;
+		const x = idx % w;
+		const y = Math.floor(idx / w);
+		if (y > 0 && !exterior[idx - w] && binary[idx - w]) queue.push(idx - w);
+		if (y < h - 1 && !exterior[idx + w] && binary[idx + w]) queue.push(idx + w);
+		if (x > 0 && !exterior[idx - 1] && binary[idx - 1]) queue.push(idx - 1);
+		if (x < w - 1 && !exterior[idx + 1] && binary[idx + 1]) queue.push(idx + 1);
+	}
+
+	// Step 5: Interior = not exterior AND not wall
+	// Mark interior regions, then find connected interior blobs
+	const interior = new Uint8Array(w * h);
+	for (let i = 0; i < w * h; i++) {
+		if (!exterior[i] && binary[i]) {
+			interior[i] = 1; // passable space inside walls
+		}
+	}
+
+	// Step 6: Find connected interior blobs
+	const blobLabels = new Int32Array(w * h);
+	blobLabels.fill(-1);
+	const blobSizes: number[] = [];
+	const blobBounds: Array<{ minX: number; minY: number; maxX: number; maxY: number }> = [];
+	let nextBlob = 0;
 
 	for (let i = 0; i < w * h; i++) {
-		if (binary[i] === 0 && labels[i] === -1) {
-			// BFS to label this component
-			const label = nextLabel++;
+		if (interior[i] && blobLabels[i] === -1) {
+			const label = nextBlob++;
 			let size = 0;
-			const queue = [i];
-			labels[i] = label;
+			const bounds = { minX: w, minY: h, maxX: 0, maxY: 0 };
+			const bq = [i];
+			blobLabels[i] = label;
 
-			while (queue.length > 0) {
-				const idx = queue.pop()!;
+			while (bq.length > 0) {
+				const idx = bq.pop()!;
 				size++;
 				const x = idx % w;
 				const y = Math.floor(idx / w);
+				if (x < bounds.minX) bounds.minX = x;
+				if (x > bounds.maxX) bounds.maxX = x;
+				if (y < bounds.minY) bounds.minY = y;
+				if (y > bounds.maxY) bounds.maxY = y;
 
-				const neighbors = [
+				const ns = [
 					y > 0 ? idx - w : -1,
 					y < h - 1 ? idx + w : -1,
 					x > 0 ? idx - 1 : -1,
 					x < w - 1 ? idx + 1 : -1
 				];
-
-				for (const n of neighbors) {
-					if (n >= 0 && binary[n] === 0 && labels[n] === -1) {
-						labels[n] = label;
-						queue.push(n);
+				for (const n of ns) {
+					if (n >= 0 && interior[n] && blobLabels[n] === -1) {
+						blobLabels[n] = label;
+						bq.push(n);
 					}
 				}
 			}
 
-			componentSizes.push(size);
+			blobSizes.push(size);
+			blobBounds.push(bounds);
 		}
 	}
 
-	if (componentSizes.length === 0) return null;
+	if (blobSizes.length === 0) return null;
 
-	// Find the largest component
-	let largestLabel = 0;
-	let largestSize = 0;
-	for (let i = 0; i < componentSizes.length; i++) {
-		if (componentSizes[i]! > largestSize) {
-			largestSize = componentSizes[i]!;
-			largestLabel = i;
+	// Step 7: The building interior is the largest blob
+	// But also include smaller blobs that are INSIDE the bounding box
+	// of the largest blob (these are rooms separated by walls)
+	let mainBlob = 0;
+	let mainSize = 0;
+	for (let i = 0; i < blobSizes.length; i++) {
+		if (blobSizes[i]! > mainSize) {
+			mainSize = blobSizes[i]!;
+			mainBlob = i;
 		}
 	}
 
-	// Step 5: Create cleaned binary - only keep largest component as walls
-	const cleaned = new Uint8Array(w * h);
-	cleaned.fill(1); // all background
+	const mainBounds = blobBounds[mainBlob]!;
+
+	// Include all blobs whose center falls within the main blob's bounding box
+	// (these are rooms inside the building separated by interior walls)
+	const buildingMask = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		if (labels[i] === largestLabel) {
-			cleaned[i] = 0; // wall
+		if (blobLabels[i] === mainBlob) {
+			buildingMask[i] = 1;
+		} else if (blobLabels[i] >= 0) {
+			const blob = blobLabels[i]!;
+			const b = blobBounds[blob]!;
+			const cx = (b.minX + b.maxX) / 2;
+			const cy = (b.minY + b.maxY) / 2;
+			// Is this blob's center inside the main building bounds?
+			if (
+				cx >= mainBounds.minX &&
+				cx <= mainBounds.maxX &&
+				cy >= mainBounds.minY &&
+				cy <= mainBounds.maxY
+			) {
+				buildingMask[i] = 1;
+			}
 		}
 	}
 
-	// Step 6: Flood fill from border to find exterior
-	const visited = new Uint8Array(w * h);
-	const floodQueue: number[] = [];
-
-	for (let x = 0; x < w; x++) {
-		if (cleaned[x]) floodQueue.push(x);
-		if (cleaned[(h - 1) * w + x]) floodQueue.push((h - 1) * w + x);
-	}
-	for (let y = 0; y < h; y++) {
-		if (cleaned[y * w]) floodQueue.push(y * w);
-		if (cleaned[y * w + w - 1]) floodQueue.push(y * w + w - 1);
-	}
-
-	while (floodQueue.length > 0) {
-		const idx = floodQueue.pop()!;
-		if (visited[idx]) continue;
-		visited[idx] = 1;
-
-		const x = idx % w;
-		const y = Math.floor(idx / w);
-
-		if (y > 0 && !visited[idx - w] && cleaned[idx - w]) floodQueue.push(idx - w);
-		if (y < h - 1 && !visited[idx + w] && cleaned[idx + w]) floodQueue.push(idx + w);
-		if (x > 0 && !visited[idx - 1] && cleaned[idx - 1]) floodQueue.push(idx - 1);
-		if (x < w - 1 && !visited[idx + 1] && cleaned[idx + 1]) floodQueue.push(idx + 1);
+	// Also include wall pixels that are inside the main bounds
+	// (interior walls are part of the building footprint)
+	for (let i = 0; i < w * h; i++) {
+		if (binary[i] === 0 && !exterior[i]) {
+			// Wall pixel, not exterior
+			const x = i % w;
+			const y = Math.floor(i / w);
+			if (
+				x >= mainBounds.minX &&
+				x <= mainBounds.maxX &&
+				y >= mainBounds.minY &&
+				y <= mainBounds.maxY
+			) {
+				buildingMask[i] = 1;
+			}
+		}
 	}
 
-	// Step 7: Everything NOT visited (not reachable from border) is inside the building
-	const mask = new Uint8Array(w * h);
+	// Step 8: Compute area and trace boundary
 	let areaPx = 0;
 	let minX = w;
 	let maxX = 0;
@@ -206,8 +241,7 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 	let maxY = 0;
 
 	for (let i = 0; i < w * h; i++) {
-		if (!visited[i]) {
-			mask[i] = 1;
+		if (buildingMask[i]) {
 			areaPx++;
 			const x = i % w;
 			const y = Math.floor(i / w);
@@ -222,7 +256,7 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 
 	const areaOriginal = areaPx / (scale * scale);
 
-	// Step 8: Trace boundary polygon
+	// Trace boundary
 	const leftEdge: Array<{ x: number; y: number }> = [];
 	const rightEdge: Array<{ x: number; y: number }> = [];
 
@@ -231,13 +265,13 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		let lx = -1;
 		let rx = -1;
 		for (let x = minX; x <= maxX; x++) {
-			if (mask[y * w + x]) {
+			if (buildingMask[y * w + x]) {
 				lx = x;
 				break;
 			}
 		}
 		for (let x = maxX; x >= minX; x--) {
-			if (mask[y * w + x]) {
+			if (buildingMask[y * w + x]) {
 				rx = x;
 				break;
 			}
