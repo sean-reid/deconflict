@@ -1,8 +1,28 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/project.svelte.js';
+import type { WallSegment } from './walls.js';
 import { getBaseRate } from '@deconflict/channels';
 
 const CELL_SIZE = 8;
+
+function segmentsIntersect(
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number,
+	cx: number,
+	cy: number,
+	dx: number,
+	dy: number
+): boolean {
+	const d1 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
+	const d2 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+	const d3 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+	const d4 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+	if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0)))
+		return true;
+	return false;
+}
 
 function signalStrength(distance: number, radius: number): number {
 	if (distance <= 0) return 1;
@@ -25,6 +45,7 @@ export class HeatmapLayer implements Layer {
 	visible = false;
 	aps: AccessPoint[] = [];
 	ispSpeed = 0;
+	walls: WallSegment[] = [];
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -37,7 +58,8 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}`
+			`|isp:${this.ispSpeed}|walls:${this.walls.length}` +
+			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}`
 		);
 	}
 
@@ -106,6 +128,33 @@ export class HeatmapLayer implements Layer {
 				if (bestAp && bestSignal > 0.001) {
 					const base = getBaseRate(bestAp.band, bestAp.channelWidth) * 0.5;
 					let throughput = base * bestSignal;
+
+					// Count wall crossings between test point and serving AP
+					let wallLoss = 0;
+					for (const wall of this.walls) {
+						if (
+							segmentsIntersect(
+								worldPoint.x,
+								worldPoint.y,
+								bestAp.x,
+								bestAp.y,
+								wall.x1,
+								wall.y1,
+								wall.x2,
+								wall.y2
+							)
+						) {
+							wallLoss += wall.attenuation;
+						}
+					}
+
+					// Apply wall attenuation (convert dB to linear)
+					// Each 3dB halves the signal
+					if (wallLoss > 0) {
+						const wallFactor = Math.pow(10, -wallLoss / 20);
+						throughput *= wallFactor;
+					}
+
 					if (this.ispSpeed > 0) {
 						throughput = Math.min(throughput, this.ispSpeed);
 					}

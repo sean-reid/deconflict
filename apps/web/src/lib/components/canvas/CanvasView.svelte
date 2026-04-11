@@ -7,8 +7,7 @@
 	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { RangeRingLayer } from '$canvas/renderers/range-ring.js';
-	import { ConflictEdgeLayer } from '$canvas/renderers/conflict-edge.js';
-	import { buildInterferenceGraph } from '@deconflict/geometry';
+	import { WallLayer } from '$canvas/renderers/walls.js';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
@@ -38,7 +37,7 @@
 	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
 	let rangeRingLayer: RangeRingLayer;
-	let conflictEdgeLayer: ConflictEdgeLayer;
+	let wallLayer: WallLayer;
 	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
 	let showEmptyHint = $derived(projectState.aps.length === 0 && !projectState.floorplanUrl);
 
@@ -80,9 +79,9 @@
 			case 'R':
 				appState.showRangeRings = !appState.showRangeRings;
 				break;
-			case 'e':
-			case 'E':
-				appState.showConflictEdges = !appState.showConflictEdges;
+			case 'w':
+			case 'W':
+				appState.showWalls = !appState.showWalls;
 				break;
 			case 'h':
 			case 'H':
@@ -103,17 +102,17 @@
 		gridLayer = new GridLayer();
 		heatmapLayer = new HeatmapLayer();
 		rangeRingLayer = new RangeRingLayer();
-		conflictEdgeLayer = new ConflictEdgeLayer();
+		wallLayer = new WallLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
 
-		// Add layers in draw order: floorplan, boundary, grid, heatmap, range rings, conflict edges, APs, selection rect
+		// Add layers in draw order: floorplan, boundary, grid, walls, heatmap, range rings, APs, selection rect
 		engine.addLayer(floorplanLayer);
 		engine.addLayer(boundaryLayer);
 		engine.addLayer(gridLayer);
+		engine.addLayer(wallLayer);
 		engine.addLayer(heatmapLayer);
 		engine.addLayer(rangeRingLayer);
-		engine.addLayer(conflictEdgeLayer);
 		engine.addLayer(apLayer);
 		engine.addLayer(selectionRectLayer);
 
@@ -203,35 +202,36 @@
 	});
 
 	$effect(() => {
-		if (!conflictEdgeLayer) return;
-		const aps = projectState.aps;
-		const apPositions = aps.map((ap) => ({
-			id: ap.id,
-			x: ap.x,
-			y: ap.y,
-			interferenceRadius: ap.interferenceRadius
+		if (!wallLayer) return;
+		wallLayer.walls = projectState.walls.map((w) => ({
+			x1: w.x1,
+			y1: w.y1,
+			x2: w.x2,
+			y2: w.y2,
+			thickness: w.thickness,
+			material: w.material,
+			attenuation: w.attenuation
 		}));
-		const { edges } = buildInterferenceGraph(apPositions);
-		const apMap = new Map(aps.map((ap) => [ap.id, ap]));
-
-		conflictEdgeLayer.edges = edges.map((edge) => {
-			const apA = apMap.get(edge.a);
-			const apB = apMap.get(edge.b);
-			const isConflict =
-				apA != null &&
-				apB != null &&
-				apA.assignedChannel != null &&
-				apB.assignedChannel != null &&
-				apA.assignedChannel === apB.assignedChannel;
-			return { aId: edge.a, bId: edge.b, isConflict, overlapFraction: edge.overlapFraction };
-		});
-		conflictEdgeLayer.aps = aps;
 		engine.markDirty();
 	});
 
 	$effect(() => {
-		if (!conflictEdgeLayer) return;
-		conflictEdgeLayer.visible = appState.showConflictEdges;
+		if (!heatmapLayer) return;
+		heatmapLayer.walls = projectState.walls.map((w) => ({
+			x1: w.x1,
+			y1: w.y1,
+			x2: w.x2,
+			y2: w.y2,
+			thickness: w.thickness,
+			material: w.material,
+			attenuation: w.attenuation
+		}));
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!wallLayer) return;
+		wallLayer.visible = appState.showWalls;
 		engine.markDirty();
 	});
 

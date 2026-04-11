@@ -31,7 +31,16 @@ export const projectState = $state({
 	calibration: null as { worldUnitsPerMeter: number } | null,
 	floorplanBoundary: null as Array<{ x: number; y: number }> | null,
 	ispSpeed: 0 as number, // 0 = no limit
-	targetThroughput: 50 as number // default 50 Mbps minimum
+	targetThroughput: 50 as number, // default 50 Mbps minimum
+	walls: [] as Array<{
+		x1: number;
+		y1: number;
+		x2: number;
+		y2: number;
+		thickness: number;
+		material: string;
+		attenuation: number;
+	}>
 });
 
 export function addAp(x: number, y: number): AccessPoint {

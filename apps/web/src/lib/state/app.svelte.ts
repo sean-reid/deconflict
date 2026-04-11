@@ -5,9 +5,9 @@ export const appState = $state({
 	sidebarOpen: true,
 	showGrid: true,
 	showRangeRings: true,
-	showConflictEdges: false,
 	showLabels: true,
 	showHeatmap: false,
 	showFloorplan: true,
-	showAPs: true
+	showAPs: true,
+	showWalls: true
 });
