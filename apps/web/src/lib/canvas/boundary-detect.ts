@@ -98,22 +98,43 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		}
 	}
 
-	// Step 3.5: Dilate walls to close door gaps before flood fill
-	// This prevents exterior flood from leaking into rooms through doorways
-	// Large dilation to close door/window openings so flood fill
-	// doesn't leak from exterior into rooms
+	// Step 3.5: Morphological close (dilate then erode) to close door gaps
+	// without inflating the building area.
+	// Dilate walls to bridge door/window openings, then erode back so
+	// the overall boundary returns to approximately its original position.
 	const dilateR = Math.max(10, Math.round(w * 0.04));
-	const closed = new Uint8Array(binary);
+
+	// Dilate walls: any passable pixel within R of a wall becomes wall
+	const dilated = new Uint8Array(binary);
 	for (let y = 0; y < h; y++) {
 		for (let x = 0; x < w; x++) {
 			if (binary[y * w + x] === 0) {
-				for (let dy = -dilateR; dy <= dilateR; dy++) {
-					for (let dx = -dilateR; dx <= dilateR; dx++) {
-						const nx = x + dx;
-						const ny = y + dy;
-						if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-							closed[ny * w + nx] = 0;
-						}
+				const ylo = Math.max(0, y - dilateR);
+				const yhi = Math.min(h - 1, y + dilateR);
+				const xlo = Math.max(0, x - dilateR);
+				const xhi = Math.min(w - 1, x + dilateR);
+				for (let ny = ylo; ny <= yhi; ny++) {
+					for (let nx = xlo; nx <= xhi; nx++) {
+						dilated[ny * w + nx] = 0;
+					}
+				}
+			}
+		}
+	}
+
+	// Erode walls back: dilate the passable region of the dilated image by R.
+	// This undoes the boundary inflation while keeping closed gaps closed.
+	const closed = new Uint8Array(dilated);
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			if (dilated[y * w + x] === 1) {
+				const ylo = Math.max(0, y - dilateR);
+				const yhi = Math.min(h - 1, y + dilateR);
+				const xlo = Math.max(0, x - dilateR);
+				const xhi = Math.min(w - 1, x + dilateR);
+				for (let ny = ylo; ny <= yhi; ny++) {
+					for (let nx = xlo; nx <= xhi; nx++) {
+						closed[ny * w + nx] = 1;
 					}
 				}
 			}
@@ -145,27 +166,29 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		if (x < w - 1 && !exterior[idx + 1] && closed[idx + 1]) queue.push(idx + 1);
 	}
 
-	// Step 5: Interior = not exterior AND not wall
-	// Mark interior regions, then find connected interior blobs
-	const interior = new Uint8Array(w * h);
+	// Step 5: Building footprint = everything NOT exterior.
+	// This includes interior passable space, interior walls, and exterior walls
+	// that form the building boundary. Morphological close ensures the boundary
+	// is at approximately its true position (dilation inflation undone by erosion).
+	const footprint = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		if (!exterior[i] && binary[i]) {
-			interior[i] = 1; // passable space inside walls
+		if (!exterior[i]) {
+			footprint[i] = 1;
 		}
 	}
 
-	// Step 6: Find connected interior blobs
+	// Step 6: Find connected components of the footprint.
+	// The building is the largest component. Isolated decorations, text, and
+	// exterior features form smaller components that we discard.
 	const blobLabels = new Int32Array(w * h);
 	blobLabels.fill(-1);
 	const blobSizes: number[] = [];
-	const blobBounds: Array<{ minX: number; minY: number; maxX: number; maxY: number }> = [];
 	let nextBlob = 0;
 
 	for (let i = 0; i < w * h; i++) {
-		if (interior[i] && blobLabels[i] === -1) {
+		if (footprint[i] && blobLabels[i] === -1) {
 			const label = nextBlob++;
 			let size = 0;
-			const bounds = { minX: w, minY: h, maxX: 0, maxY: 0 };
 			const bq = [i];
 			blobLabels[i] = label;
 
@@ -174,10 +197,6 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 				size++;
 				const x = idx % w;
 				const y = Math.floor(idx / w);
-				if (x < bounds.minX) bounds.minX = x;
-				if (x > bounds.maxX) bounds.maxX = x;
-				if (y < bounds.minY) bounds.minY = y;
-				if (y > bounds.maxY) bounds.maxY = y;
 
 				const ns = [
 					y > 0 ? idx - w : -1,
@@ -186,7 +205,7 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 					x < w - 1 ? idx + 1 : -1
 				];
 				for (const n of ns) {
-					if (n >= 0 && interior[n] && blobLabels[n] === -1) {
+					if (n >= 0 && footprint[n] && blobLabels[n] === -1) {
 						blobLabels[n] = label;
 						bq.push(n);
 					}
@@ -194,15 +213,12 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 			}
 
 			blobSizes.push(size);
-			blobBounds.push(bounds);
 		}
 	}
 
 	if (blobSizes.length === 0) return null;
 
-	// Step 7: The building interior is the largest blob
-	// But also include smaller blobs that are INSIDE the bounding box
-	// of the largest blob (these are rooms separated by walls)
+	// Step 7: Keep only the largest connected component (the building)
 	let mainBlob = 0;
 	let mainSize = 0;
 	for (let i = 0; i < blobSizes.length; i++) {
@@ -212,46 +228,10 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		}
 	}
 
-	const mainBounds = blobBounds[mainBlob]!;
-
-	// Include all blobs whose center falls within the main blob's bounding box
-	// (these are rooms inside the building separated by interior walls)
 	const buildingMask = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
 		if (blobLabels[i] === mainBlob) {
 			buildingMask[i] = 1;
-		} else if (blobLabels[i] !== undefined && blobLabels[i]! >= 0) {
-			const blob = blobLabels[i]!;
-			const b = blobBounds[blob]!;
-			const cx = (b.minX + b.maxX) / 2;
-			const cy = (b.minY + b.maxY) / 2;
-			// Is this blob's center inside the main building bounds?
-			if (
-				cx >= mainBounds.minX &&
-				cx <= mainBounds.maxX &&
-				cy >= mainBounds.minY &&
-				cy <= mainBounds.maxY
-			) {
-				buildingMask[i] = 1;
-			}
-		}
-	}
-
-	// Also include wall pixels that are inside the main bounds
-	// (interior walls are part of the building footprint)
-	for (let i = 0; i < w * h; i++) {
-		if (binary[i] === 0 && !exterior[i]) {
-			// Wall pixel, not exterior
-			const x = i % w;
-			const y = Math.floor(i / w);
-			if (
-				x >= mainBounds.minX &&
-				x <= mainBounds.maxX &&
-				y >= mainBounds.minY &&
-				y <= mainBounds.maxY
-			) {
-				buildingMask[i] = 1;
-			}
 		}
 	}
 
