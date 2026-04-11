@@ -68,9 +68,7 @@ export async function serialize(): Promise<string> {
 		floorplanImage,
 		floorplanScale: projectState.floorplanScale,
 		calibration: projectState.calibration ?? undefined,
-		wallMask: projectState.wallMask
-			? JSON.parse(JSON.stringify(projectState.wallMask))
-			: null,
+		wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
 		wallAttenuation: projectState.wallAttenuation,
 		aps: projectState.aps.map((ap) => ({
 			id: ap.id,

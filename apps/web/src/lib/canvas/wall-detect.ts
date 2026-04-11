@@ -91,12 +91,7 @@ export async function detectWalls(
 							for (const word of line.words) {
 								if (word.confidence < 15) continue;
 								const { x0, y0, x1, y1 } = word.bbox;
-								ctx.fillRect(
-									x0 - pad,
-									y0 - pad,
-									x1 - x0 + 2 * pad,
-									y1 - y0 + 2 * pad
-								);
+								ctx.fillRect(x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad);
 							}
 						}
 					}
@@ -133,7 +128,7 @@ export async function detectWalls(
 
 	const binary = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		binary[i] = darkBg ? (gray[i]! > threshold ? 1 : 0) : (gray[i]! < threshold ? 1 : 0);
+		binary[i] = darkBg ? (gray[i]! > threshold ? 1 : 0) : gray[i]! < threshold ? 1 : 0;
 	}
 
 	// Step 3: Remove small disconnected blobs (noise, dots, thin text remnants)
@@ -168,7 +163,11 @@ export async function detectWalls(
 }
 
 /** Decode a wall mask PNG data URL to a Uint8Array for fast pixel lookups */
-export function decodeMask(dataUrl: string, width: number, height: number): Promise<DecodedWallMask> {
+export function decodeMask(
+	dataUrl: string,
+	width: number,
+	height: number
+): Promise<DecodedWallMask> {
 	return new Promise((resolve) => {
 		const img = new Image();
 		img.onload = () => {

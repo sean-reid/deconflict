@@ -39,9 +39,7 @@ function saveToStorage(): void {
 			floorplanScale: projectState.floorplanScale,
 			ispSpeed: projectState.ispSpeed,
 			targetThroughput: projectState.targetThroughput,
-			wallMask: projectState.wallMask
-				? JSON.parse(JSON.stringify(projectState.wallMask))
-				: null,
+			wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
 			wallAttenuation: projectState.wallAttenuation,
 			calibration: projectState.calibration
 				? JSON.parse(JSON.stringify(projectState.calibration))
