@@ -1,6 +1,7 @@
 import type { CanvasEngine } from '../engine.js';
 import { addAp } from '$state/project.svelte.js';
 import { selectAp } from '$state/canvas.svelte.js';
+import { appState } from '$state/app.svelte.js';
 
 export class PlaceHandler {
 	private engine: CanvasEngine;
@@ -18,6 +19,7 @@ export class PlaceHandler {
 
 		const ap = addAp(worldPoint.x, worldPoint.y);
 		selectAp(ap.id);
+		appState.sidebarPanel = 'aps';
 		this.engine.markDirty();
 	}
 }

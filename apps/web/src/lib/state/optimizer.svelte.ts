@@ -18,10 +18,6 @@ export async function runOptimizer(): Promise<void> {
 		optimizerState.error = 'Load a floorplan first';
 		return;
 	}
-	if (!projectState.floorplanBoundary || projectState.floorplanBoundary.length < 3) {
-		optimizerState.error = 'Building boundary not detected';
-		return;
-	}
 	if (optimizerState.isRunning) return;
 
 	optimizerState.isRunning = true;
@@ -39,11 +35,6 @@ export async function runOptimizer(): Promise<void> {
 			interferenceRadius: ap.interferenceRadius
 		}));
 
-		// Deep clone to strip Svelte 5 reactivity proxies (can't be structured-cloned)
-		const boundary = projectState.floorplanBoundary
-			? projectState.floorplanBoundary.map((p) => ({ x: p.x, y: p.y }))
-			: [];
-
 		// Decode mask on main thread (has canvas access) and send raw buffer
 		const decoded = await decodeMask(mask.dataUrl, mask.width, mask.height);
 
@@ -55,7 +46,6 @@ export async function runOptimizer(): Promise<void> {
 			projectState.wallAttenuation,
 			{
 				iterations: 10000,
-				boundary,
 				onProgress: (p: OptimizeProgress) => {
 					optimizerState.progress = Math.round((p.iteration / p.totalIterations) * 100);
 					optimizerState.score = Math.round(p.score * 100);

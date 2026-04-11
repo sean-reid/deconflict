@@ -1,3 +1,5 @@
+import { computeBuildingInterior } from './morph-interior.js';
+
 export interface BoundaryResult {
 	polygon: Array<{ x: number; y: number }>;
 	areaPx: number;
@@ -98,83 +100,20 @@ export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 		}
 	}
 
-	// Step 3.5: Morphological close (dilate then erode) to close door gaps
-	// without inflating the building area.
-	// Dilate walls to bridge door/window openings, then erode back so
-	// the overall boundary returns to approximately its original position.
-	const dilateR = Math.max(10, Math.round(w * 0.04));
+	// Step 3.5 + 4 + 5: Morph close to seal doors, flood fill to find exterior,
+	// building footprint = everything not exterior.
+	// binary convention here is inverted (0=wall, 1=passable), convert to util convention (1=wall)
+	const wallMask = new Uint8Array(w * h);
+	for (let i = 0; i < w * h; i++) wallMask[i] = binary[i] ? 0 : 1;
 
-	// Dilate walls: any passable pixel within R of a wall becomes wall
-	const dilated = new Uint8Array(binary);
-	for (let y = 0; y < h; y++) {
-		for (let x = 0; x < w; x++) {
-			if (binary[y * w + x] === 0) {
-				const ylo = Math.max(0, y - dilateR);
-				const yhi = Math.min(h - 1, y + dilateR);
-				const xlo = Math.max(0, x - dilateR);
-				const xhi = Math.min(w - 1, x + dilateR);
-				for (let ny = ylo; ny <= yhi; ny++) {
-					for (let nx = xlo; nx <= xhi; nx++) {
-						dilated[ny * w + nx] = 0;
-					}
-				}
-			}
-		}
-	}
+	const { exterior } = computeBuildingInterior(wallMask, w, h, {
+		dilateRatio: 0.04,
+		minDilateR: 10
+	});
 
-	// Erode walls back: dilate the passable region of the dilated image by R.
-	// This undoes the boundary inflation while keeping closed gaps closed.
-	const closed = new Uint8Array(dilated);
-	for (let y = 0; y < h; y++) {
-		for (let x = 0; x < w; x++) {
-			if (dilated[y * w + x] === 1) {
-				const ylo = Math.max(0, y - dilateR);
-				const yhi = Math.min(h - 1, y + dilateR);
-				const xlo = Math.max(0, x - dilateR);
-				const xhi = Math.min(w - 1, x + dilateR);
-				for (let ny = ylo; ny <= yhi; ny++) {
-					for (let nx = xlo; nx <= xhi; nx++) {
-						closed[ny * w + nx] = 1;
-					}
-				}
-			}
-		}
-	}
-
-	// Step 4: Flood fill from border to mark exterior (using closed walls)
-	const exterior = new Uint8Array(w * h);
-	const queue: number[] = [];
-
-	for (let x = 0; x < w; x++) {
-		if (closed[x]) queue.push(x);
-		if (closed[(h - 1) * w + x]) queue.push((h - 1) * w + x);
-	}
-	for (let y = 0; y < h; y++) {
-		if (closed[y * w]) queue.push(y * w);
-		if (closed[y * w + w - 1]) queue.push(y * w + w - 1);
-	}
-
-	while (queue.length > 0) {
-		const idx = queue.pop()!;
-		if (exterior[idx]) continue;
-		exterior[idx] = 1;
-		const x = idx % w;
-		const y = Math.floor(idx / w);
-		if (y > 0 && !exterior[idx - w] && closed[idx - w]) queue.push(idx - w);
-		if (y < h - 1 && !exterior[idx + w] && closed[idx + w]) queue.push(idx + w);
-		if (x > 0 && !exterior[idx - 1] && closed[idx - 1]) queue.push(idx - 1);
-		if (x < w - 1 && !exterior[idx + 1] && closed[idx + 1]) queue.push(idx + 1);
-	}
-
-	// Step 5: Building footprint = everything NOT exterior.
-	// This includes interior passable space, interior walls, and exterior walls
-	// that form the building boundary. Morphological close ensures the boundary
-	// is at approximately its true position (dilation inflation undone by erosion).
 	const footprint = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		if (!exterior[i]) {
-			footprint[i] = 1;
-		}
+		if (!exterior[i]) footprint[i] = 1;
 	}
 
 	// Step 6: Find connected components of the footprint.

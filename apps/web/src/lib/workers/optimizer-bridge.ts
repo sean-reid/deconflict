@@ -60,7 +60,6 @@ export class OptimizerBridge {
 		wallAttenuation: number,
 		options?: {
 			iterations?: number;
-			boundary?: Array<{ x: number; y: number }>;
 			onProgress?: (progress: OptimizeProgress) => void;
 		}
 	): Promise<OptimizeResult> {
@@ -81,8 +80,7 @@ export class OptimizerBridge {
 				maskWidth,
 				maskHeight,
 				wallAttenuation,
-				iterations: options?.iterations ?? 5000,
-				boundary: options?.boundary ?? []
+				iterations: options?.iterations ?? 5000
 			};
 			this.getWorker().postMessage(msg, [maskCopy.buffer]);
 		});

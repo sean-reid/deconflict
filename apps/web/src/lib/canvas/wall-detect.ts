@@ -1,4 +1,5 @@
 import { createWorker, type Worker } from 'tesseract.js';
+import { computeBuildingInterior } from './morph-interior.js';
 
 export interface WallMask {
 	dataUrl: string;
@@ -272,101 +273,11 @@ function filterSmallBlobs(binary: Uint8Array, w: number, h: number, minSize: num
  *  Morphological close seals door gaps, flood fill identifies exterior,
  *  then wall blobs with no interior-adjacent pixels are removed. */
 function removeExteriorBlobs(binary: Uint8Array, w: number, h: number): void {
-	// Work at reduced resolution for the expensive morph close
-	const maxDim = 400;
-	const rs = Math.min(1, maxDim / Math.max(w, h));
-	const sw = Math.round(w * rs);
-	const sh = Math.round(h * rs);
-
-	// Downsample binary
-	const small = new Uint8Array(sw * sh);
-	for (let sy = 0; sy < sh; sy++) {
-		const oy = Math.min(h - 1, Math.round(sy / rs));
-		for (let sx = 0; sx < sw; sx++) {
-			const ox = Math.min(w - 1, Math.round(sx / rs));
-			small[sy * sw + sx] = binary[oy * w + ox]!;
-		}
-	}
-
-	// Morphological close: dilate walls then erode back
-	const dilateR = Math.max(5, Math.round(sw * 0.03));
-
-	// Passable map: 1 = can flood, 0 = wall blocks
-	const passable = new Uint8Array(sw * sh);
-	for (let i = 0; i < sw * sh; i++) passable[i] = small[i] ? 0 : 1;
-
-	// Dilate walls (shrink passable)
-	const dilPass = new Uint8Array(passable);
-	for (let y = 0; y < sh; y++) {
-		for (let x = 0; x < sw; x++) {
-			if (!small[y * sw + x]) continue;
-			const ylo = Math.max(0, y - dilateR),
-				yhi = Math.min(sh - 1, y + dilateR);
-			const xlo = Math.max(0, x - dilateR),
-				xhi = Math.min(sw - 1, x + dilateR);
-			for (let ny = ylo; ny <= yhi; ny++) {
-				for (let nx = xlo; nx <= xhi; nx++) {
-					dilPass[ny * sw + nx] = 0;
-				}
-			}
-		}
-	}
-
-	// Erode walls back (dilate passable)
-	const closedPass = new Uint8Array(dilPass);
-	for (let y = 0; y < sh; y++) {
-		for (let x = 0; x < sw; x++) {
-			if (dilPass[y * sw + x] !== 1) continue;
-			const ylo = Math.max(0, y - dilateR),
-				yhi = Math.min(sh - 1, y + dilateR);
-			const xlo = Math.max(0, x - dilateR),
-				xhi = Math.min(sw - 1, x + dilateR);
-			for (let ny = ylo; ny <= yhi; ny++) {
-				for (let nx = xlo; nx <= xhi; nx++) {
-					closedPass[ny * sw + nx] = 1;
-				}
-			}
-		}
-	}
-
-	// Flood fill exterior from border
-	const exterior = new Uint8Array(sw * sh);
-	const queue: number[] = [];
-	for (let x = 0; x < sw; x++) {
-		if (closedPass[x]) queue.push(x);
-		if (closedPass[(sh - 1) * sw + x]) queue.push((sh - 1) * sw + x);
-	}
-	for (let y = 0; y < sh; y++) {
-		if (closedPass[y * sw]) queue.push(y * sw);
-		if (closedPass[y * sw + sw - 1]) queue.push(y * sw + sw - 1);
-	}
-	while (queue.length > 0) {
-		const idx = queue.pop()!;
-		if (exterior[idx]) continue;
-		exterior[idx] = 1;
-		const x = idx % sw,
-			y = Math.floor(idx / sw);
-		if (y > 0 && !exterior[idx - sw] && closedPass[idx - sw]) queue.push(idx - sw);
-		if (y < sh - 1 && !exterior[idx + sw] && closedPass[idx + sw]) queue.push(idx + sw);
-		if (x > 0 && !exterior[idx - 1] && closedPass[idx - 1]) queue.push(idx - 1);
-		if (x < sw - 1 && !exterior[idx + 1] && closedPass[idx + 1]) queue.push(idx + 1);
-	}
-
-	// Interior at small resolution = not exterior AND not wall
-	const interior = new Uint8Array(sw * sh);
-	for (let i = 0; i < sw * sh; i++) {
-		if (!exterior[i] && !small[i]) interior[i] = 1;
-	}
-
-	// Upsample interior to full resolution
-	const fullInterior = new Uint8Array(w * h);
-	for (let y = 0; y < h; y++) {
-		const sy = Math.min(sh - 1, Math.round(y * rs));
-		for (let x = 0; x < w; x++) {
-			const sx = Math.min(sw - 1, Math.round(x * rs));
-			fullInterior[y * w + x] = interior[sy * sw + sx]!;
-		}
-	}
+	const { interior: fullInterior } = computeBuildingInterior(binary, w, h, {
+		maxDim: 400,
+		dilateRatio: 0.03,
+		minDilateR: 5
+	});
 
 	// Label wall blobs at full resolution and check if they touch interior
 	const labels = new Int32Array(w * h).fill(-1);
