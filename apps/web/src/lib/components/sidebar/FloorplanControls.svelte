@@ -18,10 +18,10 @@
 	let hasFloorplan = $derived(projectState.floorplanUrl !== null);
 
 	const sampleFloorplans = [
-		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.png' },
-		{ name: 'House (120sqm)', file: '/samples/house-120sqm.png' },
-		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.png' },
-		{ name: 'West Wing (1580sqft)', file: '/samples/west-wing.svg' }
+		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.png', areaSqm: 48 },
+		{ name: 'House (120sqm)', file: '/samples/house-120sqm.png', areaSqm: 120 },
+		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.png', areaSqm: 300 },
+		{ name: 'West Wing (1580sqft)', file: '/samples/west-wing.svg', areaSqm: 147 }
 	];
 
 	let scaleDisplay = $derived(
@@ -98,7 +98,7 @@
 		}
 	}
 
-	async function loadSample(url: string) {
+	async function loadSample(url: string, knownAreaSqm?: number) {
 		if (projectState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(projectState.floorplanUrl);
 		}
@@ -107,7 +107,14 @@
 			const blob = await response.blob();
 			const blobUrl = URL.createObjectURL(blob);
 			projectState.floorplanUrl = blobUrl;
-			runBoundaryDetection(blobUrl);
+			await runBoundaryDetection(blobUrl);
+
+			// Auto-calibrate if we know the area
+			if (knownAreaSqm && detectedWorldArea && detectedWorldArea > 0) {
+				areaInput = String(knownAreaSqm);
+				areaUnit = 'sqm';
+				applyCalibration();
+			}
 		} catch {
 			// Failed to load sample
 		}
@@ -191,7 +198,7 @@
 			<span class="samples-label">or try a sample:</span>
 			<div class="sample-buttons">
 				{#each sampleFloorplans as sample}
-					<button class="sample-btn" onclick={() => loadSample(sample.file)}>
+					<button class="sample-btn" onclick={() => loadSample(sample.file, sample.areaSqm)}>
 						{sample.name}
 					</button>
 				{/each}

@@ -50,12 +50,8 @@
 <div class="results-panel">
 	<div class="section">
 		<Button variant="primary" disabled={solverState.isRunning} onclick={() => runSolver()}>
-			{solverState.isRunning ? 'Solving...' : 'Solve'}
+			Solve
 		</Button>
-		<Toggle
-			bind:checked={solverState.autoSolve}
-			label="Auto-solve on changes"
-		/>
 	</div>
 
 	{#if solverState.error}

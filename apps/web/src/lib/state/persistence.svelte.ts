@@ -4,6 +4,7 @@ import type { AccessPoint } from './project.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
 
 const STORAGE_KEY = 'deconflict:project';
+const FLOORPLAN_KEY = 'deconflict:floorplan';
 const SAVE_DELAY = 2000;
 
 interface SavedState {
@@ -14,7 +15,10 @@ interface SavedState {
 	regulatoryDomain: RegulatoryDomain;
 	aps: AccessPoint[];
 	floorplanScale: number;
-	// Note: floorplanUrl (blob URL) cannot be persisted - it is session-only
+	ispSpeed: number;
+	targetThroughput: number;
+	walls: typeof projectState.walls;
+	calibration: typeof projectState.calibration;
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -29,12 +33,42 @@ function saveToStorage(): void {
 			channelWidth: projectState.channelWidth,
 			regulatoryDomain: projectState.regulatoryDomain,
 			aps: JSON.parse(JSON.stringify(projectState.aps)),
-			floorplanScale: projectState.floorplanScale
+			floorplanScale: projectState.floorplanScale,
+			ispSpeed: projectState.ispSpeed,
+			targetThroughput: projectState.targetThroughput,
+			walls: JSON.parse(JSON.stringify(projectState.walls)),
+			calibration: projectState.calibration
+				? JSON.parse(JSON.stringify(projectState.calibration))
+				: null
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 		persistenceState.lastSaved = new Date();
 	} catch {
 		// localStorage might be full or unavailable
+	}
+
+	// Persist floorplan image as data URL (separate key to avoid main save bloat)
+	try {
+		if (projectState.floorplanUrl && projectState.floorplanUrl.startsWith('blob:')) {
+			// Convert blob URL to data URL for persistence
+			const canvas = document.createElement('canvas');
+			const img = new Image();
+			img.onload = () => {
+				canvas.width = img.naturalWidth;
+				canvas.height = img.naturalHeight;
+				const ctx = canvas.getContext('2d')!;
+				ctx.drawImage(img, 0, 0);
+				try {
+					const dataUrl = canvas.toDataURL('image/png');
+					localStorage.setItem(FLOORPLAN_KEY, dataUrl);
+				} catch {
+					// Image too large for localStorage
+				}
+			};
+			img.src = projectState.floorplanUrl;
+		}
+	} catch {
+		// Ignore floorplan save errors
 	}
 }
 
@@ -52,8 +86,17 @@ export function restoreFromStorage(): boolean {
 		projectState.channelWidth = data.channelWidth || 20;
 		projectState.regulatoryDomain = data.regulatoryDomain || 'fcc';
 		projectState.aps = data.aps;
-		projectState.floorplanScale = data.floorplanScale ?? 1;
-		// floorplanUrl is not restored (blob URLs don't persist)
+		projectState.floorplanScale = data.floorplanScale ?? 0.4;
+		projectState.ispSpeed = data.ispSpeed ?? 0;
+		projectState.targetThroughput = data.targetThroughput ?? 50;
+		projectState.walls = data.walls ?? [];
+		projectState.calibration = data.calibration ?? null;
+
+		// Restore floorplan image
+		const floorplanData = localStorage.getItem(FLOORPLAN_KEY);
+		if (floorplanData) {
+			projectState.floorplanUrl = floorplanData;
+		}
 
 		clearHistory();
 		return true;
@@ -64,6 +107,7 @@ export function restoreFromStorage(): boolean {
 
 export function clearSavedState(): void {
 	localStorage.removeItem(STORAGE_KEY);
+	localStorage.removeItem(FLOORPLAN_KEY);
 	persistenceState.lastSaved = null;
 }
 

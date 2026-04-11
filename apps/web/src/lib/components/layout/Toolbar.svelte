@@ -106,7 +106,7 @@
 
 		<Button variant="primary" size="sm" disabled={solverState.isRunning} onclick={() => runSolver()}>
 			<Icon name="play" size={12} />
-			{solverState.isRunning ? 'Solving...' : 'Solve'}
+			Solve
 		</Button>
 
 	</div>

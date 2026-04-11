@@ -17,7 +17,7 @@ export const solverState = $state({
 	comparisonResults: null as ComparisonResult | null,
 	lastTiming: 0,
 	error: null as string | null,
-	autoSolve: false,
+	autoSolve: true,
 	throughputEstimates: [] as ThroughputEstimate[]
 });
 
