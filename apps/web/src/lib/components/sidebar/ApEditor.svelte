@@ -219,6 +219,7 @@
 				min={50}
 				max={500}
 				step={10}
+				label="px"
 			/>
 		</div>
 

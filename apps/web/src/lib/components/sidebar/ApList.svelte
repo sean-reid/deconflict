@@ -1,13 +1,18 @@
 <script lang="ts">
-	import { projectState } from '$state/project.svelte';
-	import { canvasState, selectAp } from '$state/canvas.svelte';
+	import { projectState, removeAps } from '$state/project.svelte';
+	import { canvasState, selectAp, selectAps, clearSelection } from '$state/canvas.svelte';
 	import { channelColor } from '@deconflict/channels';
+	import Button from '$components/shared/Button.svelte';
+	import Icon from '$components/shared/Icon.svelte';
 
 	const bandLabels: Record<string, string> = {
 		'2.4ghz': '2.4G',
 		'5ghz': '5G',
 		'6ghz': '6G'
 	};
+
+	let hasSelection = $derived(canvasState.selectedApIds.length > 0);
+	let selectionCount = $derived(canvasState.selectedApIds.length);
 
 	function isSelected(id: string): boolean {
 		return canvasState.selectedApIds.includes(id);
@@ -16,12 +21,41 @@
 	function handleRowClick(id: string, e: MouseEvent) {
 		selectAp(id, e.shiftKey);
 	}
+
+	function selectAll() {
+		selectAps(projectState.aps.map((ap) => ap.id));
+	}
+
+	function deleteSelected() {
+		removeAps([...canvasState.selectedApIds]);
+		clearSelection();
+	}
+
+	function clearAll() {
+		removeAps(projectState.aps.map((ap) => ap.id));
+		clearSelection();
+	}
 </script>
 
 <div class="ap-list">
 	<div class="header">
 		<span class="header-label">ACCESS POINTS</span>
-		<span class="count">{projectState.aps.length}</span>
+		<div class="header-actions">
+			{#if hasSelection}
+				<button class="action-btn delete" onclick={deleteSelected} aria-label="Delete selected">
+					<Icon name="trash" size={12} />
+					{selectionCount}
+				</button>
+			{/if}
+			{#if projectState.aps.length > 0}
+				<button class="action-btn" onclick={selectAll} aria-label="Select all">
+					All
+				</button>
+				<button class="action-btn delete" onclick={clearAll} aria-label="Clear all access points">
+					Clear
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	{#if projectState.aps.length === 0}
@@ -73,6 +107,42 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 0 0 var(--space-2) 0;
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.action-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		font-size: var(--text-xs);
+		font-family: var(--font-sans);
+		color: var(--text-tertiary);
+		background: none;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-sm);
+		padding: 2px 6px;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.action-btn:hover {
+		background: var(--bg-hover);
+		color: var(--text-secondary);
+	}
+
+	.action-btn.delete {
+		color: var(--color-error-dim);
+		border-color: var(--color-error-dim);
+	}
+
+	.action-btn.delete:hover {
+		background: rgba(255, 68, 68, 0.1);
+		color: var(--color-error);
 	}
 
 	.header-label {
