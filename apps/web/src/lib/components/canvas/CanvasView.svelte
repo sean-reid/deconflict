@@ -281,31 +281,104 @@
 
 	// Track pending placement vs pan gesture
 	const DRAG_THRESHOLD = 5;
-	const TOUCH_DELAY = 50; // ms to wait for second finger before processing
 	let pendingPlace = false;
 	let pendingPan = false;
 	let pointerStartX = 0;
 	let pointerStartY = 0;
 	let activeTouches = 0;
-	let deferredPointerDown: PointerEvent | null = null;
-	let deferTimer: ReturnType<typeof setTimeout> | null = null;
+
+	let touchStartX = 0;
+	let touchStartY = 0;
+	let touchMoved = false;
+	let touchStartedOnAp = false;
 
 	function handleTouchStart(e: TouchEvent) {
 		activeTouches = e.touches.length;
-		if (activeTouches >= 2) {
-			// Second finger arrived - cancel any deferred or pending action
-			if (deferTimer) {
-				clearTimeout(deferTimer);
-				deferTimer = null;
+
+		if (activeTouches === 1) {
+			const t = e.touches[0]!;
+			touchStartX = t.clientX;
+			touchStartY = t.clientY;
+			touchMoved = false;
+
+			if (!engine) return;
+			const rect = engine.canvas.getBoundingClientRect();
+			const screenPoint = { x: t.clientX - rect.left, y: t.clientY - rect.top };
+			const hit = hitTest(screenPoint, engine.camera, projectState.aps);
+
+			if (hit) {
+				touchStartedOnAp = true;
+				// Create a synthetic PointerEvent for the handlers
+				const synth = new PointerEvent('pointerdown', {
+					clientX: t.clientX, clientY: t.clientY, button: 0
+				});
+				selectHandler.handlePointerDown(synth);
+				dragHandler.handlePointerDown(synth);
+			} else {
+				touchStartedOnAp = false;
+				pendingPlace = true;
+				pendingPan = false;
+				pointerStartX = t.clientX;
+				pointerStartY = t.clientY;
 			}
-			deferredPointerDown = null;
+		} else if (activeTouches >= 2) {
+			// Cancel single-finger action for pinch
 			pendingPlace = false;
 			pendingPan = false;
+			touchStartedOnAp = false;
 			dragHandler.handlePointerUp();
 		}
 	}
 
+	function handleTouchMove(e: TouchEvent) {
+		if (activeTouches !== 1 || !engine) return;
+		const t = e.touches[0]!;
+
+		if (touchStartedOnAp && dragHandler.isDragging) {
+			const synth = new PointerEvent('pointermove', {
+				clientX: t.clientX, clientY: t.clientY
+			});
+			dragHandler.handlePointerMove(synth);
+			touchMoved = true;
+			return;
+		}
+
+		const dx = t.clientX - pointerStartX;
+		const dy = t.clientY - pointerStartY;
+
+		if (pendingPlace && dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
+			pendingPlace = false;
+			pendingPan = true;
+			touchMoved = true;
+		}
+
+		if (pendingPan) {
+			engine.camera.pan(
+				(t.clientX - pointerStartX) / engine.camera.state.zoom,
+				(t.clientY - pointerStartY) / engine.camera.state.zoom
+			);
+			pointerStartX = t.clientX;
+			pointerStartY = t.clientY;
+			engine.markDirty();
+		}
+	}
+
 	function handleTouchEnd(e: TouchEvent) {
+		if (activeTouches === 1 && e.touches.length === 0) {
+			// Single finger lifted
+			if (pendingPlace && !touchMoved && engine) {
+				// Tap: place an AP
+				const synth = new PointerEvent('pointerdown', {
+					clientX: touchStartX, clientY: touchStartY, button: 0
+				});
+				placeHandler.handlePointerDown(synth);
+			}
+			pendingPlace = false;
+			pendingPan = false;
+			touchStartedOnAp = false;
+			dragHandler.handlePointerUp();
+			selectHandler.handlePointerUp(new PointerEvent('pointerup'));
+		}
 		activeTouches = e.touches.length;
 	}
 
@@ -331,36 +404,19 @@
 			pendingPan = false;
 			pointerStartX = e.clientX;
 			pointerStartY = e.clientY;
-			clearSelection();
-			engine.markDirty();
 		}
 	}
 
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
 		if (e.button === 1) return;
-		if (activeTouches >= 2) return;
-
-		// For touch input, defer processing to allow second finger to arrive
-		if (e.pointerType === 'touch') {
-			deferredPointerDown = e;
-			if (deferTimer) clearTimeout(deferTimer);
-			deferTimer = setTimeout(() => {
-				if (deferredPointerDown && activeTouches < 2) {
-					processPointerDown(deferredPointerDown);
-				}
-				deferredPointerDown = null;
-				deferTimer = null;
-			}, TOUCH_DELAY);
-		} else {
-			// Mouse: process immediately
-			processPointerDown(e);
-		}
+		if (e.pointerType === 'touch') return; // handled by touch events exclusively
+		processPointerDown(e);
 	}
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!engine) return;
-		if (activeTouches >= 2) return;
+		if (e.pointerType === 'touch') return;
 
 		if (dragHandler.isDragging) {
 			dragHandler.handlePointerMove(e);
@@ -420,6 +476,7 @@
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
 		ontouchstart={handleTouchStart}
+		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}
 		ontouchcancel={handleTouchEnd}
 	></canvas>
