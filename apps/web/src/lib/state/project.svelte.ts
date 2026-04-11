@@ -32,7 +32,7 @@ export const projectState = $state({
 	calibration: null as { worldUnitsPerMeter: number } | null,
 	floorplanBoundary: null as Array<{ x: number; y: number }> | null,
 	ispSpeed: 0 as number, // 0 = no limit
-	targetThroughput: 50 as number, // default 50 Mbps minimum
+	targetThroughput: 25 as number, // default 25 Mbps minimum
 	walls: [] as Array<{
 		x1: number;
 		y1: number;

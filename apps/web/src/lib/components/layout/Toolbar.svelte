@@ -145,6 +145,7 @@
 		display: flex;
 		align-items: center;
 		gap: 2px;
+		flex-shrink: 0;
 	}
 
 	.logo {

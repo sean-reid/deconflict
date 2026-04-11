@@ -66,7 +66,7 @@
 <style>
 	.layer-panel {
 		position: absolute;
-		bottom: var(--space-3, 12px);
+		bottom: 32px;
 		left: var(--space-3, 12px);
 		z-index: 5;
 		min-width: 140px;

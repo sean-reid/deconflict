@@ -61,9 +61,15 @@
 		padding: var(--space-1) var(--space-2);
 		border-radius: var(--radius-sm);
 		box-shadow: var(--shadow-md);
-		white-space: normal;
+		white-space: nowrap;
 		max-width: 220px;
 		pointer-events: none;
+	}
+
+	@media (max-width: 768px) {
+		.tooltip {
+			display: none;
+		}
 	}
 
 	.tooltip-top {

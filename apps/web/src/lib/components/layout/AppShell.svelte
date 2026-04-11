@@ -21,6 +21,8 @@
 		<CanvasView />
 	</div>
 	{#if appState.sidebarOpen}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div class="sidebar-backdrop" role="presentation" onclick={() => { appState.sidebarOpen = false; }}></div>
 		<div class="sidebar-area">
 			<Sidebar />
 		</div>
@@ -65,9 +67,21 @@
 		grid-row: 3;
 	}
 
+	.sidebar-backdrop {
+		display: none;
+	}
+
 	@media (max-width: 768px) {
 		.app-shell {
 			grid-template-columns: 1fr;
+		}
+
+		.sidebar-backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			background: rgba(0, 0, 0, 0.4);
+			z-index: calc(var(--z-sidebar) - 1);
 		}
 
 		.sidebar-area {
