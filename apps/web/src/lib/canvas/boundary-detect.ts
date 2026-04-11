@@ -3,6 +3,61 @@ export interface BoundaryResult {
 	areaPx: number;
 }
 
+/**
+ * For SVG URLs, strip text elements before rendering to avoid
+ * text labels being detected as part of the building boundary.
+ */
+export async function prepareSvgForDetection(url: string): Promise<HTMLImageElement> {
+	const img = new Image();
+
+	// Try to fetch and clean SVG text
+	try {
+		const response = await fetch(url);
+		const text = await response.text();
+
+		if (text.trim().startsWith('<') && text.includes('<svg')) {
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(text, 'image/svg+xml');
+			const svg = doc.querySelector('svg');
+
+			if (svg) {
+				// Remove all text elements
+				const textElements = svg.querySelectorAll('text, tspan');
+				textElements.forEach((el) => el.remove());
+
+				// Also remove small circles/dots that might be legend markers
+				const circles = svg.querySelectorAll('circle');
+				circles.forEach((el) => {
+					const r = parseFloat(el.getAttribute('r') || '0');
+					if (r < 5) el.remove();
+				});
+
+				const cleaned = new XMLSerializer().serializeToString(svg);
+				const blob = new Blob([cleaned], { type: 'image/svg+xml' });
+				const cleanUrl = URL.createObjectURL(blob);
+
+				return new Promise((resolve, reject) => {
+					img.onload = () => {
+						URL.revokeObjectURL(cleanUrl);
+						resolve(img);
+					};
+					img.onerror = reject;
+					img.src = cleanUrl;
+				});
+			}
+		}
+	} catch {
+		// Fall through to loading original
+	}
+
+	// Fallback: load original image
+	return new Promise((resolve, reject) => {
+		img.onload = () => resolve(img);
+		img.onerror = reject;
+		img.src = url;
+	});
+}
+
 export function detectBoundary(image: HTMLImageElement): BoundaryResult | null {
 	const maxDim = 400;
 	const scale = Math.min(1, maxDim / Math.max(image.naturalWidth, image.naturalHeight));
