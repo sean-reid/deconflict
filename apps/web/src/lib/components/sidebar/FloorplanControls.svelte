@@ -8,6 +8,25 @@
 
 	let hasFloorplan = $derived(projectState.floorplanUrl !== null);
 
+	const sampleFloorplans = [
+		{ name: 'Small House', file: '/samples/little-white-house.svg' },
+		{ name: 'State Floor', file: '/samples/state-floor.svg' },
+		{ name: 'West Wing', file: '/samples/west-wing.svg' }
+	];
+
+	async function loadSample(url: string) {
+		if (projectState.floorplanUrl?.startsWith('blob:')) {
+			URL.revokeObjectURL(projectState.floorplanUrl);
+		}
+		try {
+			const response = await fetch(url);
+			const blob = await response.blob();
+			projectState.floorplanUrl = URL.createObjectURL(blob);
+		} catch {
+			// Failed to load sample
+		}
+	}
+
 	function handleFile(file: File) {
 		const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
 		if (!validTypes.includes(file.type)) return;
@@ -74,6 +93,16 @@
 				onchange={handleInputChange}
 				hidden
 			/>
+			<div class="samples">
+				<span class="samples-label">or try a sample:</span>
+				<div class="sample-buttons">
+					{#each sampleFloorplans as sample}
+						<button class="sample-btn" onclick={() => loadSample(sample.file)}>
+							{sample.name}
+						</button>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{:else}
 		<div class="loaded-controls">
@@ -124,6 +153,39 @@
 		outline: 2px dashed var(--accent-primary);
 		outline-offset: 2px;
 		border-radius: var(--radius-md);
+	}
+
+	.samples {
+		margin-top: var(--space-2);
+		text-align: center;
+	}
+
+	.samples-label {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+	}
+
+	.sample-buttons {
+		display: flex;
+		gap: var(--space-1);
+		margin-top: var(--space-1);
+		justify-content: center;
+	}
+
+	.sample-btn {
+		font-size: var(--text-xs);
+		color: var(--accent-primary);
+		background: none;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-sm);
+		padding: 2px 8px;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.sample-btn:hover {
+		background: var(--bg-hover);
+		border-color: var(--accent-primary-dim);
 	}
 
 	.loaded-controls {
