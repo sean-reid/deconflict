@@ -75,11 +75,7 @@ export class HeatmapLayer implements Layer {
 			this.cacheKey = key;
 		}
 
-		// Draw the cached heatmap scaled to device pixels
-		// Reset to identity, then scale by DPR to fill the device-pixel canvas
-		ctx.resetTransform();
-		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-		ctx.drawImage(this.cache, 0, 0);
+		rc.compositeOffscreen(this.cache);
 	}
 
 	private generateHeatmap(width: number, height: number, camera: any): HTMLCanvasElement {

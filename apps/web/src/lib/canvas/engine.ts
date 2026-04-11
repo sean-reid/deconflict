@@ -73,7 +73,16 @@ export class CanvasEngine {
 
 	private render(): void {
 		const { ctx, camera, width, height, dpr } = this;
-		const rc: RenderContext = { ctx, camera, width, height, dpr };
+
+		const compositeOffscreen = (offscreen: HTMLCanvasElement, alpha = 1): void => {
+			ctx.resetTransform();
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			if (alpha < 1) ctx.globalAlpha = alpha;
+			ctx.drawImage(offscreen, 0, 0);
+			if (alpha < 1) ctx.globalAlpha = 1;
+		};
+
+		const rc: RenderContext = { ctx, camera, width, height, dpr, compositeOffscreen };
 
 		// Clear the full device-pixel buffer
 		ctx.resetTransform();
