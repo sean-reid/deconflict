@@ -23,8 +23,9 @@ function deserializeResult(data: SerializedSolverResult): SolverResult {
 
 export class SolverBridge {
 	private worker: Worker | null = null;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	private pendingResolve: ((value: any) => void) | null = null;
-	private pendingReject: ((reason: any) => void) | null = null;
+	private pendingReject: ((reason: unknown) => void) | null = null;
 
 	private getWorker(): Worker {
 		if (!this.worker) {

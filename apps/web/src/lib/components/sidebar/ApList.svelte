@@ -107,7 +107,25 @@
 	{/if}
 
 	{#if projectState.aps.length >= 1 && projectState.wallMask}
-		<div class="optimize-section">
+		<div class="coverage-section">
+			{#if optimizerState.coverage > 0}
+				<div class="coverage-bar-container">
+					<div class="coverage-bar-label">
+						<span>Coverage</span>
+						<span class="coverage-value">{optimizerState.coverage}%</span>
+					</div>
+					<div class="coverage-bar-track">
+						<div
+							class="coverage-bar-fill"
+							class:low={optimizerState.coverage < 30}
+							class:med={optimizerState.coverage >= 30 && optimizerState.coverage < 60}
+							class:high={optimizerState.coverage >= 60}
+							style="width: {optimizerState.coverage}%"
+						></div>
+					</div>
+				</div>
+			{/if}
+
 			{#if optimizerState.isRunning}
 				<div class="optimize-progress">
 					<span class="optimize-status">Optimizing... {optimizerState.progress}%</span>
@@ -120,8 +138,6 @@
 				</Button>
 				{#if optimizerState.error}
 					<span class="optimize-error">{optimizerState.error}</span>
-				{:else if optimizerState.score > 0}
-					<span class="optimize-score">Coverage: {optimizerState.score}%</span>
 				{/if}
 			{/if}
 		</div>
@@ -319,17 +335,62 @@
 		color: var(--color-error);
 	}
 
-	.optimize-section {
+	.coverage-section {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-1);
+		gap: var(--space-2);
 		padding-top: var(--space-3);
 		margin-top: var(--space-2);
 		border-top: 1px solid var(--border-subtle);
 	}
 
-	.optimize-section :global(.btn) {
+	.coverage-section :global(.btn) {
 		width: 100%;
+	}
+
+	.coverage-bar-container {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.coverage-bar-label {
+		display: flex;
+		justify-content: space-between;
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.coverage-value {
+		font-family: var(--font-mono);
+		color: var(--text-secondary);
+	}
+
+	.coverage-bar-track {
+		height: 6px;
+		background: var(--bg-surface);
+		border-radius: 3px;
+		overflow: hidden;
+	}
+
+	.coverage-bar-fill {
+		height: 100%;
+		border-radius: 3px;
+		transition: width 0.3s ease;
+	}
+
+	.coverage-bar-fill.low {
+		background: var(--color-error, #ff4444);
+	}
+
+	.coverage-bar-fill.med {
+		background: var(--color-warning, #ffb800);
+	}
+
+	.coverage-bar-fill.high {
+		background: var(--color-success, #4ade80);
 	}
 
 	.optimize-progress {
@@ -343,12 +404,6 @@
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
 		font-style: italic;
-	}
-
-	.optimize-score {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--color-success, #4ade80);
 	}
 
 	.optimize-error {

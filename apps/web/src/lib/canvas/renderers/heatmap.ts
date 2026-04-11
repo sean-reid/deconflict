@@ -60,7 +60,11 @@ export class HeatmapLayer implements Layer {
 		rc.compositeOffscreen(this.cache);
 	}
 
-	private generateHeatmap(width: number, height: number, camera: any): HTMLCanvasElement {
+	private generateHeatmap(
+		width: number,
+		height: number,
+		camera: { screenToWorld: (p: { x: number; y: number }) => { x: number; y: number } }
+	): HTMLCanvasElement {
 		const offscreen = document.createElement('canvas');
 		offscreen.width = width;
 		offscreen.height = height;

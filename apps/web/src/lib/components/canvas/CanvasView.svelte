@@ -17,6 +17,7 @@
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
+	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
@@ -275,6 +276,16 @@
 		}, 500);
 	});
 
+
+	// Update coverage score when APs or wall mask change
+	let coverageTimeout: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		const _key = autoSolveKey;
+		const _mask = projectState.wallMask;
+		if (projectState.aps.length === 0 || !_mask) return;
+		if (coverageTimeout) clearTimeout(coverageTimeout);
+		coverageTimeout = setTimeout(() => updateCoverage(), 300);
+	});
 
 	// Track pending placement vs pan gesture
 	const DRAG_THRESHOLD = 5;

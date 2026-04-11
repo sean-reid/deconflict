@@ -1,6 +1,7 @@
 import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
-import { decodeMask } from '$canvas/wall-detect.js';
+import { decodeMask, countWallCrossings, type DecodedWallMask } from '$canvas/wall-detect.js';
+import { computeBuildingInterior } from '$canvas/morph-interior.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
 
 const bridge = new OptimizerBridge();
@@ -9,8 +10,88 @@ export const optimizerState = $state({
 	isRunning: false,
 	progress: 0,
 	score: 0,
+	coverage: 0, // real-time coverage percentage, updated on AP/mask changes
 	error: null as string | null
 });
+
+// Cached interior sample points and decoded mask for real-time coverage
+let cachedMaskUrl: string | null = null;
+let cachedMask: DecodedWallMask | null = null;
+let cachedSamples: Array<{ x: number; y: number }> | null = null;
+
+async function ensureCoverageCache(): Promise<boolean> {
+	const mask = projectState.wallMask;
+	if (!mask) return false;
+	if (mask.dataUrl === cachedMaskUrl && cachedMask && cachedSamples) return true;
+
+	cachedMask = await decodeMask(mask.dataUrl, mask.width, mask.height);
+	cachedMaskUrl = mask.dataUrl;
+
+	// Compute interior and sample points
+	const { interior } = computeBuildingInterior(cachedMask.data, mask.width, mask.height, {
+		maxDim: 200,
+		dilateRatio: 0.04,
+		minDilateR: 4
+	});
+
+	const interiorPixels: number[] = [];
+	for (let i = 0; i < mask.width * mask.height; i++) {
+		if (interior[i]) interiorPixels.push(i);
+	}
+
+	const sampleCount = Math.min(200, interiorPixels.length);
+	const step = interiorPixels.length / sampleCount;
+	cachedSamples = [];
+	for (let i = 0; i < sampleCount; i++) {
+		const idx = interiorPixels[Math.floor(i * step)]!;
+		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
+	}
+
+	return cachedSamples.length > 0;
+}
+
+/** Compute real-time coverage score from current AP positions */
+export async function updateCoverage(): Promise<void> {
+	if (projectState.aps.length === 0 || !projectState.wallMask) {
+		optimizerState.coverage = 0;
+		return;
+	}
+
+	if (!(await ensureCoverageCache()) || !cachedMask || !cachedSamples) {
+		optimizerState.coverage = 0;
+		return;
+	}
+
+	const { data, width, height } = cachedMask;
+	const attenuation = projectState.wallAttenuation;
+	let totalSignal = 0;
+
+	for (const sample of cachedSamples) {
+		let best = 0;
+		for (const ap of projectState.aps) {
+			const dx = sample.x - ap.x;
+			const dy = sample.y - ap.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			const ratio = dist / ap.interferenceRadius;
+			if (ratio >= 1.5) continue;
+			let signal = Math.pow(1 - ratio / 1.5, 2);
+			if (signal > 0.001) {
+				const crossings = countWallCrossings(
+					{ data, width, height },
+					ap.x,
+					ap.y,
+					sample.x,
+					sample.y
+				);
+				if (crossings > 0) signal *= Math.pow(10, (-crossings * attenuation) / 20);
+			}
+			if (signal > best) best = signal;
+		}
+		totalSignal += best;
+	}
+
+	optimizerState.coverage = Math.round((totalSignal / cachedSamples.length) * 100);
+}
 
 export async function runOptimizer(): Promise<void> {
 	if (projectState.aps.length === 0) return;
