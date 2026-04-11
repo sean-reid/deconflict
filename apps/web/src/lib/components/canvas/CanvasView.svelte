@@ -287,56 +287,98 @@
 	let pointerStartY = 0;
 	let activeTouches = 0;
 
+	// Single-finger state
 	let touchStartX = 0;
 	let touchStartY = 0;
 	let touchMoved = false;
 	let touchStartedOnAp = false;
 
+	// Two-finger pinch state
+	let pinchLastDist = 0;
+	let pinchLastCx = 0;
+	let pinchLastCy = 0;
+	let pinchFrames = 0;
+
 	function handleTouchStart(e: TouchEvent) {
 		activeTouches = e.touches.length;
 
 		if (activeTouches === 1) {
-			// Just record the start position. Don't process anything yet.
-			// Processing happens on touchmove (drag) or touchend (tap).
 			const t = e.touches[0]!;
 			touchStartX = t.clientX;
 			touchStartY = t.clientY;
 			touchMoved = false;
 			touchStartedOnAp = false;
-			pendingPlace = false;
 			pendingPan = false;
 		} else if (activeTouches >= 2) {
-			// Second finger: cancel any single-finger state
-			pendingPlace = false;
+			e.preventDefault();
+			// Cancel single-finger state
 			pendingPan = false;
 			touchStartedOnAp = false;
-			touchMoved = true; // prevent tap-to-place on touchend
+			touchMoved = true;
 			dragHandler.handlePointerUp();
+			// Initialize pinch
+			pinchFrames = 0;
+			pinchLastDist = 0;
 		}
 	}
 
 	function handleTouchMove(e: TouchEvent) {
 		if (!engine) return;
-		if (e.touches.length !== 1) return; // 2-finger handled by pan-zoom.ts
+
+		// Two-finger: pinch zoom + pan
+		if (e.touches.length === 2) {
+			e.preventDefault();
+			const t0 = e.touches[0]!;
+			const t1 = e.touches[1]!;
+			const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+			const cx = (t0.clientX + t1.clientX) / 2;
+			const cy = (t0.clientY + t1.clientY) / 2;
+
+			pinchFrames++;
+			if (pinchFrames <= 2) {
+				// Baseline frames: record, don't apply
+				pinchLastDist = dist;
+				pinchLastCx = cx;
+				pinchLastCy = cy;
+				return;
+			}
+
+			// Zoom
+			if (pinchLastDist > 0) {
+				const factor = dist / pinchLastDist;
+				if (factor < 0.95 || factor > 1.05) {
+					const rect = engine.canvas.getBoundingClientRect();
+					engine.camera.zoomAt({ x: cx - rect.left, y: cy - rect.top }, factor);
+				}
+			}
+
+			// Pan
+			engine.camera.pan(
+				(cx - pinchLastCx) / engine.camera.state.zoom,
+				(cy - pinchLastCy) / engine.camera.state.zoom
+			);
+
+			pinchLastDist = dist;
+			pinchLastCx = cx;
+			pinchLastCy = cy;
+			engine.markDirty();
+			return;
+		}
+
+		// Single-finger
+		if (e.touches.length !== 1) return;
 		const t = e.touches[0]!;
 		const dx = t.clientX - touchStartX;
 		const dy = t.clientY - touchStartY;
-		const distSq = dx * dx + dy * dy;
 
-		// First significant move: decide if we're dragging an AP or panning
-		if (!touchMoved && !touchStartedOnAp && !pendingPan && distSq > DRAG_THRESHOLD * DRAG_THRESHOLD) {
+		if (!touchMoved && !touchStartedOnAp && !pendingPan && dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
 			touchMoved = true;
-
-			// Check if we started on an AP
 			const rect = engine.canvas.getBoundingClientRect();
-			const screenPoint = { x: touchStartX - rect.left, y: touchStartY - rect.top };
-			const hit = hitTest(screenPoint, engine.camera, projectState.aps);
+			const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, projectState.aps);
 
 			if (hit) {
 				touchStartedOnAp = true;
-				const synth = new PointerEvent('pointerdown', {
-					clientX: touchStartX, clientY: touchStartY, button: 0
-				});
+				const synth = new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 });
 				selectHandler.handlePointerDown(synth);
 				dragHandler.handlePointerDown(synth);
 			} else {
@@ -346,11 +388,8 @@
 			}
 		}
 
-		// Apply drag or pan
 		if (touchStartedOnAp && dragHandler.isDragging) {
-			dragHandler.handlePointerMove(
-				new PointerEvent('pointermove', { clientX: t.clientX, clientY: t.clientY })
-			);
+			dragHandler.handlePointerMove(new PointerEvent('pointermove', { clientX: t.clientX, clientY: t.clientY }));
 		} else if (pendingPan) {
 			engine.camera.pan(
 				(t.clientX - pointerStartX) / engine.camera.state.zoom,
@@ -365,31 +404,25 @@
 	function handleTouchEnd(e: TouchEvent) {
 		if (activeTouches === 1 && e.touches.length === 0) {
 			if (!touchMoved && engine) {
-				// Clean tap (no drag): place AP or select
 				const rect = engine.canvas.getBoundingClientRect();
-				const screenPoint = { x: touchStartX - rect.left, y: touchStartY - rect.top };
-				const hit = hitTest(screenPoint, engine.camera, projectState.aps);
+				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, projectState.aps);
 
 				if (hit) {
-					const synth = new PointerEvent('pointerdown', {
-						clientX: touchStartX, clientY: touchStartY, button: 0
-					});
-					selectHandler.handlePointerDown(synth);
+					selectHandler.handlePointerDown(new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 }));
 				} else {
-					placeHandler.handlePointerDown(
-						new PointerEvent('pointerdown', {
-							clientX: touchStartX, clientY: touchStartY, button: 0
-						})
-					);
+					placeHandler.handlePointerDown(new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 }));
 				}
 			}
-			pendingPlace = false;
 			pendingPan = false;
 			touchStartedOnAp = false;
 			dragHandler.handlePointerUp();
 			selectHandler.handlePointerUp(new PointerEvent('pointerup'));
 		}
 		activeTouches = e.touches.length;
+		if (activeTouches === 0) {
+			pinchFrames = 0;
+			pinchLastDist = 0;
+		}
 	}
 
 	function processPointerDown(e: PointerEvent) {
