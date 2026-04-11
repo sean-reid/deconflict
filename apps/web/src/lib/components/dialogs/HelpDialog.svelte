@@ -40,9 +40,8 @@
 
 			<div class="dialog-body">
 				<p class="intro">
-					Deconflict is a free wireless channel planning tool. Place
-					access points on your floorplan, and the solver assigns WiFi
-					channels to minimize interference between nearby access points.
+					Free WiFi channel planner. Place access points, solve for
+					optimal channels, export your plan.
 				</p>
 
 				<section class="section">
@@ -50,7 +49,7 @@
 					<ul class="quick-start">
 						<li>Click the canvas to place access points</li>
 						<li>Click an AP to select it, drag to move</li>
-						<li>Hold <kbd>Space</kbd> + drag to pan the canvas</li>
+						<li>Click and drag empty space to pan</li>
 						<li>Scroll to zoom in and out</li>
 						<li>Click <strong>Solve</strong> to assign channels</li>
 					</ul>

@@ -5,7 +5,6 @@ export class PanZoomHandler {
 	private isPanning = false;
 	private lastX = 0;
 	private lastY = 0;
-	private spaceHeld = false;
 
 	// Touch pinch-zoom state
 	private lastPinchDist = 0;
@@ -24,8 +23,6 @@ export class PanZoomHandler {
 		canvas.addEventListener('touchstart', this.onTouchStart, { passive: false });
 		canvas.addEventListener('touchmove', this.onTouchMove, { passive: false });
 		canvas.addEventListener('touchend', this.onTouchEnd);
-		window.addEventListener('keydown', this.onKeyDown);
-		window.addEventListener('keyup', this.onKeyUp);
 	}
 
 	detach(): void {
@@ -37,8 +34,6 @@ export class PanZoomHandler {
 		canvas.removeEventListener('touchstart', this.onTouchStart);
 		canvas.removeEventListener('touchmove', this.onTouchMove);
 		canvas.removeEventListener('touchend', this.onTouchEnd);
-		window.removeEventListener('keydown', this.onKeyDown);
-		window.removeEventListener('keyup', this.onKeyUp);
 	}
 
 	private onWheel = (e: WheelEvent): void => {
@@ -52,7 +47,7 @@ export class PanZoomHandler {
 
 	private onPointerDown = (e: PointerEvent): void => {
 		// Middle mouse button, space held, or pan tool active
-		if (e.button === 1 || (e.button === 0 && this.spaceHeld)) {
+		if (e.button === 1) {
 			this.isPanning = true;
 			this.lastX = e.clientX;
 			this.lastY = e.clientY;
@@ -131,21 +126,5 @@ export class PanZoomHandler {
 	private onTouchEnd = (_e: TouchEvent): void => {
 		this.lastPinchDist = 0;
 		this.isPanning = false;
-	};
-
-	private onKeyDown = (e: KeyboardEvent): void => {
-		if (e.code === 'Space' && !e.repeat) {
-			this.spaceHeld = true;
-			this.engine.canvas.style.cursor = 'grab';
-		}
-	};
-
-	private onKeyUp = (e: KeyboardEvent): void => {
-		if (e.code === 'Space') {
-			this.spaceHeld = false;
-			if (!this.isPanning) {
-				this.engine.canvas.style.cursor = '';
-			}
-		}
 	};
 }
