@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { CanvasEngine } from '$canvas/engine.js';
 	import { FloorplanLayer } from '$canvas/renderers/floorplan.js';
+	import { BoundaryLayer } from '$canvas/renderers/boundary.js';
 	import { GridLayer } from '$canvas/renderers/grid.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { RangeRingLayer } from '$canvas/renderers/range-ring.js';
@@ -29,6 +30,7 @@
 	let dragHandler: DragHandler;
 	let placeHandler: PlaceHandler;
 	let floorplanLayer: FloorplanLayer;
+	let boundaryLayer: BoundaryLayer;
 	let gridLayer: GridLayer;
 	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
@@ -90,14 +92,16 @@
 
 		// Create layers
 		floorplanLayer = new FloorplanLayer();
+		boundaryLayer = new BoundaryLayer();
 		gridLayer = new GridLayer();
 		rangeRingLayer = new RangeRingLayer();
 		conflictEdgeLayer = new ConflictEdgeLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
 
-		// Add layers in draw order: floorplan, grid, range rings, conflict edges, APs, selection rect
+		// Add layers in draw order: floorplan, boundary, grid, range rings, conflict edges, APs, selection rect
 		engine.addLayer(floorplanLayer);
+		engine.addLayer(boundaryLayer);
 		engine.addLayer(gridLayer);
 		engine.addLayer(rangeRingLayer);
 		engine.addLayer(conflictEdgeLayer);
@@ -233,6 +237,20 @@
 	$effect(() => {
 		if (!floorplanLayer) return;
 		floorplanLayer.opacity = projectState.floorplanScale;
+		engine.markDirty();
+	});
+
+	// Sync boundary polygon to layer
+	$effect(() => {
+		if (!boundaryLayer) return;
+		const boundary = projectState.floorplanBoundary;
+		if (boundary && boundary.length >= 3) {
+			boundaryLayer.polygon = boundary;
+			boundaryLayer.visible = true;
+		} else {
+			boundaryLayer.polygon = [];
+			boundaryLayer.visible = false;
+		}
 		engine.markDirty();
 	});
 

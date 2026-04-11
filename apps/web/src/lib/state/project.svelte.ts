@@ -27,7 +27,9 @@ export const projectState = $state({
 	regulatoryDomain: 'fcc' as RegulatoryDomain,
 	aps: [] as AccessPoint[],
 	floorplanUrl: null as string | null,
-	floorplanScale: 1
+	floorplanScale: 0.4,
+	calibration: null as { worldUnitsPerMeter: number } | null,
+	floorplanBoundary: null as Array<{ x: number; y: number }> | null
 });
 
 export function addAp(x: number, y: number): AccessPoint {

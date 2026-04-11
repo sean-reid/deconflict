@@ -1,10 +1,18 @@
 <script lang="ts">
 	import { projectState } from '$state/project.svelte.js';
+	import { detectBoundary, polygonArea } from '$canvas/boundary-detect.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
+	const FLOORPLAN_TARGET_WIDTH = 800;
+
 	let fileInput = $state<HTMLInputElement>();
 	let dragOver = $state(false);
+	let detecting = $state(false);
+	let areaInput = $state('');
+	let areaUnit = $state<'sqm' | 'sqft'>('sqm');
+	let detectedWorldArea = $state<number | null>(null);
+	let calibrationDone = $state(false);
 
 	let hasFloorplan = $derived(projectState.floorplanUrl !== null);
 
@@ -14,6 +22,68 @@
 		{ name: 'West Wing', file: '/samples/west-wing.svg' }
 	];
 
+	let scaleDisplay = $derived(
+		projectState.calibration
+			? `1px = ${(1 / projectState.calibration.worldUnitsPerMeter).toFixed(2)}m`
+			: null
+	);
+
+	function runBoundaryDetection(url: string) {
+		detecting = true;
+		calibrationDone = false;
+		detectedWorldArea = null;
+		areaInput = '';
+		projectState.calibration = null;
+		projectState.floorplanBoundary = null;
+
+		const img = new Image();
+		img.onload = () => {
+			try {
+				const result = detectBoundary(img);
+				if (result && result.polygon.length >= 3) {
+					const scaleFactor = FLOORPLAN_TARGET_WIDTH / img.naturalWidth;
+					const worldPolygon = result.polygon.map((p) => ({
+						x: p.x * scaleFactor,
+						y: p.y * scaleFactor
+					}));
+					projectState.floorplanBoundary = worldPolygon;
+					detectedWorldArea = polygonArea(worldPolygon);
+				}
+			} catch {
+				// Detection failed silently
+			}
+			detecting = false;
+		};
+		img.onerror = () => {
+			detecting = false;
+		};
+		img.src = url;
+	}
+
+	function applyCalibration() {
+		const val = parseFloat(areaInput);
+		if (!val || val <= 0 || !detectedWorldArea) return;
+		let realAreaSqm = val;
+		if (areaUnit === 'sqft') {
+			realAreaSqm = val * 0.092903;
+		}
+		const worldUnitsPerMeter = Math.sqrt(detectedWorldArea / realAreaSqm);
+		projectState.calibration = { worldUnitsPerMeter };
+		calibrationDone = true;
+	}
+
+	function skipCalibration() {
+		projectState.floorplanBoundary = null;
+		detectedWorldArea = null;
+		calibrationDone = true;
+	}
+
+	function handleAreaKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			applyCalibration();
+		}
+	}
+
 	async function loadSample(url: string) {
 		if (projectState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(projectState.floorplanUrl);
@@ -21,7 +91,9 @@
 		try {
 			const response = await fetch(url);
 			const blob = await response.blob();
-			projectState.floorplanUrl = URL.createObjectURL(blob);
+			const blobUrl = URL.createObjectURL(blob);
+			projectState.floorplanUrl = blobUrl;
+			runBoundaryDetection(blobUrl);
 		} catch {
 			// Failed to load sample
 		}
@@ -33,7 +105,9 @@
 		if (projectState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(projectState.floorplanUrl);
 		}
-		projectState.floorplanUrl = URL.createObjectURL(file);
+		const blobUrl = URL.createObjectURL(file);
+		projectState.floorplanUrl = blobUrl;
+		runBoundaryDetection(blobUrl);
 	}
 
 	function handleInputChange(e: Event) {
@@ -64,6 +138,11 @@
 			URL.revokeObjectURL(projectState.floorplanUrl);
 		}
 		projectState.floorplanUrl = null;
+		projectState.floorplanBoundary = null;
+		projectState.calibration = null;
+		detectedWorldArea = null;
+		calibrationDone = false;
+		areaInput = '';
 	}
 
 	function handleOpacityChange(e: Event) {
@@ -129,6 +208,39 @@
 				/>
 				<span class="opacity-value">{Math.round(projectState.floorplanScale * 100)}%</span>
 			</div>
+
+			{#if detecting}
+				<div class="calibration-section">
+					<span class="calibration-status">Detecting boundary...</span>
+				</div>
+			{:else if detectedWorldArea && !calibrationDone}
+				<div class="calibration-section">
+					<span class="calibration-label">Detected area outline. What is the total area?</span>
+					<div class="calibration-input-row">
+						<input
+							type="number"
+							class="area-input"
+							placeholder="e.g. 200"
+							bind:value={areaInput}
+							onkeydown={handleAreaKeydown}
+							min="1"
+							step="any"
+						/>
+						<button
+							class="unit-toggle"
+							onclick={() => (areaUnit = areaUnit === 'sqm' ? 'sqft' : 'sqm')}
+						>
+							{areaUnit === 'sqm' ? 'sqm' : 'sqft'}
+						</button>
+						<button class="apply-btn" onclick={applyCalibration}>Apply</button>
+					</div>
+					<button class="skip-link" onclick={skipCalibration}>Skip</button>
+				</div>
+			{:else if scaleDisplay}
+				<div class="calibration-section">
+					<span class="calibration-confirmed">Scale: {scaleDisplay}</span>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -231,5 +343,105 @@
 		color: var(--text-tertiary);
 		min-width: 36px;
 		text-align: right;
+	}
+
+	.calibration-section {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.calibration-status {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		font-style: italic;
+	}
+
+	.calibration-label {
+		font-size: var(--text-xs);
+		color: var(--text-secondary);
+		line-height: 1.4;
+	}
+
+	.calibration-input-row {
+		display: flex;
+		gap: var(--space-1);
+		align-items: center;
+	}
+
+	.area-input {
+		flex: 1;
+		height: 28px;
+		background: var(--bg-surface);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-md);
+		color: var(--text-primary);
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		padding: 0 var(--space-2);
+		outline: none;
+		min-width: 0;
+	}
+
+	.area-input:focus {
+		border-color: var(--accent-primary);
+	}
+
+	.unit-toggle {
+		height: 28px;
+		padding: 0 var(--space-2);
+		background: var(--bg-surface);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-md);
+		color: var(--text-secondary);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.unit-toggle:hover {
+		background: var(--bg-hover);
+		border-color: var(--accent-primary-dim);
+	}
+
+	.apply-btn {
+		height: 28px;
+		padding: 0 var(--space-2);
+		background: var(--accent-primary);
+		border: none;
+		border-radius: var(--radius-md);
+		color: var(--text-on-accent, #fff);
+		font-size: var(--text-xs);
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.apply-btn:hover {
+		opacity: 0.9;
+	}
+
+	.skip-link {
+		background: none;
+		border: none;
+		color: var(--text-tertiary);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		padding: 0;
+		text-decoration: underline;
+		align-self: flex-start;
+	}
+
+	.skip-link:hover {
+		color: var(--text-secondary);
+	}
+
+	.calibration-confirmed {
+		font-size: var(--text-xs);
+		color: var(--color-success, #4ade80);
+		font-family: var(--font-mono);
 	}
 </style>

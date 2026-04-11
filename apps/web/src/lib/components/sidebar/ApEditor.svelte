@@ -50,6 +50,15 @@
 
 	let batchRadius = $state(150);
 
+	let radiusDisplay = $derived(
+		singleAp
+			? projectState.calibration
+				? (singleAp.interferenceRadius / projectState.calibration.worldUnitsPerMeter).toFixed(1)
+				: String(singleAp.interferenceRadius)
+			: ''
+	);
+	let radiusUnit = $derived(projectState.calibration ? 'm' : 'px');
+
 	$effect(() => {
 		if (selectedAps.length > 0) {
 			batchRadius = selectedAps[0]?.interferenceRadius ?? 150;
@@ -221,6 +230,9 @@
 				step={10}
 				label="px"
 			/>
+			{#if projectState.calibration}
+				<span class="radius-converted">{radiusDisplay} {radiusUnit}</span>
+			{/if}
 		</div>
 
 		<div class="field">
@@ -459,6 +471,12 @@
 	.delete-section {
 		padding-top: var(--space-3);
 		border-top: 1px solid var(--border-subtle);
+	}
+
+	.radius-converted {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
 	}
 
 	:global(.full-width) {
