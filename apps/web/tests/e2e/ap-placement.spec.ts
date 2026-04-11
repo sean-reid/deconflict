@@ -25,9 +25,9 @@ test.describe('AP placement', () => {
 		await canvas.click({ position: { x: 400, y: 200 } });
 		await canvas.click({ position: { x: 300, y: 350 } });
 
-		await expect(page.locator('text=AP-1')).toBeVisible();
-		await expect(page.locator('text=AP-2')).toBeVisible();
-		await expect(page.locator('text=AP-3')).toBeVisible();
+		await expect(page.getByRole('button', { name: /AP-1/ })).toBeVisible();
+		await expect(page.getByRole('button', { name: /AP-2/ })).toBeVisible();
+		await expect(page.getByRole('button', { name: /AP-3/ })).toBeVisible();
 	});
 
 	test('select an AP by clicking it', async ({ page }) => {
