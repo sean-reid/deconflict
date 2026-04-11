@@ -1,28 +1,10 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/project.svelte.js';
-import type { WallSegment } from './walls.js';
+import type { DecodedWallMask } from '../wall-detect.js';
+import { countWallCrossings } from '../wall-detect.js';
 import { getBaseRate } from '@deconflict/channels';
 
 const CELL_SIZE = 8;
-
-function segmentsIntersect(
-	ax: number,
-	ay: number,
-	bx: number,
-	by: number,
-	cx: number,
-	cy: number,
-	dx: number,
-	dy: number
-): boolean {
-	const d1 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx);
-	const d2 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
-	const d3 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-	const d4 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
-	if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0)))
-		return true;
-	return false;
-}
 
 function signalStrength(distance: number, radius: number): number {
 	if (distance <= 0) return 1;
@@ -45,7 +27,8 @@ export class HeatmapLayer implements Layer {
 	visible = false;
 	aps: AccessPoint[] = [];
 	ispSpeed = 0;
-	walls: WallSegment[] = [];
+	wallMask: DecodedWallMask | null = null;
+	wallAttenuation = 5;
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -58,7 +41,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|walls:${this.walls.length}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|wa:${this.wallAttenuation}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}`
 		);
 	}
@@ -70,7 +53,6 @@ export class HeatmapLayer implements Layer {
 		const key = this.getCacheKey(camera);
 
 		if (key !== this.cacheKey || !this.cache) {
-			// Generate heatmap in CSS-pixel space
 			this.cache = this.generateHeatmap(width, height, camera);
 			this.cacheKey = key;
 		}
@@ -80,7 +62,6 @@ export class HeatmapLayer implements Layer {
 
 	private generateHeatmap(width: number, height: number, camera: any): HTMLCanvasElement {
 		const offscreen = document.createElement('canvas');
-		// Work in CSS-pixel space for correct screenToWorld mapping
 		offscreen.width = width;
 		offscreen.height = height;
 		const ctx = offscreen.getContext('2d')!;
@@ -101,10 +82,8 @@ export class HeatmapLayer implements Layer {
 
 		for (let row = 0; row < rows; row++) {
 			for (let col = 0; col < cols; col++) {
-				// Screen position in CSS pixels
 				const screenX = col * cellSize + cellSize / 2;
 				const screenY = row * cellSize + cellSize / 2;
-				// Convert to world coordinates
 				const worldPoint = camera.screenToWorld({ x: screenX, y: screenY });
 
 				let bestSignal = 0;
@@ -125,30 +104,19 @@ export class HeatmapLayer implements Layer {
 					const base = getBaseRate(bestAp.band, bestAp.channelWidth) * 0.5;
 					let throughput = base * bestSignal;
 
-					// Count wall crossings between test point and serving AP
-					let wallLoss = 0;
-					for (const wall of this.walls) {
-						if (
-							segmentsIntersect(
-								worldPoint.x,
-								worldPoint.y,
-								bestAp.x,
-								bestAp.y,
-								wall.x1,
-								wall.y1,
-								wall.x2,
-								wall.y2
-							)
-						) {
-							wallLoss += wall.attenuation;
+					// Wall attenuation via ray marching through the mask
+					if (this.wallMask) {
+						const crossings = countWallCrossings(
+							this.wallMask,
+							bestAp.x,
+							bestAp.y,
+							worldPoint.x,
+							worldPoint.y
+						);
+						if (crossings > 0) {
+							const wallLoss = crossings * this.wallAttenuation;
+							throughput *= Math.pow(10, -wallLoss / 20);
 						}
-					}
-
-					// Apply wall attenuation (convert dB to linear)
-					// Each 3dB halves the signal
-					if (wallLoss > 0) {
-						const wallFactor = Math.pow(10, -wallLoss / 20);
-						throughput *= wallFactor;
 					}
 
 					if (this.ispSpeed > 0) {

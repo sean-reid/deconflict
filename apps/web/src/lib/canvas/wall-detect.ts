@@ -1,40 +1,123 @@
-export interface DetectedWall {
-	x1: number;
-	y1: number;
-	x2: number;
-	y2: number;
-	thickness: number;
+import { createWorker, type Worker } from 'tesseract.js';
+
+export interface WallMask {
+	dataUrl: string;
+	width: number;
+	height: number;
+}
+
+export interface DecodedWallMask {
+	data: Uint8Array;
+	width: number;
+	height: number;
+}
+
+let ocrWorker: Worker | null = null;
+
+async function getOCRWorker(): Promise<Worker | null> {
+	if (ocrWorker) return ocrWorker;
+	try {
+		ocrWorker = await createWorker('eng');
+		return ocrWorker;
+	} catch {
+		return null;
+	}
 }
 
 /**
- * Detect walls from a floorplan image using threshold + skeletonization + line detection.
- * No external dependencies required.
+ * Detect walls from a floorplan image.
+ * Pipeline: OCR text masking -> threshold -> remove small blobs -> remove exterior blobs -> binary mask.
+ * Returns a wall mask at displayWidth resolution in world coordinates.
  */
-export function detectWalls(image: HTMLImageElement): DetectedWall[] {
-	const maxDim = 500;
-	const scale = Math.min(1, maxDim / Math.max(image.naturalWidth, image.naturalHeight));
-	const w = Math.round(image.naturalWidth * scale);
-	const h = Math.round(image.naturalHeight * scale);
+export async function detectWalls(
+	image: HTMLImageElement,
+	displayWidth: number
+): Promise<WallMask | null> {
+	const displayScale = displayWidth / image.naturalWidth;
+	const w = displayWidth;
+	const h = Math.round(image.naturalHeight * displayScale);
 
-	// Step 1: Render to offscreen canvas at reduced size
 	const canvas = document.createElement('canvas');
 	canvas.width = w;
 	canvas.height = h;
 	const ctx = canvas.getContext('2d')!;
 	ctx.drawImage(image, 0, 0, w, h);
 
-	const imageData = ctx.getImageData(0, 0, w, h);
-	const { data } = imageData;
+	// Step 1: OCR to find and mask text regions
+	try {
+		const worker = await getOCRWorker();
+		if (worker) {
+			const { data } = await worker.recognize(canvas);
 
-	// Step 2: Grayscale + threshold to binary (same approach as boundary-detect)
-	const gray = new Uint8Array(w * h);
-	for (let i = 0; i < w * h; i++) {
-		gray[i] = Math.round((data[i * 4]! + data[i * 4 + 1]! + data[i * 4 + 2]!) / 3);
+			// Sample border pixels for background color
+			const borderData = ctx.getImageData(0, 0, w, h).data;
+			let rSum = 0,
+				gSum = 0,
+				bSum = 0,
+				count = 0;
+			for (let x = 0; x < w; x++) {
+				const i1 = x * 4;
+				rSum += borderData[i1]!;
+				gSum += borderData[i1 + 1]!;
+				bSum += borderData[i1 + 2]!;
+				count++;
+				const i2 = ((h - 1) * w + x) * 4;
+				rSum += borderData[i2]!;
+				gSum += borderData[i2 + 1]!;
+				bSum += borderData[i2 + 2]!;
+				count++;
+			}
+			for (let y = 1; y < h - 1; y++) {
+				const i1 = y * w * 4;
+				rSum += borderData[i1]!;
+				gSum += borderData[i1 + 1]!;
+				bSum += borderData[i1 + 2]!;
+				count++;
+				const i2 = (y * w + w - 1) * 4;
+				rSum += borderData[i2]!;
+				gSum += borderData[i2 + 1]!;
+				bSum += borderData[i2 + 2]!;
+				count++;
+			}
+			const bgColor = `rgb(${Math.round(rSum / count)},${Math.round(gSum / count)},${Math.round(bSum / count)})`;
+
+			// Paint over text bounding boxes with background color + padding
+			const pad = Math.max(3, Math.round(w * 0.005));
+			ctx.fillStyle = bgColor;
+			if (data.blocks) {
+				for (const block of data.blocks) {
+					for (const para of block.paragraphs) {
+						for (const line of para.lines) {
+							for (const word of line.words) {
+								if (word.confidence < 15) continue;
+								const { x0, y0, x1, y1 } = word.bbox;
+								ctx.fillRect(
+									x0 - pad,
+									y0 - pad,
+									x1 - x0 + 2 * pad,
+									y1 - y0 + 2 * pad
+								);
+							}
+						}
+					}
+				}
+			}
+		}
+	} catch {
+		// OCR unavailable - continue without text masking
 	}
 
-	// Detect background brightness from edges
-	let edgeSum = 0;
-	let edgeCount = 0;
+	// Step 2: Grayscale + threshold to binary (1 = wall pixel)
+	const imageData = ctx.getImageData(0, 0, w, h);
+	const { data: pixels } = imageData;
+
+	const gray = new Uint8Array(w * h);
+	for (let i = 0; i < w * h; i++) {
+		gray[i] = Math.round((pixels[i * 4]! + pixels[i * 4 + 1]! + pixels[i * 4 + 2]!) / 3);
+	}
+
+	let edgeSum = 0,
+		edgeCount = 0;
 	for (let x = 0; x < w; x++) {
 		edgeSum += gray[x]!;
 		edgeSum += gray[(h - 1) * w + x]!;
@@ -46,321 +129,315 @@ export function detectWalls(image: HTMLImageElement): DetectedWall[] {
 		edgeCount += 2;
 	}
 	const darkBg = edgeSum / edgeCount < 128;
-
 	const threshold = darkBg ? 80 : 160;
+
 	const binary = new Uint8Array(w * h);
 	for (let i = 0; i < w * h; i++) {
-		if (darkBg) {
-			binary[i] = gray[i]! > threshold ? 1 : 0;
-		} else {
-			binary[i] = gray[i]! < threshold ? 1 : 0;
-		}
+		binary[i] = darkBg ? (gray[i]! > threshold ? 1 : 0) : (gray[i]! < threshold ? 1 : 0);
 	}
 
-	// Step 3: Zhang-Suen thinning to skeletonize walls to 1px lines
-	const skeleton = zhangSuenThin(binary, w, h);
+	// Step 3: Remove small disconnected blobs (noise, dots, thin text remnants)
+	const minBlobPx = Math.max(30, Math.round(w * h * 0.0003));
+	filterSmallBlobs(binary, w, h, minBlobPx);
 
-	// Step 4: Trace continuous paths and approximate as line segments
-	const minLength = 12;
-	const allWalls = extractLineSegments(skeleton, w, h, minLength, scale);
+	// Step 4: Remove blobs outside the building exterior
+	removeExteriorBlobs(binary, w, h);
 
-	// Step 5: Filter out isolated segments (text, decorations)
-	// Keep only walls that are near other walls (within proximity threshold)
-	// Real building walls cluster together; text is isolated
-	return filterConnectedWalls(allWalls, 30 / scale);
-}
+	let wallCount = 0;
+	for (let i = 0; i < w * h; i++) wallCount += binary[i]!;
+	if (wallCount < 50) return null;
 
-function zhangSuenThin(binary: Uint8Array, w: number, h: number): Uint8Array {
-	// binary: 1 = foreground (wall), 0 = background
-	const result = new Uint8Array(binary);
-	let changed = true;
-
-	while (changed) {
-		changed = false;
-
-		// Step 1
-		const toRemove1: number[] = [];
-		for (let y = 1; y < h - 1; y++) {
-			for (let x = 1; x < w - 1; x++) {
-				const idx = y * w + x;
-				if (result[idx] !== 1) continue;
-
-				// Get 8 neighbors (P2-P9 clockwise from top)
-				const p2 = result[(y - 1) * w + x]!;
-				const p3 = result[(y - 1) * w + x + 1]!;
-				const p4 = result[y * w + x + 1]!;
-				const p5 = result[(y + 1) * w + x + 1]!;
-				const p6 = result[(y + 1) * w + x]!;
-				const p7 = result[(y + 1) * w + x - 1]!;
-				const p8 = result[y * w + x - 1]!;
-				const p9 = result[(y - 1) * w + x - 1]!;
-
-				const B = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
-				if (B < 2 || B > 6) continue;
-
-				// Count 0->1 transitions in clockwise order
-				let A = 0;
-				const seq = [p2, p3, p4, p5, p6, p7, p8, p9, p2];
-				for (let i = 0; i < 8; i++) {
-					if (seq[i] === 0 && seq[i + 1] === 1) A++;
-				}
-				if (A !== 1) continue;
-
-				// Step 1 conditions
-				if (p2 * p4 * p6 !== 0) continue;
-				if (p4 * p6 * p8 !== 0) continue;
-
-				toRemove1.push(idx);
-			}
-		}
-		for (const idx of toRemove1) {
-			result[idx] = 0;
-			changed = true;
-		}
-
-		// Step 2 (same but different conditions)
-		const toRemove2: number[] = [];
-		for (let y = 1; y < h - 1; y++) {
-			for (let x = 1; x < w - 1; x++) {
-				const idx = y * w + x;
-				if (result[idx] !== 1) continue;
-
-				const p2 = result[(y - 1) * w + x]!;
-				const p3 = result[(y - 1) * w + x + 1]!;
-				const p4 = result[y * w + x + 1]!;
-				const p5 = result[(y + 1) * w + x + 1]!;
-				const p6 = result[(y + 1) * w + x]!;
-				const p7 = result[(y + 1) * w + x - 1]!;
-				const p8 = result[y * w + x - 1]!;
-				const p9 = result[(y - 1) * w + x - 1]!;
-
-				const B = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
-				if (B < 2 || B > 6) continue;
-
-				let A = 0;
-				const seq = [p2, p3, p4, p5, p6, p7, p8, p9, p2];
-				for (let i = 0; i < 8; i++) {
-					if (seq[i] === 0 && seq[i + 1] === 1) A++;
-				}
-				if (A !== 1) continue;
-
-				// Step 2 conditions (different from step 1)
-				if (p2 * p4 * p8 !== 0) continue;
-				if (p2 * p6 * p8 !== 0) continue;
-
-				toRemove2.push(idx);
-			}
-		}
-		for (const idx of toRemove2) {
-			result[idx] = 0;
-			changed = true;
-		}
-	}
-
-	return result;
-}
-
-/**
- * Trace continuous paths along the skeleton, then approximate
- * each path as line segments using Douglas-Peucker simplification.
- * Handles curves, diagonals, and any wall shape.
- */
-function extractLineSegments(
-	skeleton: Uint8Array,
-	w: number,
-	h: number,
-	minLength: number,
-	scale: number
-): DetectedWall[] {
-	const visited = new Uint8Array(w * h);
-	const paths: Array<Array<{ x: number; y: number }>> = [];
-
-	// Find all connected paths in the skeleton
+	// Step 5: Encode binary mask as PNG data URL
+	const maskCanvas = document.createElement('canvas');
+	maskCanvas.width = w;
+	maskCanvas.height = h;
+	const maskCtx = maskCanvas.getContext('2d')!;
+	const maskImg = maskCtx.createImageData(w, h);
 	for (let i = 0; i < w * h; i++) {
-		if (!skeleton[i] || visited[i]) continue;
-
-		// Find an endpoint or junction to start from
-		const startX = i % w;
-		const startY = Math.floor(i / w);
-
-		// Trace from this pixel
-		const path = tracePath(skeleton, visited, w, h, startX, startY);
-		if (path.length >= minLength) {
-			paths.push(path.map((p) => ({ x: p.x / scale, y: p.y / scale })));
+		const j = i * 4;
+		if (binary[i]) {
+			maskImg.data[j] = 255;
+			maskImg.data[j + 1] = 255;
+			maskImg.data[j + 2] = 255;
+			maskImg.data[j + 3] = 255;
 		}
 	}
+	maskCtx.putImageData(maskImg, 0, 0);
 
-	// Convert paths to line segments using Douglas-Peucker
-	const walls: DetectedWall[] = [];
-	for (const path of paths) {
-		const simplified = douglasPeucker(path, 2 / scale);
-		for (let i = 0; i < simplified.length - 1; i++) {
-			const a = simplified[i]!;
-			const b = simplified[i + 1]!;
-			const len = Math.hypot(b.x - a.x, b.y - a.y);
-			if (len >= minLength / scale) {
-				walls.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, thickness: 3 });
-			}
-		}
-	}
-
-	return walls;
+	return { dataUrl: maskCanvas.toDataURL('image/png'), width: w, height: h };
 }
 
-/** Trace a connected path through the skeleton from a starting pixel */
-function tracePath(
-	skeleton: Uint8Array,
-	visited: Uint8Array,
-	w: number,
-	h: number,
-	startX: number,
-	startY: number
-): Array<{ x: number; y: number }> {
-	const path: Array<{ x: number; y: number }> = [];
-	let cx = startX;
-	let cy = startY;
+/** Decode a wall mask PNG data URL to a Uint8Array for fast pixel lookups */
+export function decodeMask(dataUrl: string, width: number, height: number): Promise<DecodedWallMask> {
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.onload = () => {
+			const canvas = document.createElement('canvas');
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext('2d')!;
+			ctx.drawImage(img, 0, 0);
+			const data = ctx.getImageData(0, 0, width, height).data;
+			const mask = new Uint8Array(width * height);
+			for (let i = 0; i < mask.length; i++) {
+				mask[i] = data[i * 4]! > 128 ? 1 : 0;
+			}
+			resolve({ data: mask, width, height });
+		};
+		img.onerror = () => resolve({ data: new Uint8Array(width * height), width, height });
+		img.src = dataUrl;
+	});
+}
+
+/** Count wall crossings along a ray using Bresenham's line algorithm.
+ *  Each 0->1 transition is one wall crossing. */
+export function countWallCrossings(
+	mask: DecodedWallMask,
+	x0: number,
+	y0: number,
+	x1: number,
+	y1: number
+): number {
+	const { data, width, height } = mask;
+	let ix0 = Math.round(x0),
+		iy0 = Math.round(y0);
+	const ix1 = Math.round(x1),
+		iy1 = Math.round(y1);
+
+	const dx = Math.abs(ix1 - ix0);
+	const dy = Math.abs(iy1 - iy0);
+	const sx = ix0 < ix1 ? 1 : -1;
+	const sy = iy0 < iy1 ? 1 : -1;
+	let err = dx - dy;
+
+	let crossings = 0;
+	let wasWall = false;
 
 	while (true) {
-		const idx = cy * w + cx;
-		if (visited[idx]) break;
-		visited[idx] = 1;
-		path.push({ x: cx, y: cy });
-
-		// Find next unvisited neighbor (8-connected)
-		let found = false;
-		for (const [dx, dy] of [
-			[1, 0],
-			[0, 1],
-			[-1, 0],
-			[0, -1],
-			[1, 1],
-			[-1, 1],
-			[1, -1],
-			[-1, -1]
-		]) {
-			const nx = cx + dx;
-			const ny = cy + dy;
-			if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
-				const ni = ny * w + nx;
-				if (skeleton[ni] && !visited[ni]) {
-					cx = nx;
-					cy = ny;
-					found = true;
-					break;
-				}
-			}
-		}
-		if (!found) break;
-	}
-
-	return path;
-}
-
-function douglasPeucker(
-	points: Array<{ x: number; y: number }>,
-	epsilon: number
-): Array<{ x: number; y: number }> {
-	if (points.length <= 2) return points;
-
-	let maxDist = 0;
-	let maxIdx = 0;
-	const first = points[0]!;
-	const last = points[points.length - 1]!;
-
-	for (let i = 1; i < points.length - 1; i++) {
-		const p = points[i]!;
-		const dx = last.x - first.x;
-		const dy = last.y - first.y;
-		const lenSq = dx * dx + dy * dy;
-		let d: number;
-		if (lenSq === 0) {
-			d = Math.hypot(p.x - first.x, p.y - first.y);
+		if (ix0 >= 0 && ix0 < width && iy0 >= 0 && iy0 < height) {
+			const isWall = data[iy0 * width + ix0] === 1;
+			if (isWall && !wasWall) crossings++;
+			wasWall = isWall;
 		} else {
-			const t = Math.max(0, Math.min(1, ((p.x - first.x) * dx + (p.y - first.y) * dy) / lenSq));
-			d = Math.hypot(p.x - (first.x + t * dx), p.y - (first.y + t * dy));
+			wasWall = false;
 		}
-		if (d > maxDist) {
-			maxDist = d;
-			maxIdx = i;
+
+		if (ix0 === ix1 && iy0 === iy1) break;
+
+		const e2 = 2 * err;
+		if (e2 > -dy) {
+			err -= dy;
+			ix0 += sx;
+		}
+		if (e2 < dx) {
+			err += dx;
+			iy0 += sy;
 		}
 	}
 
-	if (maxDist > epsilon) {
-		const left = douglasPeucker(points.slice(0, maxIdx + 1), epsilon);
-		const right = douglasPeucker(points.slice(maxIdx), epsilon);
-		return [...left.slice(0, -1), ...right];
-	}
-
-	return [first, last];
+	return crossings;
 }
 
-/**
- * Filter out isolated wall segments that aren't part of the main building.
- * Real building walls connect to each other. Text, legends, and decorations
- * produce isolated segments that don't connect to anything.
- */
-function filterConnectedWalls(walls: DetectedWall[], proximity: number): DetectedWall[] {
-	if (walls.length <= 1) return walls;
+function filterSmallBlobs(binary: Uint8Array, w: number, h: number, minSize: number): void {
+	const labels = new Int32Array(w * h).fill(-1);
+	const blobPixels: number[][] = [];
+	let nextLabel = 0;
 
-	// Build adjacency: two walls are "connected" if any endpoint is within proximity
-	const neighbors: number[][] = walls.map(() => []);
-	for (let i = 0; i < walls.length; i++) {
-		for (let j = i + 1; j < walls.length; j++) {
-			if (wallsNear(walls[i]!, walls[j]!, proximity)) {
-				neighbors[i]!.push(j);
-				neighbors[j]!.push(i);
-			}
-		}
-	}
+	for (let i = 0; i < w * h; i++) {
+		if (!binary[i] || labels[i] !== -1) continue;
 
-	// Find connected components via BFS
-	const componentId = new Int32Array(walls.length).fill(-1);
-	const componentSizes: number[] = [];
-	let nextId = 0;
-
-	for (let i = 0; i < walls.length; i++) {
-		if (componentId[i] !== -1) continue;
-		const id = nextId++;
-		let size = 0;
+		const label = nextLabel++;
+		const pixels: number[] = [];
 		const queue = [i];
-		componentId[i] = id;
+		labels[i] = label;
+
 		while (queue.length > 0) {
 			const idx = queue.pop()!;
-			size++;
-			for (const n of neighbors[idx]!) {
-				if (componentId[n] === -1) {
-					componentId[n] = id;
-					queue.push(n);
+			pixels.push(idx);
+			const x = idx % w;
+			const y = Math.floor(idx / w);
+
+			if (y > 0 && binary[idx - w] && labels[idx - w] === -1) {
+				labels[idx - w] = label;
+				queue.push(idx - w);
+			}
+			if (y < h - 1 && binary[idx + w] && labels[idx + w] === -1) {
+				labels[idx + w] = label;
+				queue.push(idx + w);
+			}
+			if (x > 0 && binary[idx - 1] && labels[idx - 1] === -1) {
+				labels[idx - 1] = label;
+				queue.push(idx - 1);
+			}
+			if (x < w - 1 && binary[idx + 1] && labels[idx + 1] === -1) {
+				labels[idx + 1] = label;
+				queue.push(idx + 1);
+			}
+		}
+
+		blobPixels.push(pixels);
+	}
+
+	for (const pixels of blobPixels) {
+		if (pixels.length < minSize) {
+			for (const idx of pixels) binary[idx] = 0;
+		}
+	}
+}
+
+/** Remove wall blobs that are outside the building.
+ *  Morphological close seals door gaps, flood fill identifies exterior,
+ *  then wall blobs with no interior-adjacent pixels are removed. */
+function removeExteriorBlobs(binary: Uint8Array, w: number, h: number): void {
+	// Work at reduced resolution for the expensive morph close
+	const maxDim = 400;
+	const rs = Math.min(1, maxDim / Math.max(w, h));
+	const sw = Math.round(w * rs);
+	const sh = Math.round(h * rs);
+
+	// Downsample binary
+	const small = new Uint8Array(sw * sh);
+	for (let sy = 0; sy < sh; sy++) {
+		const oy = Math.min(h - 1, Math.round(sy / rs));
+		for (let sx = 0; sx < sw; sx++) {
+			const ox = Math.min(w - 1, Math.round(sx / rs));
+			small[sy * sw + sx] = binary[oy * w + ox]!;
+		}
+	}
+
+	// Morphological close: dilate walls then erode back
+	const dilateR = Math.max(5, Math.round(sw * 0.03));
+
+	// Passable map: 1 = can flood, 0 = wall blocks
+	const passable = new Uint8Array(sw * sh);
+	for (let i = 0; i < sw * sh; i++) passable[i] = small[i] ? 0 : 1;
+
+	// Dilate walls (shrink passable)
+	const dilPass = new Uint8Array(passable);
+	for (let y = 0; y < sh; y++) {
+		for (let x = 0; x < sw; x++) {
+			if (!small[y * sw + x]) continue;
+			const ylo = Math.max(0, y - dilateR),
+				yhi = Math.min(sh - 1, y + dilateR);
+			const xlo = Math.max(0, x - dilateR),
+				xhi = Math.min(sw - 1, x + dilateR);
+			for (let ny = ylo; ny <= yhi; ny++) {
+				for (let nx = xlo; nx <= xhi; nx++) {
+					dilPass[ny * sw + nx] = 0;
 				}
 			}
 		}
-		componentSizes.push(size);
 	}
 
-	// Keep only the largest connected component
-	let bestComp = 0;
-	let bestSize = 0;
-	for (let i = 0; i < componentSizes.length; i++) {
-		if (componentSizes[i]! > bestSize) {
-			bestSize = componentSizes[i]!;
-			bestComp = i;
+	// Erode walls back (dilate passable)
+	const closedPass = new Uint8Array(dilPass);
+	for (let y = 0; y < sh; y++) {
+		for (let x = 0; x < sw; x++) {
+			if (dilPass[y * sw + x] !== 1) continue;
+			const ylo = Math.max(0, y - dilateR),
+				yhi = Math.min(sh - 1, y + dilateR);
+			const xlo = Math.max(0, x - dilateR),
+				xhi = Math.min(sw - 1, x + dilateR);
+			for (let ny = ylo; ny <= yhi; ny++) {
+				for (let nx = xlo; nx <= xhi; nx++) {
+					closedPass[ny * sw + nx] = 1;
+				}
+			}
 		}
 	}
 
-	return walls.filter((_, i) => componentId[i] === bestComp);
-}
-
-function wallsNear(a: DetectedWall, b: DetectedWall, proximity: number): boolean {
-	const p2 = proximity * proximity;
-	// Check all 4 endpoint-to-endpoint distances
-	const pairs = [
-		[a.x1, a.y1, b.x1, b.y1],
-		[a.x1, a.y1, b.x2, b.y2],
-		[a.x2, a.y2, b.x1, b.y1],
-		[a.x2, a.y2, b.x2, b.y2]
-	];
-	for (const [ax, ay, bx, by] of pairs) {
-		if ((ax! - bx!) * (ax! - bx!) + (ay! - by!) * (ay! - by!) <= p2) return true;
+	// Flood fill exterior from border
+	const exterior = new Uint8Array(sw * sh);
+	const queue: number[] = [];
+	for (let x = 0; x < sw; x++) {
+		if (closedPass[x]) queue.push(x);
+		if (closedPass[(sh - 1) * sw + x]) queue.push((sh - 1) * sw + x);
 	}
-	return false;
+	for (let y = 0; y < sh; y++) {
+		if (closedPass[y * sw]) queue.push(y * sw);
+		if (closedPass[y * sw + sw - 1]) queue.push(y * sw + sw - 1);
+	}
+	while (queue.length > 0) {
+		const idx = queue.pop()!;
+		if (exterior[idx]) continue;
+		exterior[idx] = 1;
+		const x = idx % sw,
+			y = Math.floor(idx / sw);
+		if (y > 0 && !exterior[idx - sw] && closedPass[idx - sw]) queue.push(idx - sw);
+		if (y < sh - 1 && !exterior[idx + sw] && closedPass[idx + sw]) queue.push(idx + sw);
+		if (x > 0 && !exterior[idx - 1] && closedPass[idx - 1]) queue.push(idx - 1);
+		if (x < sw - 1 && !exterior[idx + 1] && closedPass[idx + 1]) queue.push(idx + 1);
+	}
+
+	// Interior at small resolution = not exterior AND not wall
+	const interior = new Uint8Array(sw * sh);
+	for (let i = 0; i < sw * sh; i++) {
+		if (!exterior[i] && !small[i]) interior[i] = 1;
+	}
+
+	// Upsample interior to full resolution
+	const fullInterior = new Uint8Array(w * h);
+	for (let y = 0; y < h; y++) {
+		const sy = Math.min(sh - 1, Math.round(y * rs));
+		for (let x = 0; x < w; x++) {
+			const sx = Math.min(sw - 1, Math.round(x * rs));
+			fullInterior[y * w + x] = interior[sy * sw + sx]!;
+		}
+	}
+
+	// Label wall blobs at full resolution and check if they touch interior
+	const labels = new Int32Array(w * h).fill(-1);
+	const blobPixels: number[][] = [];
+	const blobTouchesInterior: boolean[] = [];
+	let nextLabel = 0;
+
+	for (let i = 0; i < w * h; i++) {
+		if (!binary[i] || labels[i] !== -1) continue;
+
+		const label = nextLabel++;
+		const pixels: number[] = [];
+		let touches = false;
+		const bq = [i];
+		labels[i] = label;
+
+		while (bq.length > 0) {
+			const idx = bq.pop()!;
+			pixels.push(idx);
+			const x = idx % w,
+				y = Math.floor(idx / w);
+
+			// Check 4-connected neighbors for interior
+			if (y > 0 && fullInterior[idx - w]) touches = true;
+			if (y < h - 1 && fullInterior[idx + w]) touches = true;
+			if (x > 0 && fullInterior[idx - 1]) touches = true;
+			if (x < w - 1 && fullInterior[idx + 1]) touches = true;
+
+			if (y > 0 && binary[idx - w] && labels[idx - w] === -1) {
+				labels[idx - w] = label;
+				bq.push(idx - w);
+			}
+			if (y < h - 1 && binary[idx + w] && labels[idx + w] === -1) {
+				labels[idx + w] = label;
+				bq.push(idx + w);
+			}
+			if (x > 0 && binary[idx - 1] && labels[idx - 1] === -1) {
+				labels[idx - 1] = label;
+				bq.push(idx - 1);
+			}
+			if (x < w - 1 && binary[idx + 1] && labels[idx + 1] === -1) {
+				labels[idx + 1] = label;
+				bq.push(idx + 1);
+			}
+		}
+
+		blobPixels.push(pixels);
+		blobTouchesInterior.push(touches);
+	}
+
+	// Remove blobs that don't touch interior (exterior decorations, legends)
+	for (let b = 0; b < blobPixels.length; b++) {
+		if (!blobTouchesInterior[b]) {
+			for (const idx of blobPixels[b]!) binary[idx] = 0;
+		}
+	}
 }

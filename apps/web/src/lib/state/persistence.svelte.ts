@@ -15,9 +15,11 @@ interface SavedState {
 	regulatoryDomain: RegulatoryDomain;
 	aps: AccessPoint[];
 	floorplanScale: number;
+	unitSystem?: 'imperial' | 'metric';
 	ispSpeed: number;
 	targetThroughput: number;
-	walls: typeof projectState.walls;
+	wallMask?: { dataUrl: string; width: number; height: number } | null;
+	wallAttenuation?: number;
 	calibration: typeof projectState.calibration;
 }
 
@@ -33,10 +35,14 @@ function saveToStorage(): void {
 			channelWidth: projectState.channelWidth,
 			regulatoryDomain: projectState.regulatoryDomain,
 			aps: JSON.parse(JSON.stringify(projectState.aps)),
+			unitSystem: projectState.unitSystem,
 			floorplanScale: projectState.floorplanScale,
 			ispSpeed: projectState.ispSpeed,
 			targetThroughput: projectState.targetThroughput,
-			walls: JSON.parse(JSON.stringify(projectState.walls)),
+			wallMask: projectState.wallMask
+				? JSON.parse(JSON.stringify(projectState.wallMask))
+				: null,
+			wallAttenuation: projectState.wallAttenuation,
 			calibration: projectState.calibration
 				? JSON.parse(JSON.stringify(projectState.calibration))
 				: null
@@ -91,10 +97,12 @@ export function restoreFromStorage(): boolean {
 		projectState.channelWidth = data.channelWidth || 20;
 		projectState.regulatoryDomain = data.regulatoryDomain || 'fcc';
 		projectState.aps = data.aps;
+		projectState.unitSystem = data.unitSystem ?? 'imperial';
 		projectState.floorplanScale = data.floorplanScale ?? 0.4;
 		projectState.ispSpeed = data.ispSpeed ?? 0;
 		projectState.targetThroughput = data.targetThroughput ?? 50;
-		projectState.walls = data.walls ?? [];
+		projectState.wallMask = data.wallMask ?? null;
+		projectState.wallAttenuation = data.wallAttenuation ?? 5;
 		projectState.calibration = data.calibration ?? null;
 
 		// Restore floorplan image

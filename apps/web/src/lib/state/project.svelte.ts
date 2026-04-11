@@ -31,17 +31,11 @@ export const projectState = $state({
 	floorplanScale: 0.4,
 	calibration: null as { worldUnitsPerMeter: number } | null,
 	floorplanBoundary: null as Array<{ x: number; y: number }> | null,
+	unitSystem: 'imperial' as 'imperial' | 'metric',
 	ispSpeed: 0 as number, // 0 = no limit
 	targetThroughput: 25 as number, // default 25 Mbps minimum
-	walls: [] as Array<{
-		x1: number;
-		y1: number;
-		x2: number;
-		y2: number;
-		thickness: number;
-		material: string;
-		attenuation: number;
-	}>
+	wallMask: null as { dataUrl: string; width: number; height: number } | null,
+	wallAttenuation: 5 as number
 });
 
 export function addAp(x: number, y: number): AccessPoint {

@@ -12,7 +12,7 @@
 	let dragOver = $state(false);
 	let detecting = $state(false);
 	let areaInput = $state('');
-	let areaUnit = $state<'sqm' | 'sqft'>('sqm');
+	let areaUnit = $state<'sqm' | 'sqft'>(projectState.unitSystem === 'imperial' ? 'sqft' : 'sqm');
 	let detectedWorldArea = $state<number | null>(null);
 	let calibrationDone = $state(false);
 
@@ -25,11 +25,14 @@
 		{ name: 'West Wing (1580sqft)', file: '/samples/west-wing.svg', areaSqm: 147 }
 	];
 
-	let scaleDisplay = $derived(
-		projectState.calibration
-			? `1px = ${(1 / projectState.calibration.worldUnitsPerMeter).toFixed(2)}m`
-			: null
-	);
+	let scaleDisplay = $derived.by(() => {
+		if (!projectState.calibration) return null;
+		const mPerPx = 1 / projectState.calibration.worldUnitsPerMeter;
+		if (projectState.unitSystem === 'imperial') {
+			return `1px = ${(mPerPx * 3.28084).toFixed(2)}ft`;
+		}
+		return `1px = ${mPerPx.toFixed(2)}m`;
+	});
 
 	async function runBoundaryDetection(url: string) {
 		detecting = true;
@@ -62,33 +65,16 @@
 				}));
 				projectState.floorplanBoundary = worldPolygon;
 
-				// Use bounding box of the polygon for area estimation
-				// This is more robust than pixel counting which can miss rooms
-				let pMinX = Infinity;
-				let pMinY = Infinity;
-				let pMaxX = -Infinity;
-				let pMaxY = -Infinity;
-				for (const p of worldPolygon) {
-					if (p.x < pMinX) pMinX = p.x;
-					if (p.y < pMinY) pMinY = p.y;
-					if (p.x > pMaxX) pMaxX = p.x;
-					if (p.y > pMaxY) pMaxY = p.y;
-				}
-				detectedWorldArea = (pMaxX - pMinX) * (pMaxY - pMinY);
+				// Use the actual pixel area from boundary detection, scaled to world coords.
+				// Morphological close ensures door gaps don't leak flood fill but area
+				// isn't inflated by the dilation step.
+				detectedWorldArea = result.areaPx * cleanScaleFactor * cleanScaleFactor;
 			}
 
-			// Wall detection (use cleaned image to exclude text, scale with original dims)
-			const walls = detectWalls(cleanImg);
-			if (walls.length > 0) {
-				projectState.walls = walls.map((w) => ({
-					x1: w.x1 * scaleFactor,
-					y1: w.y1 * scaleFactor,
-					x2: w.x2 * scaleFactor,
-					y2: w.y2 * scaleFactor,
-					thickness: w.thickness * scaleFactor,
-					material: 'drywall',
-					attenuation: 5
-				}));
+			// Wall detection with OCR text removal, at display resolution
+			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH);
+			if (wallMask) {
+				projectState.wallMask = wallMask;
 				scheduleSave();
 			}
 		} catch (e) {
@@ -197,7 +183,7 @@
 		projectState.floorplanUrl = null;
 		projectState.floorplanBoundary = null;
 		projectState.calibration = null;
-		projectState.walls = [];
+		projectState.wallMask = null;
 		projectState.aps = [];
 		detectedWorldArea = null;
 		calibrationDone = false;

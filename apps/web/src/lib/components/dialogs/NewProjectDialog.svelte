@@ -25,7 +25,7 @@
 		projectState.aps = [];
 		projectState.floorplanUrl = null;
 		projectState.floorplanScale = 0.4;
-		projectState.walls = [];
+		projectState.wallMask = null;
 		projectState.calibration = null;
 		projectState.floorplanBoundary = null;
 		projectState.ispSpeed = 0;

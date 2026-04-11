@@ -6,6 +6,7 @@
 	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { WallLayer } from '$canvas/renderers/walls.js';
+	import { decodeMask } from '$canvas/wall-detect.js';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
@@ -167,6 +168,7 @@
 	$effect(() => {
 		if (!gridLayer) return;
 		gridLayer.worldUnitsPerMeter = projectState.calibration?.worldUnitsPerMeter ?? null;
+		gridLayer.unitSystem = projectState.unitSystem;
 		engine.markDirty();
 	});
 
@@ -183,32 +185,27 @@
 		engine.markDirty();
 	});
 
+	let wallMaskVersion = 0;
 	$effect(() => {
-		if (!wallLayer) return;
-		wallLayer.walls = projectState.walls.map((w) => ({
-			x1: w.x1,
-			y1: w.y1,
-			x2: w.x2,
-			y2: w.y2,
-			thickness: w.thickness,
-			material: w.material,
-			attenuation: w.attenuation
-		}));
-		engine.markDirty();
-	});
+		if (!wallLayer || !heatmapLayer) return;
+		const mask = projectState.wallMask;
+		wallMaskVersion++;
+		const thisVersion = wallMaskVersion;
 
-	$effect(() => {
-		if (!heatmapLayer) return;
-		heatmapLayer.walls = projectState.walls.map((w) => ({
-			x1: w.x1,
-			y1: w.y1,
-			x2: w.x2,
-			y2: w.y2,
-			thickness: w.thickness,
-			material: w.material,
-			attenuation: w.attenuation
-		}));
-		engine.markDirty();
+		if (!mask) {
+			wallLayer.mask = null;
+			heatmapLayer.wallMask = null;
+			engine.markDirty();
+			return;
+		}
+
+		decodeMask(mask.dataUrl, mask.width, mask.height).then((decoded) => {
+			if (wallMaskVersion !== thisVersion) return;
+			wallLayer.mask = decoded;
+			heatmapLayer.wallMask = decoded;
+			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
+			engine.markDirty();
+		});
 	});
 
 	$effect(() => {

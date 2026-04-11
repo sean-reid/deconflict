@@ -9,18 +9,12 @@ interface ProjectFile {
 	band: Band;
 	channelWidth: ChannelWidth;
 	regulatoryDomain: RegulatoryDomain;
+	unitSystem?: 'imperial' | 'metric';
 	floorplanImage?: string; // data URL of the floorplan image
 	floorplanScale: number;
 	calibration?: { worldUnitsPerMeter: number };
-	walls: Array<{
-		x1: number;
-		y1: number;
-		x2: number;
-		y2: number;
-		thickness: number;
-		material: string;
-		attenuation: number;
-	}>;
+	wallMask?: { dataUrl: string; width: number; height: number } | null;
+	wallAttenuation?: number;
 	aps: Array<{
 		id: string;
 		name: string;
@@ -70,10 +64,14 @@ export async function serialize(): Promise<string> {
 		band: projectState.band,
 		channelWidth: projectState.channelWidth,
 		regulatoryDomain: projectState.regulatoryDomain,
+		unitSystem: projectState.unitSystem,
 		floorplanImage,
 		floorplanScale: projectState.floorplanScale,
 		calibration: projectState.calibration ?? undefined,
-		walls: JSON.parse(JSON.stringify(projectState.walls)),
+		wallMask: projectState.wallMask
+			? JSON.parse(JSON.stringify(projectState.wallMask))
+			: null,
+		wallAttenuation: projectState.wallAttenuation,
 		aps: projectState.aps.map((ap) => ({
 			id: ap.id,
 			name: ap.name,
@@ -109,9 +107,11 @@ export function deserialize(json: string): void {
 	projectState.band = data.band || '5ghz';
 	projectState.channelWidth = data.channelWidth || 20;
 	projectState.regulatoryDomain = data.regulatoryDomain || 'fcc';
+	projectState.unitSystem = data.unitSystem ?? 'imperial';
 	projectState.floorplanScale = data.floorplanScale ?? 0.4;
 	projectState.calibration = data.calibration ?? null;
-	projectState.walls = data.walls ?? [];
+	projectState.wallMask = data.wallMask ?? null;
+	projectState.wallAttenuation = data.wallAttenuation ?? 5;
 
 	// Restore floorplan image
 	if (data.floorplanImage) {

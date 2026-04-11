@@ -37,6 +37,7 @@
 		"@deconflict/channels": "workspace:*",
 		"@deconflict/geometry": "workspace:*",
 		"@deconflict/solver": "workspace:*",
-		"jspdf": "^4.2.1"
+		"jspdf": "^4.2.1",
+		"tesseract.js": "^7.0.0"
 	}
 }
