@@ -398,6 +398,7 @@
 
 	canvas {
 		display: block;
+		touch-action: none;
 	}
 
 	.empty-hint {

@@ -45,17 +45,18 @@
 				</p>
 
 				<section class="section">
-					<h3 class="section-heading">QUICK START</h3>
+					<h3 class="section-heading">HOW TO USE</h3>
 					<ul class="quick-start">
-						<li>Click the canvas to place access points</li>
-						<li>Click an AP to select it, drag to move</li>
-						<li>Click and drag empty space to pan</li>
-						<li>Scroll to zoom in and out</li>
-						<li>Click <strong>Solve</strong> to assign channels</li>
+						<li>Tap the canvas to place access points</li>
+						<li>Tap an AP to select it, drag to move</li>
+						<li>Drag empty space to pan around</li>
+						<li>Pinch to zoom (or scroll on desktop)</li>
+						<li>Channels are assigned automatically</li>
+						<li>Toggle the heatmap to see signal coverage</li>
 					</ul>
 				</section>
 
-				<section class="section">
+				<section class="section desktop-only">
 					<h3 class="section-heading">KEYBOARD SHORTCUTS</h3>
 					<div class="shortcuts">
 						<div class="shortcut-row"><kbd>G</kbd><span>Toggle grid</span></div>
@@ -285,5 +286,17 @@
 
 	.credit a:hover {
 		text-decoration: underline;
+	}
+
+	@media (max-width: 768px) {
+		.desktop-only {
+			display: none;
+		}
+
+		.dialog {
+			max-width: 100%;
+			max-height: 90vh;
+			margin: 0 var(--space-3);
+		}
 	}
 </style>
