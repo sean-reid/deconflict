@@ -65,7 +65,6 @@ export function removeAps(ids: string[]): void {
 export function updateAp(id: string, changes: Partial<AccessPoint>): void {
 	const ap = projectState.aps.find((a) => a.id === id);
 	if (ap) {
-		pushState();
 		Object.assign(ap, changes);
 	}
 }
