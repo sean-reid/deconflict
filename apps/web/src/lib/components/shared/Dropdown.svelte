@@ -9,11 +9,19 @@
 		disabled?: boolean;
 	}
 
-	let { items, children }: { items: MenuItem[], children: any } = $props();
+	let { items, children }: { items: MenuItem[]; children: any } = $props();
 	let open = $state(false);
 	let menuEl: HTMLDivElement;
+	let triggerEl: HTMLButtonElement;
+	let menuStyle = $state('');
 
-	function toggle() { open = !open; }
+	function toggle() {
+		open = !open;
+		if (open && triggerEl) {
+			const rect = triggerEl.getBoundingClientRect();
+			menuStyle = `top: ${rect.bottom + 4}px; left: ${rect.left}px;`;
+		}
+	}
 
 	function handleClick(item: MenuItem) {
 		if (item.disabled) return;
@@ -34,7 +42,7 @@
 </script>
 
 <div class="dropdown" bind:this={menuEl}>
-	<button class="dropdown-trigger" onclick={toggle} class:open>
+	<button class="dropdown-trigger" bind:this={triggerEl} onclick={toggle} class:open>
 		{@render children()}
 		<svg
 			class="trigger-chevron"
@@ -54,7 +62,7 @@
 		</svg>
 	</button>
 	{#if open}
-		<div class="dropdown-menu">
+		<div class="dropdown-menu" style={menuStyle}>
 			{#each items as item}
 				{#if item.separator}
 					<div class="dropdown-separator"></div>
@@ -119,9 +127,7 @@
 	}
 
 	.dropdown-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
+		position: fixed;
 		min-width: 200px;
 		background: var(--bg-elevated);
 		border: 1px solid var(--border-default);
