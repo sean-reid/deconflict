@@ -13,6 +13,8 @@ export interface AccessPoint {
 	assignedChannel: number | null;
 	interferenceRadius: number;
 	power: number;
+	modelId: string | null;
+	modelLabel: string | null;
 }
 
 let nextApNumber = 1;
@@ -54,7 +56,9 @@ export function addAp(x: number, y: number): AccessPoint {
 		interferenceRadius: projectState.calibration
 			? Math.round(15 * projectState.calibration.worldUnitsPerMeter)
 			: 150,
-		power: 20
+		power: 20,
+		modelId: null,
+		modelLabel: null
 	};
 	projectState.aps.push(ap);
 	scheduleSave();

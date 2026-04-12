@@ -4,11 +4,13 @@
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
 	import { buildInterferenceGraph } from '@deconflict/geometry';
+	import { findModel, getBandSpec, type ApModel } from '$lib/data/ap-models.js';
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 	import NumberInput from '$components/shared/NumberInput.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
+	import ModelPicker from '$components/shared/ModelPicker.svelte';
 
 	const bandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
@@ -153,6 +155,31 @@
 		updateAp(singleAp.id, { fixedChannel, assignedChannel: fixedChannel });
 	}
 
+	function handleModelChange(model: ApModel | null) {
+		if (!singleAp) return;
+		if (!model) {
+			updateAp(singleAp.id, { modelId: null, modelLabel: null });
+			return;
+		}
+		const spec = getBandSpec(model, singleAp.band) ?? getBandSpec(model, projectState.band) ?? model.bands[0];
+		if (!spec) return;
+
+		const radiusWorld = projectState.calibration
+			? Math.round(spec.typicalIndoorRange * projectState.calibration.worldUnitsPerMeter)
+			: 150;
+
+		updateAp(singleAp.id, {
+			modelId: model.id,
+			modelLabel: `${model.vendor} ${model.model}`,
+			band: spec.band,
+			channelWidth: spec.maxChannelWidth,
+			power: spec.maxTxPower,
+			interferenceRadius: radiusWorld,
+			fixedChannel: null,
+			assignedChannel: null
+		});
+	}
+
 	function handleNameInput(e: Event) {
 		if (!singleAp) return;
 		const target = e.target as HTMLInputElement;
@@ -180,6 +207,13 @@
 			&larr; All APs ({projectState.aps.length})
 		</button>
 		<div class="section-header">PROPERTIES</div>
+
+		<div class="field">
+			<Tooltip text="Select your AP hardware model to auto-fill band, power, and range settings." position="left">
+				<span class="field-label">Model</span>
+			</Tooltip>
+			<ModelPicker value={singleAp.modelId} onchange={handleModelChange} />
+		</div>
 
 		<div class="field">
 			<Tooltip text="A label for this access point. Use something descriptive like 'Living Room' or 'Upstairs Hall'." position="left">
