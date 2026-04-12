@@ -225,9 +225,10 @@
 		placeHandler = new PlaceHandler(engine);
 		wallEditHandler = new WallEditHandler(engine);
 		wallEditHandler.onEdit = () => {
-			// Live update renderers during painting (before Done)
-			if (cachedWallData) {
-				wallLayer.invalidateCache();
+			// Sync handler's data to renderers for live preview
+			wallLayer.invalidateCache();
+			if (wallEditHandler.materialData) {
+				wallLayer.materialMap = wallEditHandler.materialData;
 			}
 			engine.markDirty();
 		};
