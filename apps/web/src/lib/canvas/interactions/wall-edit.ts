@@ -69,12 +69,11 @@ export class WallEditHandler {
 		const cx = Math.round(wx);
 		const cy = Math.round(wy);
 		const mode = appState.wallEditMode;
-
-		// Clamp to mask bounds — no mid-stroke expansion
-		if (cx < 0 || cx >= w || cy < 0 || cy >= h) return;
-
 		const w = this.maskWidth;
 		const h = this.maskHeight;
+
+		// Clamp to mask bounds
+		if (cx < 0 || cx >= w || cy < 0 || cy >= h) return;
 		const wallData = this.wallData;
 
 		const xlo = Math.max(0, cx - r);
