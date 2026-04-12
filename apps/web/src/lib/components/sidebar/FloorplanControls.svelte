@@ -192,6 +192,8 @@
 		projectState.floorplanBoundary = null;
 		projectState.calibration = null;
 		projectState.wallMask = null;
+		projectState.wallMaterial = 0;
+		projectState.materialMask = null;
 		projectState.aps = [];
 		detectedWorldArea = null;
 		calibrationDone = false;

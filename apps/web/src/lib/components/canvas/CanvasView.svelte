@@ -86,7 +86,14 @@
 
 		relabelBlob(cachedWallLabels.labels, cachedMaterialData, wallPopup.blobId, newMaterial);
 
-		// Encode and save
+		// Update renderers immediately
+		wallLayer.materialMap = cachedMaterialData;
+		wallLayer.invalidateCache();
+		heatmapLayer.materialMap = cachedMaterialData;
+		heatmapLayer.materialVersion++;
+		engine.markDirty();
+
+		// Encode and persist
 		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
 		projectState.materialMask = { dataUrl, width: mask.width, height: mask.height };
 		scheduleSave();
@@ -162,6 +169,8 @@
 			wallLayer.defaultMaterial = id;
 			wallLayer.invalidateCache();
 			heatmapLayer.defaultMaterial = id;
+			heatmapLayer.materialVersion++;
+			heatmapLayer.invalidateCache();
 			engine.markDirty();
 		});
 

@@ -31,10 +31,15 @@ export class HeatmapLayer implements Layer {
 	wallMask: DecodedWallMask | null = null;
 	wallAttenuation = 5; // legacy fallback
 	materialMap: Uint8Array | null = null;
+	materialVersion = 0; // incremented on any material change
 	defaultMaterial: WallMaterialId = 0;
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
+
+	invalidateCache(): void {
+		this.cacheKey = '';
+	}
 
 	private getCacheKey(
 		camera: { state: { zoom: number; x: number; y: number } },
@@ -48,7 +53,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mm:${this.materialMap ? 1 : 0}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
