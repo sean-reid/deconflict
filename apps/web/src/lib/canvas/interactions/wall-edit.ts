@@ -58,10 +58,7 @@ export class WallEditHandler {
 	}
 
 	handlePointerUp(): void {
-		if (this.painting) {
-			this.painting = false;
-			this.onEdit?.();
-		}
+		this.painting = false;
 	}
 
 	private paintAt(wx: number, wy: number): void {
@@ -88,15 +85,19 @@ export class WallEditHandler {
 					wallData[idx] = 0;
 				} else if (mode === 'draw') {
 					wallData[idx] = 1;
-				} else if (mode === 'material' && this.materialData) {
+				} else if (mode === 'material') {
 					// Only paint material on existing wall pixels
 					if (wallData[idx]) {
+						if (!this.materialData) {
+							this.materialData = new Uint8Array(w * h);
+						}
 						this.materialData[idx] = this.activeMaterial;
 					}
 				}
 			}
 		}
 
+		this.onEdit?.();
 		this.engine.markDirty();
 	}
 }

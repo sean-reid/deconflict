@@ -331,9 +331,9 @@
 			{#if !projectState.wallMask}
 				<div class="draw-walls-section">
 					<Button variant="secondary" size="sm" onclick={() => {
-						// Create an empty wall mask so the user can draw from scratch
-						const w = 800;
-						const h = 600;
+						// Create a large empty wall mask for from-scratch drawing
+						const w = 2000;
+						const h = 1500;
 						const emptyData = new Uint8Array(w * h);
 						const dataUrl = encodeMask(emptyData, w, h);
 						projectState.wallMask = { dataUrl, width: w, height: h };

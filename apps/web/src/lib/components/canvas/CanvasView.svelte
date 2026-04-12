@@ -34,6 +34,10 @@
 
 	function handleWallEditDone() {
 		appState.wallEditMode = null;
+		// Sync any material data created during painting
+		if (wallEditHandler.materialData && !cachedMaterialData) {
+			cachedMaterialData = wallEditHandler.materialData;
+		}
 		// Re-encode edited masks and persist
 		if (cachedWallData && projectState.wallMask) {
 			const { width, height } = projectState.wallMask;
