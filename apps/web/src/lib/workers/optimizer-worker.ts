@@ -114,8 +114,7 @@ function buildWallCache(
 	w: number,
 	h: number,
 	interior: Uint8Array,
-	samples: Array<{ x: number; y: number }>,
-	wallAttenuation: number
+	samples: Array<{ x: number; y: number }>
 ): WallCache {
 	const gridStep = 8;
 	const gridCols = Math.ceil(w / gridStep);
@@ -169,10 +168,6 @@ function nearestSource(cache: WallCache, x: number, y: number): number {
 		}
 	}
 	return bestIdx;
-}
-
-function cachedCrossings(cache: WallCache, srcIdx: number, sampleIdx: number): number {
-	return cache.table[srcIdx * cache.numSources + sampleIdx] ?? 0;
 }
 
 // ─── Evaluation helpers ─────────────────────────────────────────────
@@ -277,7 +272,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		totalIterations: 100,
 		stage: 'Precomputing...'
 	});
-	const cache = buildWallCache(mask, w, h, interior, samples, wallAttenuation);
+	const cache = buildWallCache(mask, w, h, interior, samples);
 
 	if (cancelled) {
 		self.postMessage({ type: 'cancelled' });
@@ -594,14 +589,4 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		score: finalScore,
 		improvement
 	});
-}
-
-function sampleUniform(arr: number[], count: number): number[] {
-	if (count >= arr.length) return arr.slice();
-	const result: number[] = [];
-	const step = arr.length / count;
-	for (let i = 0; i < count; i++) {
-		result.push(arr[Math.floor(i * step)]!);
-	}
-	return result;
 }
