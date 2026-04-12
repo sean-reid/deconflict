@@ -1,7 +1,8 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/project.svelte.js';
 import type { DecodedWallMask } from '../wall-detect.js';
-import { countWallCrossings } from '../wall-detect.js';
+import { computeWallAttenuation } from '../wall-detect.js';
+import { WALL_MATERIALS, type WallMaterialId } from '../materials.js';
 import { getBaseRate } from '@deconflict/channels';
 
 const CELL_SIZE = 8;
@@ -28,7 +29,9 @@ export class HeatmapLayer implements Layer {
 	aps: AccessPoint[] = [];
 	ispSpeed = 0;
 	wallMask: DecodedWallMask | null = null;
-	wallAttenuation = 5;
+	wallAttenuation = 5; // legacy fallback
+	materialMap: Uint8Array | null = null;
+	defaultMaterial: WallMaterialId = 0;
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -45,7 +48,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|wa:${this.wallAttenuation}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mm:${this.materialMap ? 1 : 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -113,17 +116,21 @@ export class HeatmapLayer implements Layer {
 					const base = getBaseRate(bestAp.band, bestAp.channelWidth) * 0.5;
 					let throughput = base * bestSignal;
 
-					// Wall attenuation via ray marching through the mask
+					// Wall attenuation via ray marching with per-material dB values
 					if (this.wallMask) {
-						const crossings = countWallCrossings(
+						const defaultDb =
+							WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
+						const wallLoss = computeWallAttenuation(
 							this.wallMask,
+							this.materialMap,
+							WALL_MATERIALS,
+							defaultDb,
 							bestAp.x,
 							bestAp.y,
 							worldPoint.x,
 							worldPoint.y
 						);
-						if (crossings > 0) {
-							const wallLoss = crossings * this.wallAttenuation;
+						if (wallLoss > 0) {
 							throughput *= Math.pow(10, -wallLoss / 20);
 						}
 					}

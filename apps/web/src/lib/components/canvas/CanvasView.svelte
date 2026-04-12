@@ -213,6 +213,8 @@
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
 		const mask = projectState.wallMask;
+		const matMask = projectState.materialMask;
+		const defaultMat = projectState.wallMaterial;
 		wallMaskVersion++;
 		const thisVersion = wallMaskVersion;
 
@@ -223,11 +225,26 @@
 			return;
 		}
 
-		decodeMask(mask.dataUrl, mask.width, mask.height).then((decoded) => {
+		// Decode wall mask and optionally material mask
+		const decodePromises: [Promise<import('$canvas/wall-detect.js').DecodedWallMask>, Promise<import('$canvas/wall-detect.js').DecodedWallMask> | null] = [
+			decodeMask(mask.dataUrl, mask.width, mask.height),
+			matMask ? decodeMask(matMask.dataUrl, matMask.width, matMask.height) : null
+		];
+
+		decodePromises[0].then(async (decoded) => {
 			if (wallMaskVersion !== thisVersion) return;
+			const matDecoded = decodePromises[1] ? await decodePromises[1] : null;
+			if (wallMaskVersion !== thisVersion) return;
+
 			wallLayer.mask = decoded;
+			wallLayer.materialMap = matDecoded?.data ?? null;
+			wallLayer.defaultMaterial = defaultMat;
+
 			heatmapLayer.wallMask = decoded;
+			heatmapLayer.materialMap = matDecoded?.data ?? null;
+			heatmapLayer.defaultMaterial = defaultMat;
 			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
+
 			engine.markDirty();
 		});
 	});
