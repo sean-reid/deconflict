@@ -19,7 +19,7 @@
 	import { solverState, runSolver } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
-	import { setEngineRef } from '$canvas/engine-ref.js';
+	import { setEngineRef, setMaterialChangeHandler } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
@@ -158,6 +158,12 @@
 		window.addEventListener('keydown', handleKeyDown);
 		engine = new CanvasEngine(canvasEl);
 		setEngineRef(engine);
+		setMaterialChangeHandler((id) => {
+			wallLayer.defaultMaterial = id;
+			wallLayer.invalidateCache();
+			heatmapLayer.defaultMaterial = id;
+			engine.markDirty();
+		});
 
 		// Create layers
 		floorplanLayer = new FloorplanLayer();
@@ -295,16 +301,6 @@
 		});
 	});
 
-	// Sync default material to renderers (instant, no async decode needed)
-	$effect(() => {
-		if (!wallLayer || !heatmapLayer) return;
-		const mat = projectState.wallMaterial;
-		wallLayer.defaultMaterial = mat;
-		wallLayer.invalidateCache();
-		heatmapLayer.defaultMaterial = mat;
-		heatmapLayer.wallAttenuation = projectState.wallAttenuation;
-		engine.markDirty();
-	});
 
 	$effect(() => {
 		if (!wallLayer) return;

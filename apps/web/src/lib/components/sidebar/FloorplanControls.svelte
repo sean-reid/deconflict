@@ -4,6 +4,7 @@
 	import { detectWalls } from '$canvas/wall-detect.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
+	import { notifyMaterialChange } from '$canvas/engine-ref.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
@@ -11,6 +12,7 @@
 
 	function handleMaterialChange(id: WallMaterialId) {
 		projectState.wallMaterial = id;
+		notifyMaterialChange(id);
 		scheduleSave();
 	}
 
