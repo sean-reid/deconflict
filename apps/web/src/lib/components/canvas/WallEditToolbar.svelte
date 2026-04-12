@@ -13,6 +13,7 @@
 
 	function setMode(mode: 'erase' | 'draw' | 'material') {
 		appState.wallEditMode = mode;
+		appState.wallEditLastMode = mode;
 	}
 </script>
 

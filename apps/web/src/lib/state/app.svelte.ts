@@ -11,5 +11,6 @@ export const appState = $state({
 	showAPs: true,
 	showWalls: true,
 	wallEditMode: null as WallEditMode,
+	wallEditLastMode: 'erase' as Exclude<WallEditMode, null>,
 	wallBrushSize: 15
 });

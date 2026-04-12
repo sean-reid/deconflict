@@ -320,7 +320,7 @@
 					</div>
 					<span class="material-hint">Click walls on the canvas to override individually</span>
 					<div class="wall-edit-buttons">
-						<Button variant="secondary" size="sm" onclick={() => { appState.wallEditMode = 'erase'; }}>
+						<Button variant="secondary" size="sm" onclick={() => { appState.wallEditMode = appState.wallEditLastMode; }}>
 							<Icon name="eraser" size={14} />
 							Edit Walls
 						</Button>
