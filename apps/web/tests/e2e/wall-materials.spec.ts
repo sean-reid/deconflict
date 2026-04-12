@@ -103,7 +103,9 @@ test.describe('Wall materials', () => {
 		}
 	});
 
-	test('change default → place AP → click-override blob keeps non-default color', async ({ page }) => {
+	test('change default → place AP → click-override blob keeps non-default color', async ({
+		page
+	}) => {
 		// Step 1: Change default to Brick
 		await page.locator('.material-option:has-text("Brick")').click();
 		await page.waitForTimeout(500);
