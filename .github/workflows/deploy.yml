@@ -3,6 +3,8 @@ name: Deploy
 on:
   push:
     branches: [main, production]
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -15,6 +17,7 @@ jobs:
     permissions:
       contents: read
       deployments: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,11 +28,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Deploy to Cloudflare Pages
+        id: deploy
         run: |
           if [ "${{ github.ref_name }}" = "production" ]; then
             npx wrangler pages deploy apps/web/build --project-name=deconflict --branch=production
           else
-            npx wrangler pages deploy apps/web/build --project-name=deconflict --branch=main
+            npx wrangler pages deploy apps/web/build --project-name=deconflict --branch=${{ github.head_ref || github.ref_name }}
           fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
