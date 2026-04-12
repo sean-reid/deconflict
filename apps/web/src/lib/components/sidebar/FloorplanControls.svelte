@@ -6,17 +6,11 @@
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
-	import Select from '$components/shared/Select.svelte';
 
 	const FLOORPLAN_TARGET_WIDTH = 800;
 
-	const materialOptions = WALL_MATERIALS.map((m) => ({
-		value: String(m.id),
-		label: `${m.name} (${m.attenuation} dB)`
-	}));
-
-	function handleMaterialChange(val: string) {
-		projectState.wallMaterial = Number(val) as WallMaterialId;
+	function handleMaterialChange(id: WallMaterialId) {
+		projectState.wallMaterial = id;
 		scheduleSave();
 	}
 
@@ -303,13 +297,23 @@
 			{#if projectState.wallMask}
 				<div class="material-section">
 					<span class="material-label">Wall Type</span>
-					<Select
-						value={String(projectState.wallMaterial)}
-						options={materialOptions}
-						onchange={handleMaterialChange}
-						aria-label="Wall material"
-					/>
-					<span class="material-hint">Signal loss per wall crossing</span>
+					<div class="material-list">
+						{#each WALL_MATERIALS as mat}
+							<button
+								class="material-option"
+								class:active={projectState.wallMaterial === mat.id}
+								onclick={() => handleMaterialChange(mat.id)}
+							>
+								<span
+									class="material-swatch"
+									style="background: rgb({mat.color[0]},{mat.color[1]},{mat.color[2]})"
+								></span>
+								<span class="material-name">{mat.name}</span>
+								<span class="material-db">{mat.attenuation} dB</span>
+							</button>
+						{/each}
+					</div>
+					<span class="material-hint">Click walls on the canvas to override individually</span>
 				</div>
 			{/if}
 		</div>
@@ -540,7 +544,7 @@
 	.material-section {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-1);
+		gap: var(--space-2);
 		margin-top: var(--space-2);
 		padding-top: var(--space-2);
 		border-top: 1px solid var(--border-subtle);
@@ -552,6 +556,61 @@
 		color: var(--text-tertiary);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+	}
+
+	.material-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.material-option {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-1) var(--space-2);
+		border: none;
+		background: none;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--text-secondary);
+		text-align: left;
+		width: 100%;
+		transition: all var(--transition-fast);
+	}
+
+	.material-option:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.material-option.active {
+		background: var(--accent-primary-glow);
+		color: var(--text-primary);
+	}
+
+	.material-option:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
+	.material-swatch {
+		width: 10px;
+		height: 10px;
+		border-radius: 2px;
+		flex-shrink: 0;
+	}
+
+	.material-name {
+		flex: 1;
+	}
+
+	.material-db {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
 	}
 
 	.material-hint {

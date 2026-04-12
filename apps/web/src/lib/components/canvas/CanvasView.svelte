@@ -255,49 +255,54 @@
 		engine.markDirty();
 	});
 
+	// Decode wall mask + material mask (async, only when data URLs change)
 	let wallMaskVersion = 0;
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
 		const mask = projectState.wallMask;
 		const matMask = projectState.materialMask;
-		const defaultMat = projectState.wallMaterial;
 		wallMaskVersion++;
 		const thisVersion = wallMaskVersion;
 
 		if (!mask) {
 			wallLayer.mask = null;
 			heatmapLayer.wallMask = null;
+			cachedWallData = null;
+			cachedWallLabels = null;
+			cachedMaterialData = null;
 			engine.markDirty();
 			return;
 		}
 
-		// Decode wall mask and optionally material mask
-		const decodePromises: [Promise<import('$canvas/wall-detect.js').DecodedWallMask>, Promise<import('$canvas/wall-detect.js').DecodedWallMask> | null] = [
-			decodeMask(mask.dataUrl, mask.width, mask.height),
-			matMask ? decodeMask(matMask.dataUrl, matMask.width, matMask.height) : null
-		];
+		const wallPromise = decodeMask(mask.dataUrl, mask.width, mask.height);
+		const matPromise = matMask ? decodeMask(matMask.dataUrl, matMask.width, matMask.height) : null;
 
-		decodePromises[0].then(async (decoded) => {
+		wallPromise.then(async (decoded) => {
 			if (wallMaskVersion !== thisVersion) return;
-			const matDecoded = decodePromises[1] ? await decodePromises[1] : null;
+			const matDecoded = matPromise ? await matPromise : null;
 			if (wallMaskVersion !== thisVersion) return;
 
 			wallLayer.mask = decoded;
 			wallLayer.materialMap = matDecoded?.data ?? null;
-			wallLayer.defaultMaterial = defaultMat;
-
 			heatmapLayer.wallMask = decoded;
 			heatmapLayer.materialMap = matDecoded?.data ?? null;
-			heatmapLayer.defaultMaterial = defaultMat;
-			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
 
-			// Cache for wall click handling
 			cachedWallData = decoded.data;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
 			cachedMaterialData = matDecoded?.data ?? null;
 
 			engine.markDirty();
 		});
+	});
+
+	// Sync default material to renderers (instant, no async decode needed)
+	$effect(() => {
+		if (!wallLayer || !heatmapLayer) return;
+		const mat = projectState.wallMaterial;
+		wallLayer.defaultMaterial = mat;
+		heatmapLayer.defaultMaterial = mat;
+		heatmapLayer.wallAttenuation = projectState.wallAttenuation;
+		engine.markDirty();
 	});
 
 	$effect(() => {

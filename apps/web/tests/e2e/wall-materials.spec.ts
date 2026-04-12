@@ -30,16 +30,15 @@ test.describe('Wall materials', () => {
 		await page.getByText('Apartment (48sqm)').click();
 		await page.waitForTimeout(6000);
 
-		// Screenshot with default Drywall
-		await page.screenshot({ path: 'test-results/wall-materials/drywall.png' });
+		// Default is Drywall (active)
+		await expect(page.locator('.material-option.active')).toContainText('Drywall');
 
-		// Change to Concrete
-		const select = page.locator('.material-section select');
-		await select.selectOption('4'); // Concrete
+		// Click Concrete
+		await page.locator('.material-option:has-text("Concrete")').click();
 		await page.waitForTimeout(500);
 
-		// Screenshot with Concrete - walls should look different
-		await page.screenshot({ path: 'test-results/wall-materials/concrete.png' });
+		// Concrete should now be active
+		await expect(page.locator('.material-option.active')).toContainText('Concrete');
 	});
 
 	test('clicking a wall shows material popup', async ({ page }) => {
