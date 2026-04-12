@@ -26,6 +26,8 @@
 		projectState.floorplanUrl = null;
 		projectState.floorplanScale = 0.4;
 		projectState.wallMask = null;
+		projectState.wallMaterial = 0;
+		projectState.materialMask = null;
 		projectState.calibration = null;
 		projectState.floorplanBoundary = null;
 		projectState.ispSpeed = 0;

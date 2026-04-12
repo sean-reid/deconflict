@@ -20,6 +20,8 @@ interface SavedState {
 	targetThroughput: number;
 	wallMask?: { dataUrl: string; width: number; height: number } | null;
 	wallAttenuation?: number;
+	wallMaterial?: number;
+	materialMask?: { dataUrl: string; width: number; height: number } | null;
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
 	calibration: typeof projectState.calibration;
 }
@@ -42,6 +44,10 @@ function saveToStorage(): void {
 			targetThroughput: projectState.targetThroughput,
 			wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
 			wallAttenuation: projectState.wallAttenuation,
+			wallMaterial: projectState.wallMaterial,
+			materialMask: projectState.materialMask
+				? JSON.parse(JSON.stringify(projectState.materialMask))
+				: null,
 			floorplanBoundary: projectState.floorplanBoundary
 				? JSON.parse(JSON.stringify(projectState.floorplanBoundary))
 				: null,
@@ -105,6 +111,9 @@ export function restoreFromStorage(): boolean {
 		projectState.targetThroughput = data.targetThroughput ?? 50;
 		projectState.wallMask = data.wallMask ?? null;
 		projectState.wallAttenuation = data.wallAttenuation ?? 5;
+		projectState.wallMaterial = (data.wallMaterial ??
+			0) as import('$canvas/materials.js').WallMaterialId;
+		projectState.materialMask = data.materialMask ?? null;
 		projectState.floorplanBoundary = data.floorplanBoundary ?? null;
 		projectState.calibration = data.calibration ?? null;
 
