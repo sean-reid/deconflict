@@ -220,6 +220,179 @@ export const AP_MODELS: readonly ApModel[] = [
 			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 26, typicalIndoorRange: 30 },
 			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 20 }
 		]
+	},
+
+	// ─── Google Nest / Home ──────────────────────────────────────────
+	{
+		id: 'google-nest-wifi-pro',
+		vendor: 'Google',
+		model: 'Nest WiFi Pro',
+		wifiStandard: 'WiFi 6E',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 19, typicalIndoorRange: 30 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 19, typicalIndoorRange: 20 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 19, typicalIndoorRange: 15 }
+		]
+	},
+	{
+		id: 'google-nest-wifi',
+		vendor: 'Google',
+		model: 'Nest WiFi',
+		wifiStandard: 'WiFi 5',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 20, maxTxPower: 19, typicalIndoorRange: 30 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 19, typicalIndoorRange: 20 }
+		]
+	},
+
+	// ─── Amazon eero ─────────────────────────────────────────────────
+	{
+		id: 'eero-pro-6e',
+		vendor: 'eero',
+		model: 'Pro 6E',
+		wifiStandard: 'WiFi 6E',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 35 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 25 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 18 }
+		]
+	},
+	{
+		id: 'eero-6-plus',
+		vendor: 'eero',
+		model: '6+',
+		wifiStandard: 'WiFi 6',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 20, typicalIndoorRange: 30 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 20, typicalIndoorRange: 22 }
+		]
+	},
+
+	// ─── Netgear ─────────────────────────────────────────────────────
+	{
+		id: 'netgear-rax50',
+		vendor: 'Netgear',
+		model: 'Nighthawk RAX50',
+		wifiStandard: 'WiFi 6',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 35 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 23, typicalIndoorRange: 25 }
+		]
+	},
+	{
+		id: 'netgear-raxe500',
+		vendor: 'Netgear',
+		model: 'Nighthawk RAXE500',
+		wifiStandard: 'WiFi 6E',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 40 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 30 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 22 }
+		]
+	},
+	{
+		id: 'netgear-orbi-rbke963',
+		vendor: 'Netgear',
+		model: 'Orbi RBKE963',
+		wifiStandard: 'WiFi 6E',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 35 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 23, typicalIndoorRange: 28 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 23, typicalIndoorRange: 20 }
+		]
+	},
+
+	// ─── Linksys ─────────────────────────────────────────────────────
+	{
+		id: 'linksys-velop-mx5300',
+		vendor: 'Linksys',
+		model: 'Velop MX5300',
+		wifiStandard: 'WiFi 6',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 22, typicalIndoorRange: 35 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 22, typicalIndoorRange: 25 }
+		]
+	},
+
+	// ─── ASUS ────────────────────────────────────────────────────────
+	{
+		id: 'asus-rt-ax86u',
+		vendor: 'ASUS',
+		model: 'RT-AX86U',
+		wifiStandard: 'WiFi 6',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 40 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 30 }
+		]
+	},
+	{
+		id: 'asus-zenwifi-et8',
+		vendor: 'ASUS',
+		model: 'ZenWiFi ET8',
+		wifiStandard: 'WiFi 6E',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 35 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 23, typicalIndoorRange: 28 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 23, typicalIndoorRange: 20 }
+		]
+	},
+	{
+		id: 'asus-rt-be96u',
+		vendor: 'ASUS',
+		model: 'RT-BE96U',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 40 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 30 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 25, typicalIndoorRange: 22 }
+		]
+	},
+
+	// ─── TP-Link Consumer ────────────────────────────────────────────
+	{
+		id: 'tplink-deco-xe75',
+		vendor: 'TP-Link',
+		model: 'Deco XE75',
+		wifiStandard: 'WiFi 6E',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 20, typicalIndoorRange: 30 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 20, typicalIndoorRange: 22 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 20, typicalIndoorRange: 15 }
+		]
+	},
+	{
+		id: 'tplink-archer-ax73',
+		vendor: 'TP-Link',
+		model: 'Archer AX73',
+		wifiStandard: 'WiFi 6',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 20, typicalIndoorRange: 35 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 20, typicalIndoorRange: 25 }
+		]
+	},
+
+	// ─── Apple ───────────────────────────────────────────────────────
+	{
+		id: 'apple-airport-express',
+		vendor: 'Apple',
+		model: 'AirPort Express',
+		wifiStandard: 'WiFi 4',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 20, maxTxPower: 18, typicalIndoorRange: 25 },
+			{ band: '5ghz', maxChannelWidth: 40, maxTxPower: 18, typicalIndoorRange: 15 }
+		]
+	},
+
+	// ─── Sonos ───────────────────────────────────────────────────────
+	{
+		id: 'sonos-boost',
+		vendor: 'Sonos',
+		model: 'Boost',
+		wifiStandard: 'WiFi 4',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 20, maxTxPower: 18, typicalIndoorRange: 25 },
+			{ band: '5ghz', maxChannelWidth: 40, maxTxPower: 18, typicalIndoorRange: 15 }
+		]
 	}
 ];
 

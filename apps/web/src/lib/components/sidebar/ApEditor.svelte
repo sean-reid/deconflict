@@ -12,11 +12,20 @@
 	import Tooltip from '$components/shared/Tooltip.svelte';
 	import ModelPicker from '$components/shared/ModelPicker.svelte';
 
-	const bandOptions = [
+	const allBandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
 		{ value: '5ghz', label: '5 GHz' },
 		{ value: '6ghz', label: '6 GHz' }
 	];
+
+	// Constrain band options to what the selected model supports
+	let bandOptions = $derived.by(() => {
+		if (!singleAp?.modelId) return allBandOptions;
+		const model = findModel(singleAp.modelId);
+		if (!model) return allBandOptions;
+		const supportedBands = new Set(model.bands.map((b) => b.band));
+		return allBandOptions.filter((o) => supportedBands.has(o.value as Band));
+	});
 
 	const widthsByBand: Record<string, Array<{ value: string; label: string }>> = {
 		'2.4ghz': [
