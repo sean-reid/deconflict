@@ -138,10 +138,12 @@ export class WallEditHandler {
 					wallData[idx] = 0;
 				} else if (mode === 'draw') {
 					wallData[idx] = 1;
-					// New wall pixels get the last-used material (not default Drywall)
-					if (this.materialData) {
-						this.materialData[idx] = this.activeMaterial;
+					// New wall pixels get the active material from the toolbar
+					if (!this.materialData) {
+						this.materialData = new Uint8Array(w * h);
+						this.materialData.fill(this.defaultMaterial);
 					}
+					this.materialData[idx] = this.activeMaterial;
 				} else if (mode === 'material') {
 					// Only paint material on existing wall pixels
 					if (wallData[idx]) {
