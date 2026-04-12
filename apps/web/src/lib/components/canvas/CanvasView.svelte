@@ -16,7 +16,7 @@
 	import { projectState, removeAps } from '$state/project.svelte.js';
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
-	import { undo, redo } from '$state/history.svelte.js';
+	import { undo, redo, pushState } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
@@ -101,6 +101,7 @@
 
 	async function handleMaterialSelect(newMaterial: WallMaterialId) {
 		if (!wallPopup || !cachedWallLabels || !projectState.wallMask) return;
+		pushState(); // undo captures state before blob relabel
 		const mask = projectState.wallMask;
 
 		// Create or clone material mask
@@ -304,12 +305,22 @@
 		engine.markDirty();
 	});
 
-	// Decode wall mask + material mask (async, only when data URLs change)
+	// Decode wall mask + material mask (async, only when data URLs actually change)
 	let wallMaskVersion = 0;
+	let lastWallMaskUrl: string | null = null;
+	let lastMatMaskUrl: string | null = null;
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
 		const mask = projectState.wallMask;
 		const matMask = projectState.materialMask;
+
+		// Skip re-decode if the data URLs haven't changed (avoids stale overwrites)
+		const wallUrl = mask?.dataUrl ?? null;
+		const matUrl = matMask?.dataUrl ?? null;
+		if (wallUrl === lastWallMaskUrl && matUrl === lastMatMaskUrl && cachedWallData) return;
+		lastWallMaskUrl = wallUrl;
+		lastMatMaskUrl = matUrl;
+
 		wallMaskVersion++;
 		const thisVersion = wallMaskVersion;
 
