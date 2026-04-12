@@ -22,7 +22,11 @@
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
+	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
+	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
+	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
+	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
 
 	let canvasDragOver = $state(false);
 
@@ -44,6 +48,48 @@
 
 	function handleCanvasDragLeave() {
 		canvasDragOver = false;
+	}
+
+	// Wall material popup state
+	let wallPopup = $state<{ x: number; y: number; material: WallMaterialId; blobId: number } | null>(null);
+	let cachedWallLabels: ReturnType<typeof labelWallBlobs> | null = null;
+	let cachedMaterialData: Uint8Array | null = null;
+	let cachedWallData: Uint8Array | null = null;
+
+	function handleWallClick(screenX: number, screenY: number): boolean {
+		if (!engine || !cachedWallData || !cachedWallLabels) return false;
+		const world = engine.camera.screenToWorld({ x: screenX, y: screenY });
+		const px = Math.round(world.x);
+		const py = Math.round(world.y);
+		const mask = projectState.wallMask;
+		if (!mask || px < 0 || px >= mask.width || py < 0 || py >= mask.height) return false;
+		const idx = py * mask.width + px;
+		if (!cachedWallData[idx]) return false;
+
+		const blobId = cachedWallLabels.labels[idx]!;
+		if (blobId < 0) return false;
+
+		const matId = cachedMaterialData ? (cachedMaterialData[idx] ?? projectState.wallMaterial) : projectState.wallMaterial;
+		wallPopup = { x: screenX, y: screenY, material: matId as WallMaterialId, blobId };
+		return true;
+	}
+
+	async function handleMaterialSelect(newMaterial: WallMaterialId) {
+		if (!wallPopup || !cachedWallLabels || !projectState.wallMask) return;
+		const mask = projectState.wallMask;
+
+		// Create or clone material mask
+		if (!cachedMaterialData) {
+			cachedMaterialData = new Uint8Array(mask.width * mask.height);
+			cachedMaterialData.fill(projectState.wallMaterial);
+		}
+
+		relabelBlob(cachedWallLabels.labels, cachedMaterialData, wallPopup.blobId, newMaterial);
+
+		// Encode and save
+		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
+		projectState.materialMask = { dataUrl, width: mask.width, height: mask.height };
+		scheduleSave();
 	}
 
 	let canvasEl: HTMLCanvasElement;
@@ -244,6 +290,11 @@
 			heatmapLayer.materialMap = matDecoded?.data ?? null;
 			heatmapLayer.defaultMaterial = defaultMat;
 			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
+
+			// Cache for wall click handling
+			cachedWallData = decoded.data;
+			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
+			cachedMaterialData = matDecoded?.data ?? null;
 
 			engine.markDirty();
 		});
@@ -541,9 +592,15 @@
 		if (!engine) return;
 
 		if (pendingPlace) {
-			// Pointer released without significant movement: place an AP
-			placeHandler.handlePointerDown(e);
 			pendingPlace = false;
+			// Check if click was on a wall pixel first (for material popup)
+			const rect = engine.canvas.getBoundingClientRect();
+			const sx = e.clientX - rect.left;
+			const sy = e.clientY - rect.top;
+			if (!handleWallClick(sx, sy)) {
+				// Not a wall click — place an AP
+				placeHandler.handlePointerDown(e);
+			}
 		}
 
 		if (pendingPan) {
@@ -585,6 +642,16 @@
 		</div>
 	{/if}
 </div>
+
+{#if wallPopup}
+	<WallMaterialPopup
+		x={wallPopup.x}
+		y={wallPopup.y}
+		currentMaterial={wallPopup.material}
+		onselect={handleMaterialSelect}
+		onclose={() => { wallPopup = null; }}
+	/>
+{/if}
 
 <style>
 	.canvas-container {

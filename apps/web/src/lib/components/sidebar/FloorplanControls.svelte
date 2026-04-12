@@ -2,11 +2,23 @@
 	import { projectState } from '$state/project.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import { detectWalls } from '$canvas/wall-detect.js';
+	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
+	import Select from '$components/shared/Select.svelte';
 
 	const FLOORPLAN_TARGET_WIDTH = 800;
+
+	const materialOptions = WALL_MATERIALS.map((m) => ({
+		value: String(m.id),
+		label: `${m.name} (${m.attenuation} dB)`
+	}));
+
+	function handleMaterialChange(val: string) {
+		projectState.wallMaterial = Number(val) as WallMaterialId;
+		scheduleSave();
+	}
 
 	let fileInput = $state<HTMLInputElement>();
 	let dragOver = $state(false);
@@ -287,6 +299,19 @@
 					<span class="calibration-confirmed">Scale: {scaleDisplay}</span>
 				</div>
 			{/if}
+
+			{#if projectState.wallMask}
+				<div class="material-section">
+					<span class="material-label">Wall Type</span>
+					<Select
+						value={String(projectState.wallMaterial)}
+						options={materialOptions}
+						onchange={handleMaterialChange}
+						aria-label="Wall material"
+					/>
+					<span class="material-hint">Signal loss per wall crossing</span>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -510,6 +535,28 @@
 		font-size: var(--text-xs);
 		color: var(--color-success, #4ade80);
 		font-family: var(--font-mono);
+	}
+
+	.material-section {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.material-label {
+		font-family: var(--font-sans);
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.material-hint {
+		font-size: var(--text-xs);
+		color: var(--text-disabled);
 	}
 
 </style>
