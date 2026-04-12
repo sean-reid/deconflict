@@ -1,20 +1,15 @@
 <script lang="ts">
 	import { projectState } from '$state/project.svelte.js';
+	import { appState } from '$state/app.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
-	import { detectWalls } from '$canvas/wall-detect.js';
-	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
+	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
-	import { notifyMaterialChange } from '$canvas/engine-ref.js';
+	import { pushState } from '$state/history.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
 	const FLOORPLAN_TARGET_WIDTH = 800;
 
-	function handleMaterialChange(id: WallMaterialId) {
-		projectState.wallMaterial = id;
-		notifyMaterialChange(id);
-		scheduleSave();
-	}
 
 	let fileInput = $state<HTMLInputElement>();
 	let dragOver = $state(false);
@@ -24,7 +19,7 @@
 	let detectedWorldArea = $state<number | null>(null);
 	let calibrationDone = $state(false);
 
-	let hasFloorplan = $derived(projectState.floorplanUrl !== null);
+	let hasFloorplan = $derived(projectState.floorplanUrl !== null || projectState.wallMask !== null);
 
 	const sampleFloorplans = [
 		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.svg', areaSqm: 48 },
@@ -93,22 +88,33 @@
 
 	function applyCalibration() {
 		const val = parseFloat(areaInput);
-		if (!val || val <= 0 || !detectedWorldArea) return;
+		if (!val || val <= 0) return;
+
+		// Use detected area if available, otherwise compute from wall mask bounding box
+		let worldArea = detectedWorldArea;
+		if (!worldArea && projectState.wallMask) {
+			const { width, height } = projectState.wallMask;
+			// Use the mask dimensions as the world area (pixels squared)
+			worldArea = width * height;
+		}
+		if (!worldArea) return;
+
 		let realAreaSqm = val;
 		if (areaUnit === 'sqft') {
 			realAreaSqm = val * 0.092903;
 		}
-		const worldUnitsPerMeter = Math.sqrt(detectedWorldArea / realAreaSqm);
+		const worldUnitsPerMeter = Math.sqrt(worldArea / realAreaSqm);
+		const isFirstCalibration = projectState.calibration === null;
 		projectState.calibration = { worldUnitsPerMeter };
 
-		// Set realistic default radius for existing APs
-		// Typical indoor 5 GHz: ~15m, 2.4 GHz: ~30m
-		const defaultRadiusMeters = 15;
-		const defaultRadiusWorld = Math.round(defaultRadiusMeters * worldUnitsPerMeter);
-		for (const ap of projectState.aps) {
-			if (ap.interferenceRadius === 150) {
-				// Only adjust APs still at the uncalibrated default
-				ap.interferenceRadius = defaultRadiusWorld;
+		// Only adjust AP radii on first calibration, not recalibration
+		if (isFirstCalibration) {
+			const defaultRadiusMeters = 15;
+			const defaultRadiusWorld = Math.round(defaultRadiusMeters * worldUnitsPerMeter);
+			for (const ap of projectState.aps) {
+				if (ap.interferenceRadius === 150) {
+					ap.interferenceRadius = defaultRadiusWorld;
+				}
 			}
 		}
 
@@ -239,12 +245,26 @@
 				{/each}
 			</div>
 		</div>
+		<div class="draw-scratch">
+			<Button variant="secondary" size="sm" onclick={() => {
+				const w = 2000;
+				const h = 1500;
+				const emptyData = new Uint8Array(w * h);
+				const dataUrl = encodeMask(emptyData, w, h);
+				projectState.wallMask = { dataUrl, width: w, height: h };
+				appState.wallEditMode = 'draw';
+				scheduleSave();
+			}}>
+				<Icon name="pencil" size={14} />
+				Draw from Scratch
+			</Button>
+		</div>
 	{:else}
 		<div class="loaded-controls">
 			<div class="loaded-header">
 				<span class="loaded-label">
 					<Icon name="file" size={14} />
-					Floorplan loaded
+					{projectState.floorplanUrl ? 'Floorplan loaded' : 'Walls drawn'}
 				</span>
 				<Button variant="ghost" size="sm" onclick={removeFloorplan}>
 					<Icon name="trash" size={14} />
@@ -269,9 +289,9 @@
 				<div class="calibration-section">
 					<span class="calibration-status">Detecting boundary...</span>
 				</div>
-			{:else if detectedWorldArea && !calibrationDone}
+			{:else if (detectedWorldArea || projectState.wallMask) && !calibrationDone}
 				<div class="calibration-section">
-					<span class="calibration-label">Detected area outline. What is the total area?</span>
+					<span class="calibration-label">What is the total area of the floorplan?</span>
 					<div class="calibration-input-row">
 						<input
 							type="number"
@@ -295,31 +315,23 @@
 			{:else if scaleDisplay}
 				<div class="calibration-section">
 					<span class="calibration-confirmed">Scale: {scaleDisplay}</span>
+					<button class="skip-link" onclick={() => { calibrationDone = false; }}>Recalibrate</button>
 				</div>
 			{/if}
 
-			{#if projectState.wallMask}
-				<div class="material-section">
-					<span class="material-label">Wall Type</span>
-					<div class="material-list">
-						{#each WALL_MATERIALS as mat}
-							<button
-								class="material-option"
-								class:active={projectState.wallMaterial === mat.id}
-								onclick={() => handleMaterialChange(mat.id)}
-							>
-								<span
-									class="material-swatch"
-									style="background: rgb({mat.color[0]},{mat.color[1]},{mat.color[2]})"
-								></span>
-								<span class="material-name">{mat.name}</span>
-								<span class="material-db">{mat.attenuation} dB</span>
-							</button>
-						{/each}
-					</div>
-					<span class="material-hint">Click walls on the canvas to override individually</span>
-				</div>
-			{/if}
+		</div>
+	{/if}
+
+	{#if projectState.wallMask}
+		<div class="wall-actions">
+			<Button variant="secondary" size="sm" onclick={() => {
+				pushState();
+				appState.wallEditMode = appState.wallEditLastMode;
+			}}>
+				<Icon name="eraser" size={14} />
+				Edit Walls
+			</Button>
+			<span class="wall-hint">Click any wall to change its material</span>
 		</div>
 	{/if}
 
@@ -545,81 +557,32 @@
 		font-family: var(--font-mono);
 	}
 
-	.material-section {
+	.wall-actions {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-2);
+		gap: var(--space-1);
 		margin-top: var(--space-2);
 		padding-top: var(--space-2);
 		border-top: 1px solid var(--border-subtle);
 	}
 
-	.material-label {
-		font-family: var(--font-sans);
-		font-size: var(--text-xs);
-		color: var(--text-tertiary);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.material-list {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-
-	.material-option {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-1) var(--space-2);
-		border: none;
-		background: none;
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		color: var(--text-secondary);
-		text-align: left;
+	.wall-actions :global(.btn) {
 		width: 100%;
-		transition: all var(--transition-fast);
 	}
 
-	.material-option:hover {
-		background: var(--bg-hover);
-		color: var(--text-primary);
-	}
-
-	.material-option.active {
-		background: var(--accent-primary-glow);
-		color: var(--text-primary);
-	}
-
-	.material-option:focus-visible {
-		outline: 2px solid var(--accent-primary);
-		outline-offset: 1px;
-	}
-
-	.material-swatch {
-		width: 10px;
-		height: 10px;
-		border-radius: 2px;
-		flex-shrink: 0;
-	}
-
-	.material-name {
-		flex: 1;
-	}
-
-	.material-db {
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		color: var(--text-tertiary);
-	}
-
-	.material-hint {
+	.wall-hint {
 		font-size: var(--text-xs);
 		color: var(--text-disabled);
+	}
+
+	.draw-scratch {
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.draw-scratch :global(.btn) {
+		width: 100%;
 	}
 
 </style>

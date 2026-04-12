@@ -6,7 +6,8 @@
 	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { WallLayer } from '$canvas/renderers/walls.js';
-	import { decodeMask } from '$canvas/wall-detect.js';
+	import { decodeMask, encodeMask } from '$canvas/wall-detect.js';
+	import { WallEditHandler } from '$canvas/interactions/wall-edit.js';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
@@ -15,7 +16,7 @@
 	import { projectState, removeAps } from '$state/project.svelte.js';
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
-	import { undo, redo } from '$state/history.svelte.js';
+	import { undo, redo, pushState } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
@@ -27,6 +28,46 @@
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
+	import WallEditToolbar from '$components/canvas/WallEditToolbar.svelte';
+
+	let wallEditMaterial = $state<WallMaterialId>(0);
+	let brushCursorX = $state(0);
+	let brushCursorY = $state(0);
+	let brushCursorSize = $state(0);
+	let brushCursorVisible = $state(false);
+
+	function handleWallEditDone() {
+		appState.wallEditMode = null;
+		brushCursorVisible = false;
+		// Sync any material data created during painting
+		if (wallEditHandler.materialData && !cachedMaterialData) {
+			cachedMaterialData = wallEditHandler.materialData;
+		}
+		// Re-encode edited masks and persist (use handler dimensions which may have expanded)
+		if (cachedWallData) {
+			const width = wallEditHandler.maskWidth || projectState.wallMask?.width || 800;
+			const height = wallEditHandler.maskHeight || projectState.wallMask?.height || 600;
+			const newWallUrl = encodeMask(cachedWallData, width, height);
+			const newMatUrl = cachedMaterialData ? encodeMaterialMask(cachedMaterialData, width, height) : null;
+
+			// Update URLs and pre-set lastUrls so the async decode effect skips re-decode
+			projectState.wallMask = { dataUrl: newWallUrl, width, height };
+			lastWallMaskUrl = newWallUrl;
+			if (newMatUrl) {
+				projectState.materialMask = { dataUrl: newMatUrl, width, height };
+				lastMatMaskUrl = newMatUrl;
+			}
+
+			// Recompute blob labels so click-to-override works on the edited walls
+			cachedWallLabels = labelWallBlobs(cachedWallData, width, height);
+
+			wallLayer.invalidateCache();
+			heatmapLayer.invalidateCache();
+			heatmapLayer.materialVersion++;
+			engine.markDirty();
+			scheduleSave();
+		}
+	}
 
 	let canvasDragOver = $state(false);
 
@@ -76,6 +117,7 @@
 
 	async function handleMaterialSelect(newMaterial: WallMaterialId) {
 		if (!wallPopup || !cachedWallLabels || !projectState.wallMask) return;
+		pushState(); // undo captures state before blob relabel
 		const mask = projectState.wallMask;
 
 		// Create or clone material mask
@@ -106,6 +148,7 @@
 	let selectHandler: SelectHandler;
 	let dragHandler: DragHandler;
 	let placeHandler: PlaceHandler;
+	let wallEditHandler: WallEditHandler;
 	let floorplanLayer: FloorplanLayer;
 	let gridLayer: GridLayer;
 	let heatmapLayer: HeatmapLayer;
@@ -196,6 +239,28 @@
 		selectHandler = new SelectHandler(engine, selectionRectLayer);
 		dragHandler = new DragHandler(engine);
 		placeHandler = new PlaceHandler(engine);
+		wallEditHandler = new WallEditHandler(engine);
+		wallEditHandler.onEdit = () => {
+			// Sync handler's data to BOTH wall + heatmap renderers for live preview
+			const maskRef = wallEditHandler.wallData ? {
+				data: wallEditHandler.wallData,
+				width: wallEditHandler.maskWidth,
+				height: wallEditHandler.maskHeight
+			} : null;
+			if (maskRef) {
+				wallLayer.mask = maskRef;
+				heatmapLayer.wallMask = maskRef;
+				cachedWallData = wallEditHandler.wallData;
+			}
+			if (wallEditHandler.materialData) {
+				wallLayer.materialMap = wallEditHandler.materialData;
+				heatmapLayer.materialMap = wallEditHandler.materialData;
+				heatmapLayer.materialVersion++;
+			}
+			wallLayer.invalidateCache();
+			heatmapLayer.invalidateCache();
+			engine.markDirty();
+		};
 
 		// Set up resize observer
 		const observer = new ResizeObserver((entries) => {
@@ -270,12 +335,22 @@
 		engine.markDirty();
 	});
 
-	// Decode wall mask + material mask (async, only when data URLs change)
+	// Decode wall mask + material mask (async, only when data URLs actually change)
 	let wallMaskVersion = 0;
+	let lastWallMaskUrl: string | null = null;
+	let lastMatMaskUrl: string | null = null;
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
 		const mask = projectState.wallMask;
 		const matMask = projectState.materialMask;
+
+		// Skip re-decode if the data URLs haven't changed (avoids stale overwrites)
+		const wallUrl = mask?.dataUrl ?? null;
+		const matUrl = matMask?.dataUrl ?? null;
+		if (wallUrl === lastWallMaskUrl && matUrl === lastMatMaskUrl && cachedWallData) return;
+		lastWallMaskUrl = wallUrl;
+		lastMatMaskUrl = matUrl;
+
 		wallMaskVersion++;
 		const thisVersion = wallMaskVersion;
 
@@ -309,6 +384,14 @@
 			cachedWallData = decoded.data;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
 			cachedMaterialData = matData ?? null;
+
+			// Wire wall edit handler with live mask data
+			if (wallEditHandler) {
+				wallEditHandler.wallData = decoded.data;
+				wallEditHandler.materialData = cachedMaterialData;
+				wallEditHandler.maskWidth = decoded.width;
+				wallEditHandler.maskHeight = decoded.height;
+			}
 
 			engine.markDirty();
 		});
@@ -565,13 +648,29 @@
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
 		if (e.button === 1) return;
-		if (e.pointerType === 'touch') return; // handled by touch events exclusively
+		if (e.pointerType === 'touch') return;
+		// Wall edit mode intercepts primary pointer
+		if (appState.wallEditMode) {
+			wallEditHandler.activeMaterial = wallEditMaterial;
+			wallEditHandler.defaultMaterial = projectState.wallMaterial;
+			wallEditHandler.handlePointerDown(e);
+			return;
+		}
 		processPointerDown(e);
 	}
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!engine) return;
 		if (e.pointerType === 'touch') return;
+		if (appState.wallEditMode) {
+			const rect = engine.canvas.getBoundingClientRect();
+			brushCursorX = e.clientX - rect.left;
+			brushCursorY = e.clientY - rect.top;
+			brushCursorSize = appState.wallBrushSize * 2 * engine.camera.state.zoom;
+			brushCursorVisible = true;
+			wallEditHandler.handlePointerMove(e);
+			return;
+		}
 
 		if (dragHandler.isDragging) {
 			dragHandler.handlePointerMove(e);
@@ -605,6 +704,10 @@
 
 	function handlePointerUp(e: PointerEvent) {
 		if (!engine) return;
+		if (appState.wallEditMode) {
+			wallEditHandler.handlePointerUp();
+			return;
+		}
 
 		if (pendingPlace) {
 			pendingPlace = false;
@@ -650,6 +753,15 @@
 		ontouchcancel={handleTouchEnd}
 	></canvas>
 	<LayerPanel />
+	{#if appState.wallEditMode}
+		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
+		{#if brushCursorVisible}
+			<div
+				class="brush-cursor"
+				style="left: {brushCursorX - brushCursorSize / 2}px; top: {brushCursorY - brushCursorSize / 2}px; width: {brushCursorSize}px; height: {brushCursorSize}px"
+			></div>
+		{/if}
+	{/if}
 	{#if showEmptyHint}
 		<div class="empty-hint">
 			<p>Drop a floorplan image here</p>
@@ -675,6 +787,15 @@
 		overflow: hidden;
 		background: var(--canvas-bg);
 		position: relative;
+	}
+
+	.brush-cursor {
+		position: absolute;
+		border: 1.5px solid var(--accent-primary);
+		border-radius: 50%;
+		pointer-events: none;
+		z-index: 15;
+		opacity: 0.7;
 	}
 
 	.canvas-container.drag-over {
