@@ -16,6 +16,8 @@ interface ProjectFile {
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
 	wallMask?: { dataUrl: string; width: number; height: number } | null;
 	wallAttenuation?: number;
+	wallMaterial?: number;
+	materialMask?: { dataUrl: string; width: number; height: number } | null;
 	aps: Array<{
 		id: string;
 		name: string;
@@ -72,6 +74,10 @@ export async function serialize(): Promise<string> {
 		floorplanBoundary: projectState.floorplanBoundary ?? undefined,
 		wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
 		wallAttenuation: projectState.wallAttenuation,
+		wallMaterial: projectState.wallMaterial,
+		materialMask: projectState.materialMask
+			? JSON.parse(JSON.stringify(projectState.materialMask))
+			: null,
 		aps: projectState.aps.map((ap) => ({
 			id: ap.id,
 			name: ap.name,
@@ -113,6 +119,9 @@ export function deserialize(json: string): void {
 	projectState.floorplanBoundary = data.floorplanBoundary ?? null;
 	projectState.wallMask = data.wallMask ?? null;
 	projectState.wallAttenuation = data.wallAttenuation ?? 5;
+	projectState.wallMaterial = (data.wallMaterial ??
+		0) as import('$canvas/materials.js').WallMaterialId;
+	projectState.materialMask = data.materialMask ?? null;
 
 	// Restore floorplan image
 	if (data.floorplanImage) {

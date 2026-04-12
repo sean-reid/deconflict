@@ -35,7 +35,9 @@ export const projectState = $state({
 	ispSpeed: 0 as number, // 0 = no limit
 	targetThroughput: 25 as number, // default 25 Mbps minimum
 	wallMask: null as { dataUrl: string; width: number; height: number } | null,
-	wallAttenuation: 5 as number
+	wallAttenuation: 5 as number, // legacy, used as fallback when no materialMask
+	wallMaterial: 0 as import('$canvas/materials.js').WallMaterialId, // global default material
+	materialMask: null as { dataUrl: string; width: number; height: number } | null
 });
 
 export function addAp(x: number, y: number): AccessPoint {
