@@ -88,12 +88,22 @@
 
 	function applyCalibration() {
 		const val = parseFloat(areaInput);
-		if (!val || val <= 0 || !detectedWorldArea) return;
+		if (!val || val <= 0) return;
+
+		// Use detected area if available, otherwise compute from wall mask bounding box
+		let worldArea = detectedWorldArea;
+		if (!worldArea && projectState.wallMask) {
+			const { width, height } = projectState.wallMask;
+			// Use the mask dimensions as the world area (pixels squared)
+			worldArea = width * height;
+		}
+		if (!worldArea) return;
+
 		let realAreaSqm = val;
 		if (areaUnit === 'sqft') {
 			realAreaSqm = val * 0.092903;
 		}
-		const worldUnitsPerMeter = Math.sqrt(detectedWorldArea / realAreaSqm);
+		const worldUnitsPerMeter = Math.sqrt(worldArea / realAreaSqm);
 		projectState.calibration = { worldUnitsPerMeter };
 
 		// Set realistic default radius for existing APs
@@ -278,9 +288,9 @@
 				<div class="calibration-section">
 					<span class="calibration-status">Detecting boundary...</span>
 				</div>
-			{:else if detectedWorldArea && !calibrationDone}
+			{:else if (detectedWorldArea || projectState.wallMask) && !calibrationDone}
 				<div class="calibration-section">
-					<span class="calibration-label">Detected area outline. What is the total area?</span>
+					<span class="calibration-label">What is the total area of the floorplan?</span>
 					<div class="calibration-input-row">
 						<input
 							type="number"
@@ -304,6 +314,7 @@
 			{:else if scaleDisplay}
 				<div class="calibration-section">
 					<span class="calibration-confirmed">Scale: {scaleDisplay}</span>
+					<button class="skip-link" onclick={() => { calibrationDone = false; }}>Recalibrate</button>
 				</div>
 			{/if}
 

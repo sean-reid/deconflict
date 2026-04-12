@@ -85,9 +85,7 @@ test.describe('Wall editing', () => {
 		await page.locator('.wall-toolbar').locator('text=Done').click();
 	});
 
-	test('full sequence: edit walls → paint material → place APs → re-edit', async ({
-		page
-	}) => {
+	test('full sequence: edit walls → paint material → place APs → re-edit', async ({ page }) => {
 		// 1. Edit walls - erase a spot
 		await page.getByText('Edit Walls').click();
 		const canvas = page.locator('canvas');
