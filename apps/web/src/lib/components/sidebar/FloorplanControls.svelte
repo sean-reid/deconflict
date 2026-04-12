@@ -242,6 +242,20 @@
 				{/each}
 			</div>
 		</div>
+		<div class="draw-scratch">
+			<Button variant="secondary" size="sm" onclick={() => {
+				const w = 2000;
+				const h = 1500;
+				const emptyData = new Uint8Array(w * h);
+				const dataUrl = encodeMask(emptyData, w, h);
+				projectState.wallMask = { dataUrl, width: w, height: h };
+				appState.wallEditMode = 'draw';
+				scheduleSave();
+			}}>
+				<Icon name="pencil" size={14} />
+				Draw from Scratch
+			</Button>
+		</div>
 	{:else}
 		<div class="loaded-controls">
 			<div class="loaded-header">
@@ -333,23 +347,6 @@
 				</div>
 			{/if}
 
-			{#if !projectState.wallMask}
-				<div class="draw-walls-section">
-					<Button variant="secondary" size="sm" onclick={() => {
-						// Create a large empty wall mask for from-scratch drawing
-						const w = 2000;
-						const h = 1500;
-						const emptyData = new Uint8Array(w * h);
-						const dataUrl = encodeMask(emptyData, w, h);
-						projectState.wallMask = { dataUrl, width: w, height: h };
-						appState.wallEditMode = 'draw';
-						scheduleSave();
-					}}>
-						<Icon name="pencil" size={14} />
-						Draw Walls
-					</Button>
-				</div>
-			{/if}
 		</div>
 	{/if}
 
@@ -661,13 +658,13 @@
 		flex: 1;
 	}
 
-	.draw-walls-section {
+	.draw-scratch {
 		margin-top: var(--space-2);
 		padding-top: var(--space-2);
 		border-top: 1px solid var(--border-subtle);
 	}
 
-	.draw-walls-section :global(.btn) {
+	.draw-scratch :global(.btn) {
 		width: 100%;
 	}
 
