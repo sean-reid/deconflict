@@ -281,25 +281,25 @@
 		}
 
 		const wallPromise = decodeMask(mask.dataUrl, mask.width, mask.height);
-		const matPromise = matMask ? decodeMask(matMask.dataUrl, matMask.width, matMask.height) : null;
+		const matPromise = matMask ? decodeMaterialMask(matMask.dataUrl, matMask.width, matMask.height) : null;
 
 		wallPromise.then(async (decoded) => {
 			if (wallMaskVersion !== thisVersion) return;
-			const matDecoded = matPromise ? await matPromise : null;
+			const matData = matPromise ? await matPromise : null;
 			if (wallMaskVersion !== thisVersion) return;
 
 			const defaultMat = projectState.wallMaterial;
 			wallLayer.mask = decoded;
-			wallLayer.materialMap = matDecoded?.data ?? null;
+			wallLayer.materialMap = matData ?? null;
 			wallLayer.defaultMaterial = defaultMat;
 			heatmapLayer.wallMask = decoded;
-			heatmapLayer.materialMap = matDecoded?.data ?? null;
+			heatmapLayer.materialMap = matData ?? null;
 			heatmapLayer.defaultMaterial = defaultMat;
 			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
 
 			cachedWallData = decoded.data;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
-			cachedMaterialData = matDecoded?.data ?? null;
+			cachedMaterialData = matData ?? null;
 
 			engine.markDirty();
 		});

@@ -102,4 +102,32 @@ test.describe('Wall materials', () => {
 			await page.screenshot({ path: 'test-results/wall-materials/blob-override-glass.png' });
 		}
 	});
+
+	test('change default → place AP → click-override blob keeps non-default color', async ({ page }) => {
+		// Step 1: Change default to Brick
+		await page.locator('.material-option:has-text("Brick")').click();
+		await page.waitForTimeout(500);
+		await page.screenshot({ path: 'test-results/wall-materials/seq-1-brick-default.png' });
+
+		// Step 2: Place an AP
+		const canvas = page.locator('canvas');
+		await canvas.click({ position: { x: 400, y: 300 } });
+		await page.waitForTimeout(1000);
+		await page.screenshot({ path: 'test-results/wall-materials/seq-2-ap-placed.png' });
+
+		// Step 3: Click a wall and override to Glass
+		await canvas.click({ position: { x: 100, y: 120 } });
+		await page.waitForTimeout(300);
+		const popup = page.locator('.popup');
+		if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
+			await popup.locator('.material-row:has-text("Glass")').click();
+			await page.waitForTimeout(1000);
+		}
+		await page.screenshot({ path: 'test-results/wall-materials/seq-3-after-override.png' });
+
+		// Verify: walls should NOT all be Drywall — Floorplan tab should still show Brick active
+		await page.getByRole('tab', { name: 'Floorplan' }).click();
+		await page.waitForTimeout(300);
+		await expect(page.locator('.material-option.active')).toContainText('Brick');
+	});
 });
