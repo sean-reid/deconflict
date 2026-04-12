@@ -300,6 +300,7 @@
 		if (!wallLayer || !heatmapLayer) return;
 		const mat = projectState.wallMaterial;
 		wallLayer.defaultMaterial = mat;
+		wallLayer.invalidateCache();
 		heatmapLayer.defaultMaterial = mat;
 		heatmapLayer.wallAttenuation = projectState.wallAttenuation;
 		engine.markDirty();

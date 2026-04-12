@@ -12,7 +12,12 @@ export class WallLayer implements Layer {
 	private cachedImage: HTMLCanvasElement | null = null;
 	private cachedMaskRef: Uint8Array | null = null;
 	private cachedMatRef: Uint8Array | null = null;
-	private cachedDefaultMat: WallMaterialId = 0;
+	private cachedDefaultMat: WallMaterialId = -1 as WallMaterialId; // force first render
+
+	/** Force the colorized image to regenerate on next render */
+	invalidateCache(): void {
+		this.cachedMaskRef = null;
+	}
 
 	render(rc: RenderContext): void {
 		if (!this.mask) return;
