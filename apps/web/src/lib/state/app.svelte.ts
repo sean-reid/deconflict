@@ -1,4 +1,5 @@
 export type SidebarPanel = 'floorplan' | 'aps';
+export type WallEditMode = 'erase' | 'draw' | 'material' | null;
 
 export const appState = $state({
 	sidebarPanel: 'floorplan' as SidebarPanel,
@@ -8,5 +9,7 @@ export const appState = $state({
 	showHeatmap: false,
 	showFloorplan: true,
 	showAPs: true,
-	showWalls: true
+	showWalls: true,
+	wallEditMode: null as WallEditMode,
+	wallBrushSize: 15
 });

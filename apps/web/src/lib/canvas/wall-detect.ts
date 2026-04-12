@@ -175,6 +175,26 @@ export function decodeMask(
 	});
 }
 
+/** Encode a binary wall mask Uint8Array back to a PNG data URL. */
+export function encodeMask(data: Uint8Array, w: number, h: number): string {
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const ctx = canvas.getContext('2d')!;
+	const imgData = ctx.createImageData(w, h);
+	for (let i = 0; i < data.length; i++) {
+		const j = i * 4;
+		if (data[i]) {
+			imgData.data[j] = 255;
+			imgData.data[j + 1] = 255;
+			imgData.data[j + 2] = 255;
+			imgData.data[j + 3] = 255;
+		}
+	}
+	ctx.putImageData(imgData, 0, 0);
+	return canvas.toDataURL('image/png');
+}
+
 /** Count wall crossings along a ray using Bresenham's line algorithm.
  *  Each 0->1 transition is one wall crossing. */
 export function countWallCrossings(

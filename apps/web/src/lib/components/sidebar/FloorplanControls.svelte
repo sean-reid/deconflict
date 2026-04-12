@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { projectState } from '$state/project.svelte.js';
+	import { appState } from '$state/app.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
-	import { detectWalls } from '$canvas/wall-detect.js';
+	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import { notifyMaterialChange } from '$canvas/engine-ref.js';
@@ -318,6 +319,30 @@
 						{/each}
 					</div>
 					<span class="material-hint">Click walls on the canvas to override individually</span>
+					<div class="wall-edit-buttons">
+						<Button variant="secondary" size="sm" onclick={() => { appState.wallEditMode = 'erase'; }}>
+							<Icon name="eraser" size={14} />
+							Edit Walls
+						</Button>
+					</div>
+				</div>
+			{/if}
+
+			{#if !projectState.wallMask}
+				<div class="draw-walls-section">
+					<Button variant="secondary" size="sm" onclick={() => {
+						// Create an empty wall mask so the user can draw from scratch
+						const w = 800;
+						const h = 600;
+						const emptyData = new Uint8Array(w * h);
+						const dataUrl = encodeMask(emptyData, w, h);
+						projectState.wallMask = { dataUrl, width: w, height: h };
+						appState.wallEditMode = 'draw';
+						scheduleSave();
+					}}>
+						<Icon name="pencil" size={14} />
+						Draw Walls
+					</Button>
 				</div>
 			{/if}
 		</div>
@@ -620,6 +645,25 @@
 	.material-hint {
 		font-size: var(--text-xs);
 		color: var(--text-disabled);
+	}
+
+	.wall-edit-buttons {
+		display: flex;
+		gap: var(--space-1);
+	}
+
+	.wall-edit-buttons :global(.btn) {
+		flex: 1;
+	}
+
+	.draw-walls-section {
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.draw-walls-section :global(.btn) {
+		width: 100%;
 	}
 
 </style>

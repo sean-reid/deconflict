@@ -6,7 +6,8 @@
 	import { HeatmapLayer } from '$canvas/renderers/heatmap.js';
 	import { ApLayer } from '$canvas/renderers/ap.js';
 	import { WallLayer } from '$canvas/renderers/walls.js';
-	import { decodeMask } from '$canvas/wall-detect.js';
+	import { decodeMask, encodeMask } from '$canvas/wall-detect.js';
+	import { WallEditHandler } from '$canvas/interactions/wall-edit.js';
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
@@ -27,6 +28,26 @@
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
+	import WallEditToolbar from '$components/canvas/WallEditToolbar.svelte';
+
+	let wallEditMaterial = $state<WallMaterialId>(0);
+
+	function handleWallEditDone() {
+		appState.wallEditMode = null;
+		// Re-encode edited masks and persist
+		if (cachedWallData && projectState.wallMask) {
+			const { width, height } = projectState.wallMask;
+			projectState.wallMask = { dataUrl: encodeMask(cachedWallData, width, height), width, height };
+			if (cachedMaterialData) {
+				projectState.materialMask = { dataUrl: encodeMaterialMask(cachedMaterialData, width, height), width, height };
+			}
+			wallLayer.invalidateCache();
+			heatmapLayer.invalidateCache();
+			heatmapLayer.materialVersion++;
+			engine.markDirty();
+			scheduleSave();
+		}
+	}
 
 	let canvasDragOver = $state(false);
 
@@ -106,6 +127,7 @@
 	let selectHandler: SelectHandler;
 	let dragHandler: DragHandler;
 	let placeHandler: PlaceHandler;
+	let wallEditHandler: WallEditHandler;
 	let floorplanLayer: FloorplanLayer;
 	let gridLayer: GridLayer;
 	let heatmapLayer: HeatmapLayer;
@@ -196,6 +218,14 @@
 		selectHandler = new SelectHandler(engine, selectionRectLayer);
 		dragHandler = new DragHandler(engine);
 		placeHandler = new PlaceHandler(engine);
+		wallEditHandler = new WallEditHandler(engine);
+		wallEditHandler.onEdit = () => {
+			// Live update renderers during painting (before Done)
+			if (cachedWallData) {
+				wallLayer.invalidateCache();
+			}
+			engine.markDirty();
+		};
 
 		// Set up resize observer
 		const observer = new ResizeObserver((entries) => {
@@ -309,6 +339,14 @@
 			cachedWallData = decoded.data;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
 			cachedMaterialData = matData ?? null;
+
+			// Wire wall edit handler with live mask data
+			if (wallEditHandler) {
+				wallEditHandler.wallData = decoded.data;
+				wallEditHandler.materialData = cachedMaterialData;
+				wallEditHandler.maskWidth = decoded.width;
+				wallEditHandler.maskHeight = decoded.height;
+			}
 
 			engine.markDirty();
 		});
@@ -565,13 +603,23 @@
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
 		if (e.button === 1) return;
-		if (e.pointerType === 'touch') return; // handled by touch events exclusively
+		if (e.pointerType === 'touch') return;
+		// Wall edit mode intercepts primary pointer
+		if (appState.wallEditMode) {
+			wallEditHandler.activeMaterial = wallEditMaterial;
+			wallEditHandler.handlePointerDown(e);
+			return;
+		}
 		processPointerDown(e);
 	}
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!engine) return;
 		if (e.pointerType === 'touch') return;
+		if (appState.wallEditMode) {
+			wallEditHandler.handlePointerMove(e);
+			return;
+		}
 
 		if (dragHandler.isDragging) {
 			dragHandler.handlePointerMove(e);
@@ -605,6 +653,10 @@
 
 	function handlePointerUp(e: PointerEvent) {
 		if (!engine) return;
+		if (appState.wallEditMode) {
+			wallEditHandler.handlePointerUp();
+			return;
+		}
 
 		if (pendingPlace) {
 			pendingPlace = false;
@@ -650,6 +702,9 @@
 		ontouchcancel={handleTouchEnd}
 	></canvas>
 	<LayerPanel />
+	{#if appState.wallEditMode}
+		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
+	{/if}
 	{#if showEmptyHint}
 		<div class="empty-hint">
 			<p>Drop a floorplan image here</p>
