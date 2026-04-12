@@ -238,20 +238,24 @@
 		placeHandler = new PlaceHandler(engine);
 		wallEditHandler = new WallEditHandler(engine);
 		wallEditHandler.onEdit = () => {
-			// Sync handler's data to renderers for live preview
-			// The handler may have expanded the mask, so update dimensions + data refs
-			if (wallEditHandler.wallData) {
-				wallLayer.mask = {
-					data: wallEditHandler.wallData,
-					width: wallEditHandler.maskWidth,
-					height: wallEditHandler.maskHeight
-				};
+			// Sync handler's data to BOTH wall + heatmap renderers for live preview
+			const maskRef = wallEditHandler.wallData ? {
+				data: wallEditHandler.wallData,
+				width: wallEditHandler.maskWidth,
+				height: wallEditHandler.maskHeight
+			} : null;
+			if (maskRef) {
+				wallLayer.mask = maskRef;
+				heatmapLayer.wallMask = maskRef;
 				cachedWallData = wallEditHandler.wallData;
 			}
 			if (wallEditHandler.materialData) {
 				wallLayer.materialMap = wallEditHandler.materialData;
+				heatmapLayer.materialMap = wallEditHandler.materialData;
+				heatmapLayer.materialVersion++;
 			}
 			wallLayer.invalidateCache();
+			heatmapLayer.invalidateCache();
 			engine.markDirty();
 		};
 
