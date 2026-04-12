@@ -315,38 +315,38 @@
 				</div>
 			{/if}
 
-			{#if projectState.wallMask}
-				<div class="material-section">
-					<span class="material-label">Wall Type</span>
-					<div class="material-list">
-						{#each WALL_MATERIALS as mat}
-							<button
-								class="material-option"
-								class:active={projectState.wallMaterial === mat.id}
-								onclick={() => handleMaterialChange(mat.id)}
-							>
-								<span
-									class="material-swatch"
-									style="background: rgb({mat.color[0]},{mat.color[1]},{mat.color[2]})"
-								></span>
-								<span class="material-name">{mat.name}</span>
-								<span class="material-db">{mat.attenuation} dB</span>
-							</button>
-						{/each}
-					</div>
-					<span class="material-hint">Click walls on the canvas to override individually</span>
-					<div class="wall-edit-buttons">
-						<Button variant="secondary" size="sm" onclick={() => {
-						pushState();
-						appState.wallEditMode = appState.wallEditLastMode;
-					}}>
-							<Icon name="eraser" size={14} />
-							Edit Walls
-						</Button>
-					</div>
-				</div>
-			{/if}
+		</div>
+	{/if}
 
+	{#if projectState.wallMask}
+		<div class="material-section">
+			<span class="material-label">Wall Type</span>
+			<div class="material-list">
+				{#each WALL_MATERIALS as mat}
+					<button
+						class="material-option"
+						class:active={projectState.wallMaterial === mat.id}
+						onclick={() => handleMaterialChange(mat.id)}
+					>
+						<span
+							class="material-swatch"
+							style="background: rgb({mat.color[0]},{mat.color[1]},{mat.color[2]})"
+						></span>
+						<span class="material-name">{mat.name}</span>
+						<span class="material-db">{mat.attenuation} dB</span>
+					</button>
+				{/each}
+			</div>
+			<span class="material-hint">Click walls on the canvas to override individually</span>
+			<div class="wall-edit-buttons">
+				<Button variant="secondary" size="sm" onclick={() => {
+					pushState();
+					appState.wallEditMode = appState.wallEditLastMode;
+				}}>
+					<Icon name="eraser" size={14} />
+					Edit Walls
+				</Button>
+			</div>
 		</div>
 	{/if}
 
