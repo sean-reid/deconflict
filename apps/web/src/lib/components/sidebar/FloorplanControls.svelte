@@ -2,11 +2,19 @@
 	import { projectState } from '$state/project.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import { detectWalls } from '$canvas/wall-detect.js';
+	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
+	import { notifyMaterialChange } from '$canvas/engine-ref.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
 	const FLOORPLAN_TARGET_WIDTH = 800;
+
+	function handleMaterialChange(id: WallMaterialId) {
+		projectState.wallMaterial = id;
+		notifyMaterialChange(id);
+		scheduleSave();
+	}
 
 	let fileInput = $state<HTMLInputElement>();
 	let dragOver = $state(false);
@@ -184,6 +192,8 @@
 		projectState.floorplanBoundary = null;
 		projectState.calibration = null;
 		projectState.wallMask = null;
+		projectState.wallMaterial = 0;
+		projectState.materialMask = null;
 		projectState.aps = [];
 		detectedWorldArea = null;
 		calibrationDone = false;
@@ -285,6 +295,29 @@
 			{:else if scaleDisplay}
 				<div class="calibration-section">
 					<span class="calibration-confirmed">Scale: {scaleDisplay}</span>
+				</div>
+			{/if}
+
+			{#if projectState.wallMask}
+				<div class="material-section">
+					<span class="material-label">Wall Type</span>
+					<div class="material-list">
+						{#each WALL_MATERIALS as mat}
+							<button
+								class="material-option"
+								class:active={projectState.wallMaterial === mat.id}
+								onclick={() => handleMaterialChange(mat.id)}
+							>
+								<span
+									class="material-swatch"
+									style="background: rgb({mat.color[0]},{mat.color[1]},{mat.color[2]})"
+								></span>
+								<span class="material-name">{mat.name}</span>
+								<span class="material-db">{mat.attenuation} dB</span>
+							</button>
+						{/each}
+					</div>
+					<span class="material-hint">Click walls on the canvas to override individually</span>
 				</div>
 			{/if}
 		</div>
@@ -510,6 +543,83 @@
 		font-size: var(--text-xs);
 		color: var(--color-success, #4ade80);
 		font-family: var(--font-mono);
+	}
+
+	.material-section {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		margin-top: var(--space-2);
+		padding-top: var(--space-2);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.material-label {
+		font-family: var(--font-sans);
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.material-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.material-option {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-1) var(--space-2);
+		border: none;
+		background: none;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		color: var(--text-secondary);
+		text-align: left;
+		width: 100%;
+		transition: all var(--transition-fast);
+	}
+
+	.material-option:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.material-option.active {
+		background: var(--accent-primary-glow);
+		color: var(--text-primary);
+	}
+
+	.material-option:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
+	}
+
+	.material-swatch {
+		width: 10px;
+		height: 10px;
+		border-radius: 2px;
+		flex-shrink: 0;
+	}
+
+	.material-name {
+		flex: 1;
+	}
+
+	.material-db {
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+	}
+
+	.material-hint {
+		font-size: var(--text-xs);
+		color: var(--text-disabled);
 	}
 
 </style>
