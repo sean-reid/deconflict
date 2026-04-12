@@ -31,9 +31,14 @@
 	import WallEditToolbar from '$components/canvas/WallEditToolbar.svelte';
 
 	let wallEditMaterial = $state<WallMaterialId>(0);
+	let brushCursorX = $state(0);
+	let brushCursorY = $state(0);
+	let brushCursorSize = $state(0);
+	let brushCursorVisible = $state(false);
 
 	function handleWallEditDone() {
 		appState.wallEditMode = null;
+		brushCursorVisible = false;
 		// Sync any material data created during painting
 		if (wallEditHandler.materialData && !cachedMaterialData) {
 			cachedMaterialData = wallEditHandler.materialData;
@@ -630,6 +635,7 @@
 		// Wall edit mode intercepts primary pointer
 		if (appState.wallEditMode) {
 			wallEditHandler.activeMaterial = wallEditMaterial;
+			wallEditHandler.defaultMaterial = projectState.wallMaterial;
 			wallEditHandler.handlePointerDown(e);
 			return;
 		}
@@ -640,7 +646,11 @@
 		if (!engine) return;
 		if (e.pointerType === 'touch') return;
 		if (appState.wallEditMode) {
-			wallEditHandler.updateCursor(e);
+			const rect = engine.canvas.getBoundingClientRect();
+			brushCursorX = e.clientX - rect.left;
+			brushCursorY = e.clientY - rect.top;
+			brushCursorSize = appState.wallBrushSize * 2 * engine.camera.state.zoom;
+			brushCursorVisible = true;
 			wallEditHandler.handlePointerMove(e);
 			return;
 		}
@@ -728,11 +738,10 @@
 	<LayerPanel />
 	{#if appState.wallEditMode}
 		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
-		{#if wallEditHandler?.cursorVisible}
-			{@const size = wallEditHandler.getScreenBrushSize()}
+		{#if brushCursorVisible}
 			<div
 				class="brush-cursor"
-				style="left: {wallEditHandler.cursorX - size / 2}px; top: {wallEditHandler.cursorY - size / 2}px; width: {size}px; height: {size}px"
+				style="left: {brushCursorX - brushCursorSize / 2}px; top: {brushCursorY - brushCursorSize / 2}px; width: {brushCursorSize}px; height: {brushCursorSize}px"
 			></div>
 		{/if}
 	{/if}
