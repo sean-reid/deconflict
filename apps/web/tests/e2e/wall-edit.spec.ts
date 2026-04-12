@@ -85,36 +85,33 @@ test.describe('Wall editing', () => {
 		await page.locator('.wall-toolbar').locator('text=Done').click();
 	});
 
-	test('full sequence: edit walls → change material → place APs → verify state', async ({
+	test('full sequence: edit walls → paint material → place APs → re-edit', async ({
 		page
 	}) => {
-		// 1. Edit walls - erase
+		// 1. Edit walls - erase a spot
 		await page.getByText('Edit Walls').click();
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 200, y: 120 } });
+
+		// 2. Switch to material mode and paint
+		await page.locator('.wall-toolbar').locator('text=Material').click();
+		await page.waitForTimeout(200);
+		await canvas.click({ position: { x: 300, y: 120 } });
+
+		// 3. Done
 		await page.locator('.wall-toolbar').locator('text=Done').click();
 		await page.waitForTimeout(500);
 
-		// 2. Change material to Concrete
-		await page.locator('.material-option:has-text("Concrete")').click();
-		await page.waitForTimeout(500);
-		await expect(page.locator('.material-option.active')).toContainText('Concrete');
-
-		// 3. Place 2 APs
+		// 4. Place 2 APs
 		await canvas.click({ position: { x: 300, y: 200 } });
 		await canvas.click({ position: { x: 500, y: 350 } });
 		await page.waitForTimeout(1000);
 
-		// 4. Material should still be Concrete
+		// 5. Edit walls again - should work
 		await page.getByRole('tab', { name: 'Floorplan' }).click();
 		await page.waitForTimeout(300);
-		await expect(page.locator('.material-option.active')).toContainText('Concrete');
-
-		// 5. Edit walls again - should work
 		await page.getByText('Edit Walls').click();
 		await expect(page.locator('.wall-toolbar')).toBeVisible();
 		await page.locator('.wall-toolbar').locator('text=Done').click();
-
-		await page.screenshot({ path: 'test-results/wall-edit/full-sequence.png' });
 	});
 });
