@@ -48,7 +48,20 @@ function buildSerializedGraph() {
 }
 
 function getColorOptions(): number[] {
-	const channels = getAvailableChannels(projectState.band, projectState.regulatoryDomain);
+	// Use the most common band among APs, falling back to project default
+	const bandCounts = new Map<string, number>();
+	for (const ap of projectState.aps) {
+		bandCounts.set(ap.band, (bandCounts.get(ap.band) ?? 0) + 1);
+	}
+	let primaryBand = projectState.band;
+	let maxCount = 0;
+	for (const [band, count] of bandCounts) {
+		if (count > maxCount) {
+			maxCount = count;
+			primaryBand = band as typeof projectState.band;
+		}
+	}
+	const channels = getAvailableChannels(primaryBand, projectState.regulatoryDomain);
 	return channels.map((ch) => ch.number);
 }
 
@@ -126,6 +139,8 @@ export async function runSolver(): Promise<void> {
 		solverState.lastTiming = result.timeMs;
 		clearAssignments();
 		applyAssignments(result.assignment);
+		// Force Svelte reactivity to see the channel assignment changes
+		projectState.aps = [...projectState.aps];
 		computeThroughput();
 	} catch (err) {
 		solverState.error = err instanceof Error ? err.message : 'Solver failed';
