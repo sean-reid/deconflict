@@ -27,7 +27,7 @@
 	let detectedWorldArea = $state<number | null>(null);
 	let calibrationDone = $state(false);
 
-	let hasFloorplan = $derived(projectState.floorplanUrl !== null);
+	let hasFloorplan = $derived(projectState.floorplanUrl !== null || projectState.wallMask !== null);
 
 	const sampleFloorplans = [
 		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.svg', areaSqm: 48 },
@@ -261,7 +261,7 @@
 			<div class="loaded-header">
 				<span class="loaded-label">
 					<Icon name="file" size={14} />
-					Floorplan loaded
+					{projectState.floorplanUrl ? 'Floorplan loaded' : 'Walls drawn'}
 				</span>
 				<Button variant="ghost" size="sm" onclick={removeFloorplan}>
 					<Icon name="trash" size={14} />
