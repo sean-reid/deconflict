@@ -58,6 +58,9 @@
 				lastMatMaskUrl = newMatUrl;
 			}
 
+			// Recompute blob labels so click-to-override works on the edited walls
+			cachedWallLabels = labelWallBlobs(cachedWallData, width, height);
+
 			wallLayer.invalidateCache();
 			heatmapLayer.invalidateCache();
 			heatmapLayer.materialVersion++;
