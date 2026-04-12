@@ -288,10 +288,14 @@
 			const matDecoded = matPromise ? await matPromise : null;
 			if (wallMaskVersion !== thisVersion) return;
 
+			const defaultMat = projectState.wallMaterial;
 			wallLayer.mask = decoded;
 			wallLayer.materialMap = matDecoded?.data ?? null;
+			wallLayer.defaultMaterial = defaultMat;
 			heatmapLayer.wallMask = decoded;
 			heatmapLayer.materialMap = matDecoded?.data ?? null;
+			heatmapLayer.defaultMaterial = defaultMat;
+			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
 
 			cachedWallData = decoded.data;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
