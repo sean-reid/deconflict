@@ -5,6 +5,7 @@
 	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
+	import { pushState } from '$state/history.svelte.js';
 	import { notifyMaterialChange } from '$canvas/engine-ref.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
@@ -12,6 +13,7 @@
 	const FLOORPLAN_TARGET_WIDTH = 800;
 
 	function handleMaterialChange(id: WallMaterialId) {
+		pushState();
 		projectState.wallMaterial = id;
 		notifyMaterialChange(id);
 		scheduleSave();
@@ -321,8 +323,7 @@
 					<span class="material-hint">Click walls on the canvas to override individually</span>
 					<div class="wall-edit-buttons">
 						<Button variant="secondary" size="sm" onclick={() => {
-						// Push undo state before entering edit mode
-						import('$state/history.svelte.js').then(m => m.pushState());
+						pushState();
 						appState.wallEditMode = appState.wallEditLastMode;
 					}}>
 							<Icon name="eraser" size={14} />

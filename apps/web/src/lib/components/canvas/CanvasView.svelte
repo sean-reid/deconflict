@@ -41,10 +41,17 @@
 		// Re-encode edited masks and persist
 		if (cachedWallData && projectState.wallMask) {
 			const { width, height } = projectState.wallMask;
-			projectState.wallMask = { dataUrl: encodeMask(cachedWallData, width, height), width, height };
-			if (cachedMaterialData) {
-				projectState.materialMask = { dataUrl: encodeMaterialMask(cachedMaterialData, width, height), width, height };
+			const newWallUrl = encodeMask(cachedWallData, width, height);
+			const newMatUrl = cachedMaterialData ? encodeMaterialMask(cachedMaterialData, width, height) : null;
+
+			// Update URLs and pre-set lastUrls so the async decode effect skips re-decode
+			projectState.wallMask = { dataUrl: newWallUrl, width, height };
+			lastWallMaskUrl = newWallUrl;
+			if (newMatUrl) {
+				projectState.materialMask = { dataUrl: newMatUrl, width, height };
+				lastMatMaskUrl = newMatUrl;
 			}
+
 			wallLayer.invalidateCache();
 			heatmapLayer.invalidateCache();
 			heatmapLayer.materialVersion++;
@@ -633,6 +640,7 @@
 		if (!engine) return;
 		if (e.pointerType === 'touch') return;
 		if (appState.wallEditMode) {
+			wallEditHandler.updateCursor(e);
 			wallEditHandler.handlePointerMove(e);
 			return;
 		}
@@ -720,6 +728,13 @@
 	<LayerPanel />
 	{#if appState.wallEditMode}
 		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
+		{#if wallEditHandler?.cursorVisible}
+			{@const size = wallEditHandler.getScreenBrushSize()}
+			<div
+				class="brush-cursor"
+				style="left: {wallEditHandler.cursorX - size / 2}px; top: {wallEditHandler.cursorY - size / 2}px; width: {size}px; height: {size}px"
+			></div>
+		{/if}
 	{/if}
 	{#if showEmptyHint}
 		<div class="empty-hint">
@@ -746,6 +761,15 @@
 		overflow: hidden;
 		background: var(--canvas-bg);
 		position: relative;
+	}
+
+	.brush-cursor {
+		position: absolute;
+		border: 1.5px solid var(--accent-primary);
+		border-radius: 50%;
+		pointer-events: none;
+		z-index: 15;
+		opacity: 0.7;
 	}
 
 	.canvas-container.drag-over {

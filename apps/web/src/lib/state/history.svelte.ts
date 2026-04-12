@@ -1,6 +1,7 @@
 import { projectState } from './project.svelte.js';
 import type { AccessPoint } from './project.svelte.js';
 import type { WallMaterialId } from '$canvas/materials.js';
+import { notifyMaterialChange } from '$canvas/engine-ref.js';
 
 const MAX_HISTORY = 50;
 
@@ -28,6 +29,7 @@ function applySnapshot(snap: Snapshot): void {
 	projectState.wallMask = snap.wallMask;
 	projectState.materialMask = snap.materialMask;
 	projectState.wallMaterial = snap.wallMaterial;
+	notifyMaterialChange(snap.wallMaterial);
 }
 
 export function pushState(): void {

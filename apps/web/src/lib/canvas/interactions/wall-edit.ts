@@ -15,11 +15,29 @@ export class WallEditHandler {
 	maskHeight = 0;
 	activeMaterial: WallMaterialId = 0;
 
+	// Brush cursor position (screen pixels, for CSS overlay)
+	cursorX = 0;
+	cursorY = 0;
+	cursorVisible = false;
+
 	// Called after edits to update renderers
 	onEdit: (() => void) | null = null;
 
 	constructor(engine: CanvasEngine) {
 		this.engine = engine;
+	}
+
+	/** Update brush cursor position (call on every pointer move in edit mode) */
+	updateCursor(e: PointerEvent): void {
+		const rect = this.engine.canvas.getBoundingClientRect();
+		this.cursorX = e.clientX - rect.left;
+		this.cursorY = e.clientY - rect.top;
+		this.cursorVisible = true;
+	}
+
+	/** Get brush diameter in screen pixels */
+	getScreenBrushSize(): number {
+		return appState.wallBrushSize * 2 * this.engine.camera.state.zoom;
 	}
 
 	handlePointerDown(e: PointerEvent): void {
