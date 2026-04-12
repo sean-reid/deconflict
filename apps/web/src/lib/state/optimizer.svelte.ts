@@ -1,6 +1,7 @@
 import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
-import { decodeMask, countWallCrossings, type DecodedWallMask } from '$canvas/wall-detect.js';
+import { decodeMask, computeWallAttenuation, type DecodedWallMask } from '$canvas/wall-detect.js';
+import { WALL_MATERIALS } from '$canvas/materials.js';
 import { computeBuildingInterior } from '$canvas/morph-interior.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
 
@@ -63,7 +64,14 @@ export async function updateCoverage(): Promise<void> {
 	}
 
 	const { data, width, height } = cachedMask;
-	const attenuation = projectState.wallAttenuation;
+	const defaultDb =
+		WALL_MATERIALS[projectState.wallMaterial]?.attenuation ?? projectState.wallAttenuation;
+	// Decode material mask if available
+	let matData: Uint8Array | null = null;
+	if (projectState.materialMask && cachedMask) {
+		// Reuse cached mask dimensions for material mask decode
+		// For now, material map may not be loaded yet - skip if null
+	}
 	let totalSignal = 0;
 
 	for (const sample of cachedSamples) {
@@ -76,14 +84,17 @@ export async function updateCoverage(): Promise<void> {
 			if (ratio >= 1.5) continue;
 			let signal = Math.pow(1 - ratio / 1.5, 2);
 			if (signal > 0.001) {
-				const crossings = countWallCrossings(
+				const wallLoss = computeWallAttenuation(
 					{ data, width, height },
+					matData,
+					WALL_MATERIALS,
+					defaultDb,
 					ap.x,
 					ap.y,
 					sample.x,
 					sample.y
 				);
-				if (crossings > 0) signal *= Math.pow(10, (-crossings * attenuation) / 20);
+				if (wallLoss > 0) signal *= Math.pow(10, -wallLoss / 20);
 			}
 			if (signal > best) best = signal;
 		}

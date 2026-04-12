@@ -1,24 +1,33 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { DecodedWallMask } from '../wall-detect.js';
-
-const WALL_COLOR = [200, 200, 210]; // drywall gray
+import { WALL_MATERIALS, type WallMaterialId } from '../materials.js';
 
 export class WallLayer implements Layer {
 	id = 'walls';
 	visible = true;
 	mask: DecodedWallMask | null = null;
+	materialMap: Uint8Array | null = null;
+	defaultMaterial: WallMaterialId = 0;
 
 	private cachedImage: HTMLCanvasElement | null = null;
 	private cachedMaskRef: Uint8Array | null = null;
+	private cachedMatRef: Uint8Array | null = null;
+	private cachedDefaultMat: WallMaterialId = 0;
 
 	render(rc: RenderContext): void {
 		if (!this.mask) return;
 		const { camera, width, height } = rc;
 
-		// Cache the colorized mask image (only regenerate when mask data changes)
-		if (this.mask.data !== this.cachedMaskRef) {
-			this.cachedImage = colorize(this.mask);
+		const needsRegen =
+			this.mask.data !== this.cachedMaskRef ||
+			this.materialMap !== this.cachedMatRef ||
+			this.defaultMaterial !== this.cachedDefaultMat;
+
+		if (needsRegen) {
+			this.cachedImage = colorize(this.mask, this.materialMap, this.defaultMaterial);
 			this.cachedMaskRef = this.mask.data;
+			this.cachedMatRef = this.materialMap;
+			this.cachedDefaultMat = this.defaultMaterial;
 		}
 
 		const transform = camera.getTransform();
@@ -34,18 +43,26 @@ export class WallLayer implements Layer {
 	}
 }
 
-function colorize(mask: DecodedWallMask): HTMLCanvasElement {
+function colorize(
+	mask: DecodedWallMask,
+	materialMap: Uint8Array | null,
+	defaultMaterial: WallMaterialId
+): HTMLCanvasElement {
 	const canvas = document.createElement('canvas');
 	canvas.width = mask.width;
 	canvas.height = mask.height;
 	const ctx = canvas.getContext('2d')!;
 	const imgData = ctx.createImageData(mask.width, mask.height);
+	const defaultColor = WALL_MATERIALS[defaultMaterial]?.color ?? WALL_MATERIALS[0]!.color;
+
 	for (let i = 0; i < mask.data.length; i++) {
 		if (mask.data[i]) {
 			const j = i * 4;
-			imgData.data[j] = WALL_COLOR[0]!;
-			imgData.data[j + 1] = WALL_COLOR[1]!;
-			imgData.data[j + 2] = WALL_COLOR[2]!;
+			const matId = materialMap ? materialMap[i]! : defaultMaterial;
+			const color = WALL_MATERIALS[matId]?.color ?? defaultColor;
+			imgData.data[j] = color[0];
+			imgData.data[j + 1] = color[1];
+			imgData.data[j + 2] = color[2];
 			imgData.data[j + 3] = 255;
 		}
 	}

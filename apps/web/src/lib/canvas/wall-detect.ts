@@ -184,7 +184,49 @@ export function countWallCrossings(
 	x1: number,
 	y1: number
 ): number {
-	const { data, width, height } = mask;
+	return bresenhamRayMarch(mask.data, mask.width, mask.height, x0, y0, x1, y1, null, null);
+}
+
+/** Compute total wall attenuation (dB) along a ray, using per-pixel material IDs.
+ *  Falls back to defaultAttenuation when no material mask is provided. */
+export function computeWallAttenuation(
+	mask: DecodedWallMask,
+	materialMap: Uint8Array | null,
+	materialDb: readonly { attenuation: number }[],
+	defaultAttenuation: number,
+	x0: number,
+	y0: number,
+	x1: number,
+	y1: number
+): number {
+	return bresenhamRayMarch(
+		mask.data,
+		mask.width,
+		mask.height,
+		x0,
+		y0,
+		x1,
+		y1,
+		materialMap,
+		materialDb.length > 0 ? materialDb : null,
+		defaultAttenuation
+	);
+}
+
+/** Shared Bresenham ray march. When materialDb is null, counts crossings.
+ *  When materialDb is provided, returns total dB attenuation. */
+function bresenhamRayMarch(
+	data: Uint8Array,
+	width: number,
+	height: number,
+	x0: number,
+	y0: number,
+	x1: number,
+	y1: number,
+	materialMap: Uint8Array | null,
+	materialDb: readonly { attenuation: number }[] | null,
+	defaultAttenuation = 5
+): number {
 	let ix0 = Math.round(x0),
 		iy0 = Math.round(y0);
 	const ix1 = Math.round(x1),
@@ -196,13 +238,23 @@ export function countWallCrossings(
 	const sy = iy0 < iy1 ? 1 : -1;
 	let err = dx - dy;
 
-	let crossings = 0;
+	let total = 0;
 	let wasWall = false;
 
 	while (true) {
 		if (ix0 >= 0 && ix0 < width && iy0 >= 0 && iy0 < height) {
-			const isWall = data[iy0 * width + ix0] === 1;
-			if (isWall && !wasWall) crossings++;
+			const idx = iy0 * width + ix0;
+			const isWall = data[idx] === 1;
+			if (isWall && !wasWall) {
+				if (materialDb && materialMap) {
+					const matId = materialMap[idx] ?? 0;
+					total += materialDb[matId]?.attenuation ?? defaultAttenuation;
+				} else if (materialDb) {
+					total += defaultAttenuation;
+				} else {
+					total += 1; // counting mode
+				}
+			}
 			wasWall = isWall;
 		} else {
 			wasWall = false;
@@ -221,7 +273,7 @@ export function countWallCrossings(
 		}
 	}
 
-	return crossings;
+	return total;
 }
 
 function filterSmallBlobs(binary: Uint8Array, w: number, h: number, minSize: number): void {
