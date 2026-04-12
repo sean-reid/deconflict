@@ -62,14 +62,66 @@ export class WallEditHandler {
 		this.painting = false;
 	}
 
+	/** Expand mask if brush reaches beyond current bounds */
+	private expandIfNeeded(cx: number, cy: number, r: number): void {
+		const margin = r + 50;
+		const needX = Math.max(cx + margin, this.maskWidth);
+		const needY = Math.max(cy + margin, this.maskHeight);
+		const needX0 = Math.min(cx - margin, 0);
+		const needY0 = Math.min(cy - margin, 0);
+
+		if (needX <= this.maskWidth && needY <= this.maskHeight && needX0 >= 0 && needY0 >= 0) return;
+
+		const oldW = this.maskWidth;
+		const oldH = this.maskHeight;
+		const offX = needX0 < 0 ? -needX0 : 0;
+		const offY = needY0 < 0 ? -needY0 : 0;
+		const newW = Math.max(needX, oldW + offX);
+		const newH = Math.max(needY, oldH + offY);
+
+		// Expand wall data
+		if (this.wallData) {
+			const newWall = new Uint8Array(newW * newH);
+			for (let y = 0; y < oldH; y++) {
+				for (let x = 0; x < oldW; x++) {
+					newWall[(y + offY) * newW + (x + offX)] = this.wallData[y * oldW + x]!;
+				}
+			}
+			this.wallData = newWall;
+		}
+
+		// Expand material data
+		if (this.materialData) {
+			const newMat = new Uint8Array(newW * newH);
+			newMat.fill(this.defaultMaterial);
+			for (let y = 0; y < oldH; y++) {
+				for (let x = 0; x < oldW; x++) {
+					newMat[(y + offY) * newW + (x + offX)] = this.materialData[y * oldW + x]!;
+				}
+			}
+			this.materialData = newMat;
+		}
+
+		this.maskWidth = newW;
+		this.maskHeight = newH;
+	}
+
 	private paintAt(wx: number, wy: number): void {
-		const { wallData, maskWidth: w, maskHeight: h } = this;
-		if (!wallData) return;
+		if (!this.wallData) return;
 
 		const r = appState.wallBrushSize;
 		const cx = Math.round(wx);
 		const cy = Math.round(wy);
 		const mode = appState.wallEditMode;
+
+		// Expand mask if drawing near or beyond edges
+		if (mode === 'draw') {
+			this.expandIfNeeded(cx, cy, r);
+		}
+
+		const w = this.maskWidth;
+		const h = this.maskHeight;
+		const wallData = this.wallData;
 
 		const xlo = Math.max(0, cx - r);
 		const xhi = Math.min(w - 1, cx + r);

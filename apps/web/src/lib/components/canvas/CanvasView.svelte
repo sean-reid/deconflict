@@ -43,9 +43,10 @@
 		if (wallEditHandler.materialData && !cachedMaterialData) {
 			cachedMaterialData = wallEditHandler.materialData;
 		}
-		// Re-encode edited masks and persist
-		if (cachedWallData && projectState.wallMask) {
-			const { width, height } = projectState.wallMask;
+		// Re-encode edited masks and persist (use handler dimensions which may have expanded)
+		if (cachedWallData) {
+			const width = wallEditHandler.maskWidth || projectState.wallMask?.width || 800;
+			const height = wallEditHandler.maskHeight || projectState.wallMask?.height || 600;
 			const newWallUrl = encodeMask(cachedWallData, width, height);
 			const newMatUrl = cachedMaterialData ? encodeMaterialMask(cachedMaterialData, width, height) : null;
 
@@ -238,10 +239,19 @@
 		wallEditHandler = new WallEditHandler(engine);
 		wallEditHandler.onEdit = () => {
 			// Sync handler's data to renderers for live preview
-			wallLayer.invalidateCache();
+			// The handler may have expanded the mask, so update dimensions + data refs
+			if (wallEditHandler.wallData) {
+				wallLayer.mask = {
+					data: wallEditHandler.wallData,
+					width: wallEditHandler.maskWidth,
+					height: wallEditHandler.maskHeight
+				};
+				cachedWallData = wallEditHandler.wallData;
+			}
 			if (wallEditHandler.materialData) {
 				wallLayer.materialMap = wallEditHandler.materialData;
 			}
+			wallLayer.invalidateCache();
 			engine.markDirty();
 		};
 
