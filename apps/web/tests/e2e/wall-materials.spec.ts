@@ -6,62 +6,100 @@ test.describe('Wall materials', () => {
 		await setupCleanState(page);
 		await page.goto('/');
 		await page.waitForSelector('canvas');
-	});
-
-	test('Wall Type dropdown appears after loading a floorplan', async ({ page }) => {
+		// Load apartment floorplan for all tests
 		await page.getByRole('tab', { name: 'Floorplan' }).click();
 		await page.waitForTimeout(300);
-
-		// No Wall Type dropdown before loading floorplan
-		await expect(page.locator('.material-section')).not.toBeVisible();
-
-		// Load apartment sample
 		await page.getByText('Apartment (48sqm)').click();
 		await page.waitForTimeout(6000);
+	});
 
-		// Wall Type dropdown should now be visible
+	test('material list appears with 6 options after floorplan load', async ({ page }) => {
 		await expect(page.locator('.material-section')).toBeVisible();
-		await expect(page.locator('.material-label')).toContainText('Wall Type');
+		await expect(page.locator('.material-option')).toHaveCount(6);
+		await expect(page.locator('.material-option.active')).toContainText('Drywall');
 	});
 
-	test('changing wall type updates wall colors', async ({ page }) => {
+	test('switching material changes active state', async ({ page }) => {
+		await page.locator('.material-option:has-text("Brick")').click();
+		await expect(page.locator('.material-option.active')).toContainText('Brick');
+
+		await page.locator('.material-option:has-text("Glass")').click();
+		await expect(page.locator('.material-option.active')).toContainText('Glass');
+	});
+
+	test('wall color persists after placing an AP', async ({ page }) => {
+		// Switch to Brick
+		await page.locator('.material-option:has-text("Brick")').click();
+		await page.waitForTimeout(300);
+		await page.screenshot({ path: 'test-results/wall-materials/brick-before-ap.png' });
+
+		// Place an AP
+		const canvas = page.locator('canvas');
+		await canvas.click({ position: { x: 400, y: 300 } });
+		await page.waitForTimeout(1000);
+		await page.screenshot({ path: 'test-results/wall-materials/brick-after-ap.png' });
+
+		// Material should still be Brick in sidebar
 		await page.getByRole('tab', { name: 'Floorplan' }).click();
 		await page.waitForTimeout(300);
-		await page.getByText('Apartment (48sqm)').click();
-		await page.waitForTimeout(6000);
+		await expect(page.locator('.material-option.active')).toContainText('Brick');
+	});
 
-		// Default is Drywall (active)
-		await expect(page.locator('.material-option.active')).toContainText('Drywall');
-
-		// Click Concrete
+	test('wall color persists after placing multiple APs', async ({ page }) => {
+		// Switch to Concrete
 		await page.locator('.material-option:has-text("Concrete")').click();
-		await page.waitForTimeout(500);
+		await page.waitForTimeout(300);
+		await page.screenshot({ path: 'test-results/wall-materials/concrete-before-aps.png' });
 
-		// Concrete should now be active
+		// Place 3 APs
+		const canvas = page.locator('canvas');
+		await canvas.click({ position: { x: 200, y: 200 } });
+		await canvas.click({ position: { x: 400, y: 200 } });
+		await canvas.click({ position: { x: 300, y: 350 } });
+		await page.waitForTimeout(1500);
+		await page.screenshot({ path: 'test-results/wall-materials/concrete-after-aps.png' });
+
+		// Switch back to Floorplan tab and verify material still Concrete
+		await page.getByRole('tab', { name: 'Floorplan' }).click();
+		await page.waitForTimeout(300);
 		await expect(page.locator('.material-option.active')).toContainText('Concrete');
 	});
 
-	test('clicking a wall shows material popup', async ({ page }) => {
+	test('switching material after placing APs updates walls', async ({ page }) => {
+		// Place APs first
+		const canvas = page.locator('canvas');
+		await canvas.click({ position: { x: 300, y: 250 } });
+		await canvas.click({ position: { x: 500, y: 250 } });
+		await page.waitForTimeout(1000);
+
+		// Switch to Floorplan tab and change material
 		await page.getByRole('tab', { name: 'Floorplan' }).click();
 		await page.waitForTimeout(300);
-		await page.getByText('Apartment (48sqm)').click();
-		await page.waitForTimeout(6000);
+		await page.screenshot({ path: 'test-results/wall-materials/drywall-with-aps.png' });
 
-		// Click on a wall pixel (top-left area of the apartment where outer wall is)
+		await page.locator('.material-option:has-text("Metal")').click();
+		await page.waitForTimeout(500);
+		await page.screenshot({ path: 'test-results/wall-materials/metal-with-aps.png' });
+
+		await expect(page.locator('.material-option.active')).toContainText('Metal');
+	});
+
+	test('clicking wall shows popup, selecting material overrides blob', async ({ page }) => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 100, y: 120 } });
 		await page.waitForTimeout(300);
 
-		// Material popup should appear with 6 options
 		const popup = page.locator('.popup');
 		if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
 			await expect(popup.locator('.material-row')).toHaveCount(6);
-			await expect(popup).toContainText('Drywall');
-			await expect(popup).toContainText('Concrete');
 
-			// Close popup
-			await page.keyboard.press('Escape');
+			// Select Glass for this wall blob
+			await popup.locator('.material-row:has-text("Glass")').click();
+			await page.waitForTimeout(500);
+
+			// Popup should close
 			await expect(popup).not.toBeVisible();
+			await page.screenshot({ path: 'test-results/wall-materials/blob-override-glass.png' });
 		}
 	});
 });
