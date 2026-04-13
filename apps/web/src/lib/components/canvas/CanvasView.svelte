@@ -846,6 +846,7 @@
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
+		onpointerleave={() => { brushCursorVisible = false; }}
 		ontouchstart={handleTouchStart}
 		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}
