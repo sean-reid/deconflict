@@ -25,8 +25,10 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 
 	isDragging = false;
-	/** Clip heatmap to floorplan image bounds (world coords). null = no clipping. */
+	/** Clip heatmap to floorplan/mask bounds (world coords). null = no clipping. */
 	floorplanBounds: { width: number; height: number } | null = null;
+	/** Wall mask dimensions — used for clipping when no floorplan image. Set immediately (no async decode). */
+	wallMaskBounds: { width: number; height: number } | null = null;
 
 	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
@@ -150,7 +152,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? 0}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -209,8 +211,8 @@ export class HeatmapLayer implements Layer {
 			fast: this.isDragging,
 			clipBounds: this.floorplanBounds
 				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
-				: this.wallMask
-					? { x: 0, y: 0, w: this.wallMask.width, h: this.wallMask.height }
+				: this.wallMaskBounds
+					? { x: 0, y: 0, w: this.wallMaskBounds.width, h: this.wallMaskBounds.height }
 					: null,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,

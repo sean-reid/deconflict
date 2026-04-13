@@ -366,6 +366,15 @@
 		}
 	});
 
+	// Sync wall mask dimensions for heatmap clipping (synchronous, no decode needed)
+	$effect(() => {
+		if (!heatmapLayer) return;
+		const mask = wallState.wallMask;
+		heatmapLayer.wallMaskBounds = mask ? { width: mask.width, height: mask.height } : null;
+		heatmapLayer.invalidateCache();
+		engine.markDirty();
+	});
+
 	// Sync wall material to renderers — only tracks wallState.wallMaterial
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
