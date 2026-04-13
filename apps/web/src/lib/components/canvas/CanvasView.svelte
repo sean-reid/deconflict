@@ -65,7 +65,7 @@
 			cachedWallLabels = labelWallBlobs(cachedWallData, width, height);
 
 			wallLayer.invalidateCache();
-			heatmapLayer.invalidateCache();
+			heatmapLayer.markWallsDirty();
 			heatmapLayer.materialVersion++;
 			engine.markDirty();
 			scheduleSave();
@@ -253,7 +253,7 @@
 				heatmapLayer.materialVersion++;
 			}
 			wallLayer.invalidateCache();
-			heatmapLayer.invalidateCache();
+			heatmapLayer.markWallsDirty();
 			engine.markDirty();
 		};
 
@@ -262,7 +262,6 @@
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
 				engine.resize(width, height);
-				if (heatmapLayer) heatmapLayer.clearCache();
 			}
 		});
 		observer.observe(containerEl);
@@ -356,15 +355,11 @@
 		engine.markDirty();
 	});
 
-	// Adaptive heatmap quality: coarse during drag, full on drop
+	// Sync drag state for adaptive quality (coarser walls during drag)
 	$effect(() => {
 		if (!heatmapLayer) return;
-		const dragging = canvasState.isDragging;
-		heatmapLayer.isDragging = dragging;
-		if (!dragging) {
-			heatmapLayer.notifyDragEnd();
-			engine.markDirty();
-		}
+		heatmapLayer.isDragging = canvasState.isDragging;
+		engine.markDirty();
 	});
 
 	// Sync wall mask dimensions for heatmap clipping (synchronous, no decode needed)
@@ -372,7 +367,7 @@
 		if (!heatmapLayer) return;
 		const mask = wallState.wallMask;
 		heatmapLayer.wallMaskBounds = mask ? { width: mask.width, height: mask.height } : null;
-		heatmapLayer.clearCache();
+		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 	});
 
@@ -384,7 +379,7 @@
 		wallLayer.invalidateCache();
 		heatmapLayer.defaultMaterial = id;
 		heatmapLayer.materialVersion++;
-		heatmapLayer.invalidateCache();
+		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 	});
 

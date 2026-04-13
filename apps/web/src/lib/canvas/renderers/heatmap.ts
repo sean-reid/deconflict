@@ -1,17 +1,17 @@
 import type { Layer, RenderContext } from '../types.js';
-import type { AccessPoint } from '$state/project.svelte.js';
+import type { AccessPoint } from '$state/ap-state.svelte.js';
 import type { DecodedWallMask } from '../wall-detect.js';
 import type { WallMaterialId } from '../materials.js';
 import { WALL_MATERIALS } from '../materials.js';
 
 /**
- * Heatmap layer — delegates computation to a Web Worker.
+ * Heatmap layer — renders signal coverage via Web Worker.
  *
- * Uses a pipeline model: at most one render request in-flight.
- * When the worker finishes, if the state has changed, it immediately
- * sends the next request with the latest data. This prevents request
- * queueing (which causes lag during drag) while keeping the heatmap
- * as fresh as the worker can compute.
+ * Simple model:
+ *  - Compute a state fingerprint each frame
+ *  - If it differs from the last request sent, and no request is in-flight, send one
+ *  - When a result arrives, store it and check if state changed; if so, send again
+ *  - Always composite whatever cached frame we have (never null it out)
  */
 export class HeatmapLayer implements Layer {
 	id = 'heatmap';
@@ -23,48 +23,25 @@ export class HeatmapLayer implements Layer {
 	materialMap: Uint8Array | null = null;
 	materialVersion = 0;
 	defaultMaterial: WallMaterialId = 0;
-
 	isDragging = false;
-	/** Clip heatmap to floorplan/mask bounds (world coords). null = no clipping. */
 	floorplanBounds: { width: number; height: number } | null = null;
-	/** Wall mask dimensions — used for clipping when no floorplan image. Set immediately (no async decode). */
 	wallMaskBounds: { width: number; height: number } | null = null;
 
 	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
-	private cacheKey = '';
-	private lastWallVersion = -1;
-	private lastDefaultMaterial: WallMaterialId = -1 as WallMaterialId;
-	private renderDirty: (() => void) | null = null;
-
-	// Pipeline state: at most one request in-flight
-	private pendingId = 0;
+	private sentKey = '';
+	private requestId = 0;
 	private inFlight = false;
-	private needsUpdate = false;
-	private lastCamera: { getInverseTransform: () => number[] } | null = null;
-	private lastWidth = 0;
-	private lastHeight = 0;
+	private wallsDirty = true;
+	private renderDirty: (() => void) | null = null;
 
 	setDirtyCallback(fn: () => void): void {
 		this.renderDirty = fn;
 	}
 
-	/** Soft invalidate: trigger re-render but keep the old frame visible until the new one arrives. */
-	invalidateCache(): void {
-		this.cacheKey = '';
-		this.lastWallVersion = -1;
-	}
-
-	/** Hard invalidate: clear the cached frame immediately (use when clip bounds change). */
-	clearCache(): void {
-		this.cacheKey = '';
-		this.cache = null;
-		this.lastWallVersion = -1;
-	}
-
-	/** Force a full-quality re-render (call on drag end). */
-	notifyDragEnd(): void {
-		this.cacheKey = '';
+	/** Mark walls as changed so they're re-sent to the worker. */
+	markWallsDirty(): void {
+		this.wallsDirty = true;
 	}
 
 	private getWorker(): Worker {
@@ -73,56 +50,33 @@ export class HeatmapLayer implements Layer {
 				type: 'module'
 			});
 			this.worker.onmessage = (e: MessageEvent) => {
-				if (e.data.type === 'result' && e.data.id === this.pendingId) {
-					const { buf, width, height } = e.data as {
-						buf: ArrayBuffer;
-						width: number;
-						height: number;
-					};
+				const { type, id, buf, width, height } = e.data;
+				if (type !== 'result' || id !== this.requestId) return;
 
-					// Validate buffer matches declared dimensions (race during resize/toggle)
-					const w = width | 0;
-					const h = height | 0;
-					const expected = w * h * 4;
-					if (!buf || !expected || buf.byteLength !== expected) {
-						// Stale result — discard but still process queued requests
-						this.inFlight = false;
-						if (this.needsUpdate && this.lastCamera) {
-							this.needsUpdate = false;
-							this.sendRender(this.lastWidth, this.lastHeight, this.lastCamera);
-						}
-						return;
-					}
+				this.inFlight = false;
 
+				// Create cache from result (skip if dimensions don't match buffer)
+				const w = width | 0;
+				const h = height | 0;
+				if (buf && buf.byteLength === w * h * 4 && w > 0 && h > 0) {
 					const offscreen = document.createElement('canvas');
 					offscreen.width = w;
 					offscreen.height = h;
 					const ctx = offscreen.getContext('2d')!;
-					const imgData = new ImageData(new Uint8ClampedArray(buf), w, h);
-					ctx.putImageData(imgData, 0, 0);
+					ctx.putImageData(new ImageData(new Uint8ClampedArray(buf), w, h), 0, 0);
 					this.cache = offscreen;
-
-					// Pipeline: request completed. If state changed, send next immediately.
-					this.inFlight = false;
-					if (this.needsUpdate && this.lastCamera) {
-						this.needsUpdate = false;
-						this.sendRender(this.lastWidth, this.lastHeight, this.lastCamera);
-					}
-
-					this.renderDirty?.();
 				}
+
+				// State may have changed while computing — check and re-send
+				this.renderDirty?.();
 			};
 		}
 		return this.worker;
 	}
 
 	private syncWalls(): void {
-		const wallVer = (this.wallMask ? 1 : 0) * 1000 + this.materialVersion + this.defaultMaterial;
-		if (wallVer === this.lastWallVersion && this.lastDefaultMaterial === this.defaultMaterial) {
-			return;
-		}
-		this.lastWallVersion = wallVer;
-		this.lastDefaultMaterial = this.defaultMaterial;
+		if (!this.wallsDirty) return;
+		this.wallsDirty = false;
 
 		const worker = this.getWorker();
 		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
@@ -156,10 +110,10 @@ export class HeatmapLayer implements Layer {
 		}
 	}
 
-	private getCacheKey(
-		camera: { state: { zoom: number; x: number; y: number } },
+	private fingerprint(
 		width: number,
-		height: number
+		height: number,
+		camera: { state: { zoom: number; x: number; y: number } }
 	): string {
 		return (
 			this.aps
@@ -168,7 +122,8 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? this.wallMask?.width ?? 0}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
+			`|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? this.wallMask?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -179,63 +134,46 @@ export class HeatmapLayer implements Layer {
 
 		const { camera, width, height } = rc;
 		if (width <= 0 || height <= 0) return;
-		const key = this.getCacheKey(camera, width, height);
 
-		if (key !== this.cacheKey) {
-			this.cacheKey = key;
-			this.lastCamera = camera;
-			this.lastWidth = width;
-			this.lastHeight = height;
+		// Send a new request if state changed and worker is free
+		const key = this.fingerprint(width, height, camera);
+		if (key !== this.sentKey && !this.inFlight) {
+			this.sentKey = key;
+			this.syncWalls();
+			this.inFlight = true;
 
-			if (!this.inFlight) {
-				this.sendRender(width, height, camera);
-			} else {
-				this.needsUpdate = true;
-			}
-		} else if (!this.cache && !this.inFlight) {
-			// Recovery: cache was cleared (resize) but no render in-flight. Retry.
-			this.sendRender(width, height, camera);
-		}
-
-		if (this.cache) {
-			rc.compositeOffscreen(this.cache);
-		}
-	}
-
-	private sendRender(
-		width: number,
-		height: number,
-		camera: { getInverseTransform: () => number[] }
-	): void {
-		this.syncWalls();
-		this.inFlight = true;
-
-		const id = ++this.pendingId;
-		const inv = camera.getInverseTransform();
-		const aps = this.aps.map((ap) => ({
-			x: ap.x,
-			y: ap.y,
-			interferenceRadius: ap.interferenceRadius,
-			band: ap.band,
-			channelWidth: ap.channelWidth
-		}));
-
-		this.getWorker().postMessage({
-			type: 'render',
-			id,
-			aps,
-			ispSpeed: this.ispSpeed,
-			fast: this.isDragging,
-			clipBounds: this.floorplanBounds
+			const id = ++this.requestId;
+			const inv = camera.getInverseTransform();
+			const clipBounds = this.floorplanBounds
 				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
 				: this.wallMaskBounds
 					? { x: 0, y: 0, w: this.wallMaskBounds.width, h: this.wallMaskBounds.height }
 					: this.wallMask
 						? { x: 0, y: 0, w: this.wallMask.width, h: this.wallMask.height }
-						: null,
-			cameraInverse: Array.from(inv),
-			viewWidth: width,
-			viewHeight: height
-		});
+						: null;
+
+			this.getWorker().postMessage({
+				type: 'render',
+				id,
+				aps: this.aps.map((ap) => ({
+					x: ap.x,
+					y: ap.y,
+					interferenceRadius: ap.interferenceRadius,
+					band: ap.band,
+					channelWidth: ap.channelWidth
+				})),
+				ispSpeed: this.ispSpeed,
+				fast: this.isDragging,
+				clipBounds,
+				cameraInverse: Array.from(inv),
+				viewWidth: width,
+				viewHeight: height
+			});
+		}
+
+		// Always composite whatever we have
+		if (this.cache) {
+			rc.compositeOffscreen(this.cache);
+		}
 	}
 }
