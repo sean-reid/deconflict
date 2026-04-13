@@ -5,11 +5,13 @@ import type { WallMaterialId } from '../materials.js';
 import { WALL_MATERIALS } from '../materials.js';
 
 /**
- * Heatmap layer — delegates computation to a Web Worker so the main thread
- * stays responsive during drag, zoom, and AP property edits.
+ * Heatmap layer — delegates computation to a Web Worker.
  *
- * The worker receives AP positions, camera transform, and wall data, and
- * returns a pixel buffer. The main thread composites the result.
+ * Uses a pipeline model: at most one render request in-flight.
+ * When the worker finishes, if the state has changed, it immediately
+ * sends the next request with the latest data. This prevents request
+ * queueing (which causes lag during drag) while keeping the heatmap
+ * as fresh as the worker can compute.
  */
 export class HeatmapLayer implements Layer {
 	id = 'heatmap';
@@ -22,23 +24,33 @@ export class HeatmapLayer implements Layer {
 	materialVersion = 0;
 	defaultMaterial: WallMaterialId = 0;
 
+	isDragging = false;
+
 	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
-	private pendingId = 0;
 	private lastWallVersion = -1;
-	private lastMaterialVersion = -1;
 	private lastDefaultMaterial: WallMaterialId = -1 as WallMaterialId;
 	private renderDirty: (() => void) | null = null;
-	isDragging = false;
-	private dragEndTimer: ReturnType<typeof setTimeout> | null = null;
 
-	/** Provide a callback so the worker result can trigger a canvas repaint. */
+	// Pipeline state: at most one request in-flight
+	private pendingId = 0;
+	private inFlight = false;
+	private needsUpdate = false;
+	private lastCamera: { getInverseTransform: () => number[] } | null = null;
+	private lastWidth = 0;
+	private lastHeight = 0;
+
 	setDirtyCallback(fn: () => void): void {
 		this.renderDirty = fn;
 	}
 
 	invalidateCache(): void {
+		this.cacheKey = '';
+	}
+
+	/** Force a full-quality re-render (call on drag end). */
+	notifyDragEnd(): void {
 		this.cacheKey = '';
 	}
 
@@ -61,6 +73,14 @@ export class HeatmapLayer implements Layer {
 					const imgData = new ImageData(new Uint8ClampedArray(buf), width, height);
 					ctx.putImageData(imgData, 0, 0);
 					this.cache = offscreen;
+
+					// Pipeline: request completed. If state changed, send next immediately.
+					this.inFlight = false;
+					if (this.needsUpdate && this.lastCamera) {
+						this.needsUpdate = false;
+						this.sendRender(this.lastWidth, this.lastHeight, this.lastCamera);
+					}
+
 					this.renderDirty?.();
 				}
 			};
@@ -134,9 +154,17 @@ export class HeatmapLayer implements Layer {
 
 		if (key !== this.cacheKey) {
 			this.cacheKey = key;
-			// During drag: skip walls for instant feedback (~3ms).
-			// On drag end: re-render with walls for accuracy.
-			this.requestRender(width, height, camera, this.isDragging);
+			this.lastCamera = camera;
+			this.lastWidth = width;
+			this.lastHeight = height;
+
+			if (!this.inFlight) {
+				// No request pending — send immediately
+				this.sendRender(width, height, camera);
+			} else {
+				// Request in-flight — mark for update when it completes
+				this.needsUpdate = true;
+			}
 		}
 
 		if (this.cache) {
@@ -144,18 +172,13 @@ export class HeatmapLayer implements Layer {
 		}
 	}
 
-	/** Call when drag state changes to schedule a full re-render on drop. */
-	notifyDragEnd(): void {
-		this.cacheKey = ''; // force re-render with walls
-	}
-
-	private requestRender(
+	private sendRender(
 		width: number,
 		height: number,
-		camera: { getInverseTransform: () => number[] },
-		skipWalls = false
+		camera: { getInverseTransform: () => number[] }
 	): void {
-		if (!skipWalls) this.syncWalls();
+		this.syncWalls();
+		this.inFlight = true;
 
 		const id = ++this.pendingId;
 		const inv = camera.getInverseTransform();
@@ -172,7 +195,7 @@ export class HeatmapLayer implements Layer {
 			id,
 			aps,
 			ispSpeed: this.ispSpeed,
-			skipWalls,
+			fast: this.isDragging,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,
 			viewHeight: height

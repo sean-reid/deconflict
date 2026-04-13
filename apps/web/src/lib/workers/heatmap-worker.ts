@@ -80,7 +80,7 @@ interface RenderMsg {
 	id: number;
 	aps: ApData[];
 	ispSpeed: number;
-	skipWalls?: boolean;
+	fast?: boolean; // coarser wall grid for drag responsiveness
 	cameraInverse: number[];
 	viewWidth: number;
 	viewHeight: number;
@@ -115,7 +115,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 			id,
 			aps,
 			ispSpeed,
-			skipWalls,
+			fast,
 			cameraInverse: inv,
 			viewWidth: width,
 			viewHeight: height
@@ -149,7 +149,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 			apCutSq[i] = rSq * MAX_RATIO_SQ;
 			apBase[i] = getBaseRate(ap.band, ap.channelWidth) * 0.5;
 			attenFields.push(
-				wallData && !skipWalls
+				wallData
 					? getAttenField(
 							ap.x,
 							ap.y,
@@ -159,7 +159,8 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 							wallH,
 							materialMap,
 							materialDb,
-							defaultDb
+							defaultDb,
+							!!fast
 						)
 					: null
 			);

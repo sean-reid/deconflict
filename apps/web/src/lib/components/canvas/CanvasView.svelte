@@ -356,7 +356,7 @@
 		engine.markDirty();
 	});
 
-	// During drag: skip walls for instant heatmap. On drop: full re-render.
+	// Adaptive heatmap quality: coarse during drag, full on drop
 	$effect(() => {
 		if (!heatmapLayer) return;
 		const dragging = canvasState.isDragging;

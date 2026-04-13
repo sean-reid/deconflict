@@ -134,12 +134,12 @@ export interface AttenField {
 	grid: Float32Array;
 	cols: number;
 	rows: number;
+	step: number; // grid spacing used when this field was built
 }
 
 /**
  * Precompute a coarse attenuation field from an AP position.
- * One DDA ray march per grid point. Only computes within `maxDist` of the AP.
- * Subsequent lookups are O(1).
+ * `gridStep` controls resolution: 6 = accurate, 12 = fast (for drag).
  */
 export function buildAttenField(
 	apX: number,
@@ -150,18 +150,18 @@ export function buildAttenField(
 	wallH: number,
 	materialMap: Uint8Array | null,
 	materialDb: number[],
-	defaultDb: number
+	defaultDb: number,
+	gridStep = ATTEN_GRID_STEP
 ): AttenField {
-	const step = ATTEN_GRID_STEP;
-	const cols = Math.ceil(wallW / step);
-	const rows = Math.ceil(wallH / step);
+	const cols = Math.ceil(wallW / gridStep);
+	const rows = Math.ceil(wallH / gridStep);
 	const grid = new Float32Array(cols * rows);
 	const maxDistSq = maxDist * maxDist;
 
 	for (let r = 0; r < rows; r++) {
-		const wy = r * step + (step >> 1);
+		const wy = r * gridStep + (gridStep >> 1);
 		for (let c = 0; c < cols; c++) {
-			const wx = c * step + (step >> 1);
+			const wx = c * gridStep + (gridStep >> 1);
 			const dx = wx - apX;
 			const dy = wy - apY;
 			if (dx * dx + dy * dy > maxDistSq) continue;
@@ -180,14 +180,14 @@ export function buildAttenField(
 		}
 	}
 
-	return { grid, cols, rows };
+	return { grid, cols, rows, step: gridStep };
 }
 
 /** O(1) wall attenuation lookup from a precomputed field. */
 export function lookupAtten(field: AttenField, wx: number, wy: number): number {
-	const step = ATTEN_GRID_STEP;
-	const gc = (wx / step + 0.5) | 0;
-	const gr = (wy / step + 0.5) | 0;
+	const s = field.step;
+	const gc = (wx / s + 0.5) | 0;
+	const gr = (wy / s + 0.5) | 0;
 	if (gc < 0 || gc >= field.cols || gr < 0 || gr >= field.rows) return 0;
 	return field.grid[gr * field.cols + gc]!;
 }
@@ -205,7 +205,8 @@ export function invalidateAttenCache(): void {
 
 /**
  * Get or build a cached attenuation field for an AP.
- * AP positions are quantized to a 4px grid to reuse fields during slow drags.
+ * `fast` mode: coarser grid (12px) + bigger quantization (12px) for drag responsiveness.
+ * `full` mode: fine grid (6px) + small quantization (4px) for accuracy when placed.
  */
 export function getAttenField(
 	apX: number,
@@ -216,19 +217,22 @@ export function getAttenField(
 	wallH: number,
 	materialMap: Uint8Array | null,
 	materialDb: number[],
-	defaultDb: number
+	defaultDb: number,
+	fast = false
 ): AttenField {
 	if (cachedGeneration !== wallGeneration) {
 		attenCache.clear();
 		cachedGeneration = wallGeneration;
 	}
 
-	const qx = (apX / 4) | 0;
-	const qy = (apY / 4) | 0;
-	const key = `${qx}:${qy}:${(radius / 4) | 0}`;
+	const q = fast ? 12 : 4;
+	const qx = (apX / q) | 0;
+	const qy = (apY / q) | 0;
+	const key = `${fast ? 'f' : 'a'}:${qx}:${qy}:${(radius / 4) | 0}`;
 
 	let field = attenCache.get(key);
 	if (!field) {
+		const gridStep = fast ? 12 : ATTEN_GRID_STEP;
 		field = buildAttenField(
 			apX,
 			apY,
@@ -238,7 +242,8 @@ export function getAttenField(
 			wallH,
 			materialMap,
 			materialDb,
-			defaultDb
+			defaultDb,
+			gridStep
 		);
 		attenCache.set(key, field);
 		if (attenCache.size > 10) {
