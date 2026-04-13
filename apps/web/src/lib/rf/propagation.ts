@@ -134,12 +134,15 @@ export interface AttenField {
 	grid: Float32Array;
 	cols: number;
 	rows: number;
-	step: number; // grid spacing used when this field was built
+	step: number;
+	originX: number; // world-space origin of the grid (may be negative)
+	originY: number;
 }
 
 /**
  * Precompute a coarse attenuation field from an AP position.
- * `gridStep` controls resolution: 6 = accurate, 12 = fast (for drag).
+ * Grid extends to cover the AP's full signal range (not just the mask bounds)
+ * so wall shadows project correctly beyond the mask boundary.
  */
 export function buildAttenField(
 	apX: number,
@@ -153,15 +156,17 @@ export function buildAttenField(
 	defaultDb: number,
 	gridStep = ATTEN_GRID_STEP
 ): AttenField {
+	const originX = 0;
+	const originY = 0;
 	const cols = Math.ceil(wallW / gridStep);
 	const rows = Math.ceil(wallH / gridStep);
 	const grid = new Float32Array(cols * rows);
 	const maxDistSq = maxDist * maxDist;
 
 	for (let r = 0; r < rows; r++) {
-		const wy = r * gridStep + (gridStep >> 1);
+		const wy = originY + r * gridStep + (gridStep >> 1);
 		for (let c = 0; c < cols; c++) {
-			const wx = c * gridStep + (gridStep >> 1);
+			const wx = originX + c * gridStep + (gridStep >> 1);
 			const dx = wx - apX;
 			const dy = wy - apY;
 			if (dx * dx + dy * dy > maxDistSq) continue;
@@ -180,14 +185,14 @@ export function buildAttenField(
 		}
 	}
 
-	return { grid, cols, rows, step: gridStep };
+	return { grid, cols, rows, step: gridStep, originX, originY };
 }
 
 /** O(1) wall attenuation lookup from a precomputed field. */
 export function lookupAtten(field: AttenField, wx: number, wy: number): number {
 	const s = field.step;
-	const gc = (wx / s + 0.5) | 0;
-	const gr = (wy / s + 0.5) | 0;
+	const gc = ((wx - field.originX) / s + 0.5) | 0;
+	const gr = ((wy - field.originY) / s + 0.5) | 0;
 	if (gc < 0 || gc >= field.cols || gr < 0 || gr >= field.rows) return 0;
 	return field.grid[gr * field.cols + gc]!;
 }
@@ -236,7 +241,7 @@ export function getAttenField(
 		field = buildAttenField(
 			apX,
 			apY,
-			radius * 2,
+			radius * 3,
 			wallData,
 			wallW,
 			wallH,

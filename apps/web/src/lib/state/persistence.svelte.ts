@@ -1,7 +1,11 @@
-import { projectState } from './project.svelte.js';
+import { apState, resetApNumbering } from './ap-state.svelte.js';
+import { floorplanState } from './floorplan-state.svelte.js';
+import { wallState } from './wall-state.svelte.js';
+import { projectMeta } from './project-meta.svelte.js';
 import { clearHistory } from './history.svelte.js';
-import type { AccessPoint } from './project.svelte.js';
+import type { AccessPoint } from './ap-state.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
+import type { WallMaterialId } from '$canvas/materials.js';
 
 const STORAGE_KEY = 'deconflict:project';
 const FLOORPLAN_KEY = 'deconflict:floorplan';
@@ -23,7 +27,7 @@ interface SavedState {
 	wallMaterial?: number;
 	materialMask?: { dataUrl: string; width: number; height: number } | null;
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
-	calibration: typeof projectState.calibration;
+	calibration: { worldUnitsPerMeter: number } | null;
 }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -33,26 +37,26 @@ function saveToStorage(): void {
 	try {
 		const data: SavedState = {
 			version: 2,
-			name: projectState.name,
-			band: projectState.band,
-			channelWidth: projectState.channelWidth,
-			regulatoryDomain: projectState.regulatoryDomain,
-			aps: JSON.parse(JSON.stringify(projectState.aps)),
-			unitSystem: projectState.unitSystem,
-			floorplanScale: projectState.floorplanScale,
-			ispSpeed: projectState.ispSpeed,
-			targetThroughput: projectState.targetThroughput,
-			wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
-			wallAttenuation: projectState.wallAttenuation,
-			wallMaterial: projectState.wallMaterial,
-			materialMask: projectState.materialMask
-				? JSON.parse(JSON.stringify(projectState.materialMask))
+			name: projectMeta.name,
+			band: apState.band,
+			channelWidth: apState.channelWidth,
+			regulatoryDomain: apState.regulatoryDomain,
+			aps: JSON.parse(JSON.stringify(apState.aps)),
+			unitSystem: floorplanState.unitSystem,
+			floorplanScale: floorplanState.floorplanScale,
+			ispSpeed: projectMeta.ispSpeed,
+			targetThroughput: projectMeta.targetThroughput,
+			wallMask: wallState.wallMask ? JSON.parse(JSON.stringify(wallState.wallMask)) : null,
+			wallAttenuation: wallState.wallAttenuation,
+			wallMaterial: wallState.wallMaterial,
+			materialMask: wallState.materialMask
+				? JSON.parse(JSON.stringify(wallState.materialMask))
 				: null,
-			floorplanBoundary: projectState.floorplanBoundary
-				? JSON.parse(JSON.stringify(projectState.floorplanBoundary))
+			floorplanBoundary: floorplanState.floorplanBoundary
+				? JSON.parse(JSON.stringify(floorplanState.floorplanBoundary))
 				: null,
-			calibration: projectState.calibration
-				? JSON.parse(JSON.stringify(projectState.calibration))
+			calibration: floorplanState.calibration
+				? JSON.parse(JSON.stringify(floorplanState.calibration))
 				: null
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -63,8 +67,7 @@ function saveToStorage(): void {
 
 	// Persist floorplan image as data URL (separate key to avoid main save bloat)
 	try {
-		if (projectState.floorplanUrl && projectState.floorplanUrl.startsWith('blob:')) {
-			// Convert blob URL to data URL for persistence
+		if (floorplanState.floorplanUrl && floorplanState.floorplanUrl.startsWith('blob:')) {
 			const canvas = document.createElement('canvas');
 			const img = new Image();
 			img.onload = () => {
@@ -79,7 +82,7 @@ function saveToStorage(): void {
 					// Image too large for localStorage
 				}
 			};
-			img.src = projectState.floorplanUrl;
+			img.src = floorplanState.floorplanUrl;
 		}
 	} catch {
 		// Ignore floorplan save errors
@@ -93,34 +96,36 @@ export function restoreFromStorage(): boolean {
 
 		const data: SavedState = JSON.parse(raw);
 		if (!data.version || data.version < 2) {
-			// Clear stale v1 data with potentially wrong wall coordinates
 			localStorage.removeItem(STORAGE_KEY);
 			localStorage.removeItem(FLOORPLAN_KEY);
 			return false;
 		}
 		if (!Array.isArray(data.aps)) return false;
 
-		projectState.name = data.name || 'Untitled Project';
-		projectState.band = data.band || '5ghz';
-		projectState.channelWidth = data.channelWidth || 20;
-		projectState.regulatoryDomain = data.regulatoryDomain || 'fcc';
-		projectState.aps = data.aps;
-		projectState.unitSystem = data.unitSystem ?? 'imperial';
-		projectState.floorplanScale = data.floorplanScale ?? 0.4;
-		projectState.ispSpeed = data.ispSpeed ?? 0;
-		projectState.targetThroughput = data.targetThroughput ?? 50;
-		projectState.wallMask = data.wallMask ?? null;
-		projectState.wallAttenuation = data.wallAttenuation ?? 5;
-		projectState.wallMaterial = (data.wallMaterial ??
-			0) as import('$canvas/materials.js').WallMaterialId;
-		projectState.materialMask = data.materialMask ?? null;
-		projectState.floorplanBoundary = data.floorplanBoundary ?? null;
-		projectState.calibration = data.calibration ?? null;
+		// Write directly to atoms (not through compat layer)
+		projectMeta.name = data.name || 'Untitled Project';
+		projectMeta.ispSpeed = data.ispSpeed ?? 0;
+		projectMeta.targetThroughput = data.targetThroughput ?? 50;
+
+		apState.band = data.band || '5ghz';
+		apState.channelWidth = data.channelWidth || 20;
+		apState.regulatoryDomain = data.regulatoryDomain || 'fcc';
+		apState.aps = data.aps;
+
+		floorplanState.unitSystem = data.unitSystem ?? 'imperial';
+		floorplanState.floorplanScale = data.floorplanScale ?? 0.4;
+		floorplanState.floorplanBoundary = data.floorplanBoundary ?? null;
+		floorplanState.calibration = data.calibration ?? null;
+
+		wallState.wallMask = data.wallMask ?? null;
+		wallState.wallAttenuation = data.wallAttenuation ?? 5;
+		wallState.wallMaterial = (data.wallMaterial ?? 0) as WallMaterialId;
+		wallState.materialMask = data.materialMask ?? null;
 
 		// Restore floorplan image
 		const floorplanData = localStorage.getItem(FLOORPLAN_KEY);
 		if (floorplanData) {
-			projectState.floorplanUrl = floorplanData;
+			floorplanState.floorplanUrl = floorplanData;
 		}
 
 		clearHistory();

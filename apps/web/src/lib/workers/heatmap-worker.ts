@@ -14,13 +14,16 @@ import {
 } from '../rf/propagation.js';
 
 const CELL_SIZE = 6;
-const MAX_RATIO_SQ = 4;
+// No hard cutoff — signal fades smoothly via 1/(1+r^4).
+// Skip cells where signal would be < 0.5% (perf optimization, no visual edge).
+const MAX_RATIO_SQ = 9; // ratio=3 → signal ≈ 1.2%
 const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // --- Color LUT ---
 
+// Gradient fades to transparent at the edges — no visible boundary
 const STOPS: [number, number, number, number, number][] = [
-	[0.0, 180, 40, 40, 128],
+	[0.0, 100, 35, 35, 0],
 	[0.15, 220, 120, 20, 115],
 	[0.35, 210, 190, 30, 102],
 	[0.55, 130, 190, 60, 94],
@@ -33,7 +36,7 @@ function packColor(r: number, g: number, b: number, a: number): number {
 }
 
 const LUT = new Uint32Array(256);
-const DEAD_COLOR = packColor(60, 30, 30, 115);
+const DEAD_COLOR = 0; // fully transparent — no signal = no heatmap overlay
 
 for (let i = 0; i < 256; i++) {
 	const ratio = i / 255;
@@ -80,7 +83,8 @@ interface RenderMsg {
 	id: number;
 	aps: ApData[];
 	ispSpeed: number;
-	fast?: boolean; // coarser wall grid for drag responsiveness
+	fast?: boolean;
+	clipBounds?: { x: number; y: number; w: number; h: number } | null;
 	cameraInverse: number[];
 	viewWidth: number;
 	viewHeight: number;
@@ -116,6 +120,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 			aps,
 			ispSpeed,
 			fast,
+			clipBounds,
 			cameraInverse: inv,
 			viewWidth: width,
 			viewHeight: height
@@ -186,6 +191,12 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 				const wx = ia * sx + ic * sy + ie;
 				const wy = ib * sx + idd * sy + ig;
 
+				// Clip to building bounds — floorplan image or wall mask
+				const cb = clipBounds ?? (wallData ? { x: 0, y: 0, w: wallW, h: wallH } : null);
+				if (cb && (wx < cb.x || wx > cb.x + cb.w || wy < cb.y || wy > cb.y + cb.h)) {
+					continue;
+				}
+
 				let best = 0;
 				for (let i = 0; i < n; i++) {
 					const dx = wx - apX[i]!;
@@ -199,7 +210,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 					const field = attenFields[i];
 					if (field && signal > WALL_SIGNAL_THRESHOLD) {
 						const loss = lookupAtten(field, wx, wy);
-						if (loss > 0) tp *= Math.pow(10, -loss / 20);
+						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
 					}
 
 					if (ispSpeed > 0 && tp > ispSpeed) tp = ispSpeed;

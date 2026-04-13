@@ -1,7 +1,7 @@
-import { projectState } from './project.svelte.js';
-import type { AccessPoint } from './project.svelte.js';
+import { apState } from './ap-state.svelte.js';
+import { wallState } from './wall-state.svelte.js';
+import type { AccessPoint } from './ap-state.svelte.js';
 import type { WallMaterialId } from '$canvas/materials.js';
-import { notifyMaterialChange } from '$canvas/engine-ref.js';
 
 const MAX_HISTORY = 50;
 
@@ -17,19 +17,19 @@ let redoStack: Snapshot[] = $state([]);
 
 function takeSnapshot(): Snapshot {
 	return {
-		aps: JSON.parse(JSON.stringify(projectState.aps)),
-		wallMask: projectState.wallMask ? { ...projectState.wallMask } : null,
-		materialMask: projectState.materialMask ? { ...projectState.materialMask } : null,
-		wallMaterial: projectState.wallMaterial
+		aps: JSON.parse(JSON.stringify(apState.aps)),
+		wallMask: wallState.wallMask ? { ...wallState.wallMask } : null,
+		materialMask: wallState.materialMask ? { ...wallState.materialMask } : null,
+		wallMaterial: wallState.wallMaterial
 	};
 }
 
 function applySnapshot(snap: Snapshot): void {
-	projectState.aps = snap.aps;
-	projectState.wallMask = snap.wallMask;
-	projectState.materialMask = snap.materialMask;
-	projectState.wallMaterial = snap.wallMaterial;
-	notifyMaterialChange(snap.wallMaterial);
+	apState.aps = snap.aps;
+	wallState.wallMask = snap.wallMask;
+	wallState.materialMask = snap.materialMask;
+	// Setting wallMaterial triggers the $effect in CanvasView that syncs renderers
+	wallState.wallMaterial = snap.wallMaterial;
 }
 
 export function pushState(): void {

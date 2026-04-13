@@ -25,6 +25,10 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 
 	isDragging = false;
+	/** Clip heatmap to floorplan/mask bounds (world coords). null = no clipping. */
+	floorplanBounds: { width: number; height: number } | null = null;
+	/** Wall mask dimensions — used for clipping when no floorplan image. Set immediately (no async decode). */
+	wallMaskBounds: { width: number; height: number } | null = null;
 
 	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
@@ -47,6 +51,7 @@ export class HeatmapLayer implements Layer {
 
 	invalidateCache(): void {
 		this.cacheKey = '';
+		this.cache = null;
 	}
 
 	/** Force a full-quality re-render (call on drag end). */
@@ -66,6 +71,14 @@ export class HeatmapLayer implements Layer {
 						width: number;
 						height: number;
 					};
+
+					// Validate buffer matches declared dimensions (race during resize)
+					const expected = width * height * 4;
+					if (!buf || buf.byteLength !== expected || width <= 0 || height <= 0) {
+						this.inFlight = false;
+						return;
+					}
+
 					const offscreen = document.createElement('canvas');
 					offscreen.width = width;
 					offscreen.height = height;
@@ -140,7 +153,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? this.wallMask?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -150,6 +163,7 @@ export class HeatmapLayer implements Layer {
 		if (this.aps.length === 0) return;
 
 		const { camera, width, height } = rc;
+		if (width <= 0 || height <= 0) return;
 		const key = this.getCacheKey(camera, width, height);
 
 		if (key !== this.cacheKey) {
@@ -196,6 +210,13 @@ export class HeatmapLayer implements Layer {
 			aps,
 			ispSpeed: this.ispSpeed,
 			fast: this.isDragging,
+			clipBounds: this.floorplanBounds
+				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
+				: this.wallMaskBounds
+					? { x: 0, y: 0, w: this.wallMaskBounds.width, h: this.wallMaskBounds.height }
+					: this.wallMask
+						? { x: 0, y: 0, w: this.wallMask.width, h: this.wallMask.height }
+						: null,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,
 			viewHeight: height

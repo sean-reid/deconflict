@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { projectState } from '$state/project.svelte.js';
+	import { wallState } from '$state/wall-state.svelte.js';
+	import { floorplanState } from '$state/floorplan-state.svelte.js';
+	import { apState } from '$state/ap-state.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
@@ -15,11 +17,11 @@
 	let dragOver = $state(false);
 	let detecting = $state(false);
 	let areaInput = $state('');
-	let areaUnit = $state<'sqm' | 'sqft'>(projectState.unitSystem === 'imperial' ? 'sqft' : 'sqm');
+	let areaUnit = $state<'sqm' | 'sqft'>(floorplanState.unitSystem === 'imperial' ? 'sqft' : 'sqm');
 	let detectedWorldArea = $state<number | null>(null);
 	let calibrationDone = $state(false);
 
-	let hasFloorplan = $derived(projectState.floorplanUrl !== null || projectState.wallMask !== null);
+	let hasFloorplan = $derived(floorplanState.floorplanUrl !== null || wallState.wallMask !== null);
 
 	const sampleFloorplans = [
 		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.svg', areaSqm: 48 },
@@ -29,9 +31,9 @@
 	];
 
 	let scaleDisplay = $derived.by(() => {
-		if (!projectState.calibration) return null;
-		const mPerPx = 1 / projectState.calibration.worldUnitsPerMeter;
-		if (projectState.unitSystem === 'imperial') {
+		if (!floorplanState.calibration) return null;
+		const mPerPx = 1 / floorplanState.calibration.worldUnitsPerMeter;
+		if (floorplanState.unitSystem === 'imperial') {
 			return `1px = ${(mPerPx * 3.28084).toFixed(2)}ft`;
 		}
 		return `1px = ${mPerPx.toFixed(2)}m`;
@@ -42,8 +44,8 @@
 		calibrationDone = false;
 		detectedWorldArea = null;
 		areaInput = '';
-		projectState.calibration = null;
-		projectState.floorplanBoundary = null;
+		floorplanState.calibration = null;
+		floorplanState.floorplanBoundary = null;
 
 		try {
 			// Load the original image (same one FloorplanLayer renders)
@@ -66,7 +68,7 @@
 					x: p.x * cleanScaleFactor,
 					y: p.y * cleanScaleFactor
 				}));
-				projectState.floorplanBoundary = worldPolygon;
+				floorplanState.floorplanBoundary = worldPolygon;
 
 				// Use the actual pixel area from boundary detection, scaled to world coords.
 				// Morphological close ensures door gaps don't leak flood fill but area
@@ -77,7 +79,7 @@
 			// Run OCR on all images - SVGs may have path-based text that prepareSvgForDetection can't strip
 			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH);
 			if (wallMask) {
-				projectState.wallMask = wallMask;
+				wallState.wallMask = wallMask;
 				scheduleSave();
 			}
 		} catch (e) {
@@ -92,8 +94,8 @@
 
 		// Use detected area if available, otherwise compute from wall mask bounding box
 		let worldArea = detectedWorldArea;
-		if (!worldArea && projectState.wallMask) {
-			const { width, height } = projectState.wallMask;
+		if (!worldArea && wallState.wallMask) {
+			const { width, height } = wallState.wallMask;
 			// Use the mask dimensions as the world area (pixels squared)
 			worldArea = width * height;
 		}
@@ -104,13 +106,13 @@
 			realAreaSqm = val * 0.092903;
 		}
 		const worldUnitsPerMeter = Math.sqrt(worldArea / realAreaSqm);
-		const oldCalibration = projectState.calibration;
-		projectState.calibration = { worldUnitsPerMeter };
+		const oldCalibration = floorplanState.calibration;
+		floorplanState.calibration = { worldUnitsPerMeter };
 
 		if (oldCalibration === null) {
 			// First calibration: set uncalibrated APs (radius=150) to real 15m
 			const defaultRadiusWorld = Math.round(15 * worldUnitsPerMeter);
-			for (const ap of projectState.aps) {
+			for (const ap of apState.aps) {
 				if (ap.interferenceRadius === 150) {
 					ap.interferenceRadius = defaultRadiusWorld;
 				}
@@ -118,7 +120,7 @@
 		} else {
 			// Recalibration: scale all AP radii proportionally to preserve real-world meters
 			const ratio = worldUnitsPerMeter / oldCalibration.worldUnitsPerMeter;
-			for (const ap of projectState.aps) {
+			for (const ap of apState.aps) {
 				ap.interferenceRadius = Math.round(ap.interferenceRadius * ratio);
 			}
 		}
@@ -128,7 +130,7 @@
 	}
 
 	function skipCalibration() {
-		projectState.floorplanBoundary = null;
+		floorplanState.floorplanBoundary = null;
 		detectedWorldArea = null;
 		calibrationDone = true;
 	}
@@ -140,14 +142,14 @@
 	}
 
 	async function loadSample(url: string, knownAreaSqm?: number) {
-		if (projectState.floorplanUrl?.startsWith('blob:')) {
-			URL.revokeObjectURL(projectState.floorplanUrl);
+		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
+			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}
 		try {
 			const response = await fetch(url);
 			const blob = await response.blob();
 			const blobUrl = URL.createObjectURL(blob);
-			projectState.floorplanUrl = blobUrl;
+			floorplanState.floorplanUrl = blobUrl;
 			await runBoundaryDetection(blobUrl, url.endsWith('.svg'));
 
 			// Auto-calibrate if we know the area
@@ -164,11 +166,11 @@
 	function handleFile(file: File) {
 		const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
 		if (!validTypes.includes(file.type)) return;
-		if (projectState.floorplanUrl?.startsWith('blob:')) {
-			URL.revokeObjectURL(projectState.floorplanUrl);
+		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
+			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}
 		const blobUrl = URL.createObjectURL(file);
-		projectState.floorplanUrl = blobUrl;
+		floorplanState.floorplanUrl = blobUrl;
 		runBoundaryDetection(blobUrl, file.type === 'image/svg+xml');
 	}
 
@@ -196,16 +198,16 @@
 	}
 
 	function removeFloorplan() {
-		if (projectState.floorplanUrl?.startsWith('blob:')) {
-			URL.revokeObjectURL(projectState.floorplanUrl);
+		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
+			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}
-		projectState.floorplanUrl = null;
-		projectState.floorplanBoundary = null;
-		projectState.calibration = null;
-		projectState.wallMask = null;
-		projectState.wallMaterial = 0;
-		projectState.materialMask = null;
-		projectState.aps = [];
+		floorplanState.floorplanUrl = null;
+		floorplanState.floorplanBoundary = null;
+		floorplanState.calibration = null;
+		wallState.wallMask = null;
+		wallState.wallMaterial = 0;
+		wallState.materialMask = null;
+		apState.aps = [];
 		detectedWorldArea = null;
 		calibrationDone = false;
 		areaInput = '';
@@ -214,7 +216,7 @@
 
 	function handleOpacityChange(e: Event) {
 		const input = e.target as HTMLInputElement;
-		projectState.floorplanScale = parseFloat(input.value);
+		floorplanState.floorplanScale = parseFloat(input.value);
 	}
 </script>
 
@@ -256,7 +258,7 @@
 				const h = 1500;
 				const emptyData = new Uint8Array(w * h);
 				const dataUrl = encodeMask(emptyData, w, h);
-				projectState.wallMask = { dataUrl, width: w, height: h };
+				wallState.wallMask = { dataUrl, width: w, height: h };
 				appState.wallEditMode = 'draw';
 				scheduleSave();
 			}}>
@@ -269,7 +271,7 @@
 			<div class="loaded-header">
 				<span class="loaded-label">
 					<Icon name="file" size={14} />
-					{projectState.floorplanUrl ? 'Floorplan loaded' : 'Walls drawn'}
+					{floorplanState.floorplanUrl ? 'Floorplan loaded' : 'Walls drawn'}
 				</span>
 				<Button variant="ghost" size="sm" onclick={removeFloorplan}>
 					<Icon name="trash" size={14} />
@@ -283,18 +285,18 @@
 					min="0.1"
 					max="1"
 					step="0.1"
-					value={projectState.floorplanScale}
+					value={floorplanState.floorplanScale}
 					oninput={handleOpacityChange}
 					class="opacity-slider"
 				/>
-				<span class="opacity-value">{Math.round(projectState.floorplanScale * 100)}%</span>
+				<span class="opacity-value">{Math.round(floorplanState.floorplanScale * 100)}%</span>
 			</div>
 
 			{#if detecting}
 				<div class="calibration-section">
 					<span class="calibration-status">Detecting boundary...</span>
 				</div>
-			{:else if (detectedWorldArea || projectState.wallMask) && !calibrationDone}
+			{:else if (detectedWorldArea || wallState.wallMask) && !calibrationDone}
 				<div class="calibration-section">
 					<span class="calibration-label">What is the total area of the floorplan?</span>
 					<div class="calibration-input-row">
@@ -327,7 +329,7 @@
 		</div>
 	{/if}
 
-	{#if projectState.wallMask}
+	{#if wallState.wallMask}
 		<div class="wall-actions">
 			<Button variant="secondary" size="sm" onclick={() => {
 				pushState();

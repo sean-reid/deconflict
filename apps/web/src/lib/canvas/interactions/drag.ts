@@ -1,6 +1,7 @@
 import type { CanvasEngine } from '../engine.js';
 import { hitTest } from '../hit-test.js';
 import { projectState, moveAp, beginMove } from '$state/project.svelte.js';
+import { scheduleSave } from '$state/persistence.svelte.js';
 import { canvasState, isSelected } from '$state/canvas.svelte.js';
 
 export class DragHandler {
@@ -63,6 +64,7 @@ export class DragHandler {
 			this.dragApId = null;
 			canvasState.isDragging = false;
 			this.apStartPositions.clear();
+			scheduleSave();
 		}
 	}
 
