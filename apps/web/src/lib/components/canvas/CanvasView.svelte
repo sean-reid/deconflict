@@ -465,16 +465,24 @@
 		engine.markDirty();
 	});
 
-	// Sync floorplan image to layer
+	// Sync floorplan image to layer + heatmap clip bounds
 	$effect(() => {
-		if (!floorplanLayer) return;
+		if (!floorplanLayer || !heatmapLayer) return;
 		const url = floorplanState.floorplanUrl;
 		if (url) {
 			floorplanLayer.loadImage(url, () => {
+				// Set heatmap clip bounds to floorplan image size
+				if (floorplanLayer.imageWidth > 0) {
+					heatmapLayer.floorplanBounds = {
+						width: floorplanLayer.imageWidth,
+						height: floorplanLayer.imageHeight
+					};
+				}
 				engine.markDirty();
 			});
 		} else {
 			floorplanLayer.clearImage();
+			heatmapLayer.floorplanBounds = null;
 		}
 		engine.markDirty();
 	});

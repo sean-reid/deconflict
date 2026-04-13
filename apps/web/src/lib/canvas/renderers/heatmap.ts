@@ -25,6 +25,8 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 
 	isDragging = false;
+	/** Clip heatmap to floorplan image bounds (world coords). null = no clipping. */
+	floorplanBounds: { width: number; height: number } | null = null;
 
 	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
@@ -148,7 +150,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -205,6 +207,9 @@ export class HeatmapLayer implements Layer {
 			aps,
 			ispSpeed: this.ispSpeed,
 			fast: this.isDragging,
+			clipBounds: this.floorplanBounds
+				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
+				: null,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,
 			viewHeight: height

@@ -80,7 +80,8 @@ interface RenderMsg {
 	id: number;
 	aps: ApData[];
 	ispSpeed: number;
-	fast?: boolean; // coarser wall grid for drag responsiveness
+	fast?: boolean;
+	clipBounds?: { x: number; y: number; w: number; h: number } | null;
 	cameraInverse: number[];
 	viewWidth: number;
 	viewHeight: number;
@@ -116,6 +117,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 			aps,
 			ispSpeed,
 			fast,
+			clipBounds,
 			cameraInverse: inv,
 			viewWidth: width,
 			viewHeight: height
@@ -185,6 +187,17 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 				const sx = col * cellSize + (cellSize >> 1);
 				const wx = ia * sx + ic * sy + ie;
 				const wy = ib * sx + idd * sy + ig;
+
+				// Clip to floorplan bounds — leave outside cells transparent
+				if (
+					clipBounds &&
+					(wx < clipBounds.x ||
+						wx > clipBounds.x + clipBounds.w ||
+						wy < clipBounds.y ||
+						wy > clipBounds.y + clipBounds.h)
+				) {
+					continue;
+				}
 
 				let best = 0;
 				for (let i = 0; i < n; i++) {
