@@ -22,14 +22,20 @@
 		const engine = getEngineRef();
 		if (!engine) return;
 
-		// Collect all points: APs + floorplan corners
-		const points = projectState.aps.map((ap) => ({ x: ap.x, y: ap.y }));
+		// Collect bounding points: AP coverage circles + floorplan corners
+		const points: Array<{ x: number; y: number }> = [];
+
+		for (const ap of projectState.aps) {
+			const r = ap.interferenceRadius;
+			points.push({ x: ap.x - r, y: ap.y - r });
+			points.push({ x: ap.x + r, y: ap.y + r });
+		}
 
 		// Include floorplan bounds if loaded
-		const fp = engine.layers.find((l) => l.id === 'floorplan') as any;
-		if (fp && fp.imageWidth > 0) {
+		const fp = engine.layers.find((l) => l.id === 'floorplan') as { imageWidth?: number; imageHeight?: number } | undefined;
+		if (fp && fp.imageWidth && fp.imageWidth > 0) {
 			points.push({ x: 0, y: 0 });
-			points.push({ x: fp.imageWidth, y: fp.imageHeight });
+			points.push({ x: fp.imageWidth, y: fp.imageHeight ?? 0 });
 		}
 
 		if (points.length === 0) return;
