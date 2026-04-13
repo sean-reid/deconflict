@@ -55,7 +55,6 @@ export class HeatmapLayer implements Layer {
 
 				this.inFlight = false;
 
-				// Create cache from result (skip if dimensions don't match buffer)
 				const w = width | 0;
 				const h = height | 0;
 				if (buf && buf.byteLength === w * h * 4 && w > 0 && h > 0) {
@@ -67,8 +66,11 @@ export class HeatmapLayer implements Layer {
 					this.cache = offscreen;
 				}
 
-				// State may have changed while computing — check and re-send
 				this.renderDirty?.();
+			};
+			// Unblock pipeline if worker crashes (Safari module worker issues)
+			this.worker.onerror = () => {
+				this.inFlight = false;
 			};
 		}
 		return this.worker;
