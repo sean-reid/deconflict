@@ -209,7 +209,9 @@ export class HeatmapLayer implements Layer {
 			fast: this.isDragging,
 			clipBounds: this.floorplanBounds
 				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
-				: null,
+				: this.wallMask
+					? { x: 0, y: 0, w: this.wallMask.width, h: this.wallMask.height }
+					: null,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,
 			viewHeight: height
