@@ -72,18 +72,20 @@ export class HeatmapLayer implements Layer {
 						height: number;
 					};
 
-					// Validate buffer matches declared dimensions (race during resize)
-					const expected = width * height * 4;
-					if (!buf || buf.byteLength !== expected || width <= 0 || height <= 0) {
+					// Validate buffer matches declared dimensions (race during resize/toggle)
+					const w = width | 0;
+					const h = height | 0;
+					const expected = w * h * 4;
+					if (!buf || !expected || buf.byteLength !== expected) {
 						this.inFlight = false;
 						return;
 					}
 
 					const offscreen = document.createElement('canvas');
-					offscreen.width = width;
-					offscreen.height = height;
+					offscreen.width = w;
+					offscreen.height = h;
 					const ctx = offscreen.getContext('2d')!;
-					const imgData = new ImageData(new Uint8ClampedArray(buf), width, height);
+					const imgData = new ImageData(new Uint8ClampedArray(buf), w, h);
 					ctx.putImageData(imgData, 0, 0);
 					this.cache = offscreen;
 

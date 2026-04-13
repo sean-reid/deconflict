@@ -74,29 +74,29 @@
 			</div>
 
 			<p class="description">
-				Plan your WiFi network by placing access points on a floorplan.
-				Walls are detected automatically, channels are assigned in real time,
-				and you can optimize AP placement for best coverage.
+				Plan your WiFi by placing access points on a floorplan.
+				Walls attenuate signal realistically, channels are assigned in real time,
+				and the optimizer finds the best AP placement for full coverage.
 			</p>
 
 			<div class="steps-section">
-				<h3 class="steps-heading">HOW IT WORKS</h3>
+				<h3 class="steps-heading">GET STARTED</h3>
 				<ol class="steps">
 					<li>
 						<span class="step-number">1</span>
-						<span>Drop a floorplan image or pick a sample</span>
+						<span>Import a floorplan image or draw walls from scratch</span>
 					</li>
 					<li>
 						<span class="step-number">2</span>
-						<span>Tap the canvas to place access points</span>
+						<span>Select an AP model or tap the canvas to place custom APs</span>
 					</li>
 					<li>
 						<span class="step-number">3</span>
-						<span>Toggle the heatmap to see signal coverage</span>
+						<span>Toggle the heatmap to see signal coverage through walls</span>
 					</li>
 					<li>
 						<span class="step-number">4</span>
-						<span>Use Optimize Placement to improve coverage</span>
+						<span>Run Optimize Placement for best coverage</span>
 					</li>
 				</ol>
 			</div>

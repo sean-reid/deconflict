@@ -69,9 +69,10 @@ test.describe('AP placement', () => {
 		const canvas = page.locator('canvas');
 		await canvas.click({ position: { x: 300, y: 300 } });
 
-		// Change band in editor
-		const bandSelect = page.locator('.editor select').first();
-		await bandSelect.selectOption('2.4ghz');
+		// Change band via custom Select dropdown
+		const bandTrigger = page.locator('.editor .select-wrapper .trigger').first();
+		await bandTrigger.click();
+		await page.locator('.select-wrapper .option', { hasText: '2.4 GHz' }).click();
 
 		// Go back to list to verify
 		await page.getByText('All APs').click();

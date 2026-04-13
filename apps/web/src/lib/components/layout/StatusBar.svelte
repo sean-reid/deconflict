@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { projectState } from '$state/project.svelte';
+	import { wallState } from '$state/wall-state.svelte';
 	import { canvasState } from '$state/canvas.svelte';
 	import { persistenceState } from '$state/persistence.svelte';
 	import { getEngineRef } from '$canvas/engine-ref.js';
@@ -31,11 +32,14 @@
 			points.push({ x: ap.x + r, y: ap.y + r });
 		}
 
-		// Include floorplan bounds if loaded
+		// Include floorplan image bounds or wall mask bounds (draw-from-scratch)
 		const fp = engine.layers.find((l) => l.id === 'floorplan') as { imageWidth?: number; imageHeight?: number } | undefined;
 		if (fp && fp.imageWidth && fp.imageWidth > 0) {
 			points.push({ x: 0, y: 0 });
 			points.push({ x: fp.imageWidth, y: fp.imageHeight ?? 0 });
+		} else if (wallState.wallMask) {
+			points.push({ x: 0, y: 0 });
+			points.push({ x: wallState.wallMask.width, y: wallState.wallMask.height });
 		}
 
 		if (points.length === 0) return;

@@ -40,19 +40,40 @@
 
 			<div class="dialog-body">
 				<p class="intro">
-					Free WiFi channel planner. Place access points, solve for
-					optimal channels, export your plan.
+					Free, open-source WiFi channel planner. Import a floorplan, place access points,
+					and get optimal channel assignments with physics-based signal coverage.
 				</p>
 
 				<section class="section">
-					<h3 class="section-heading">HOW TO USE</h3>
+					<h3 class="section-heading">GETTING STARTED</h3>
 					<ul class="quick-start">
+						<li>Import a floorplan image (PNG, JPEG, SVG) or draw walls from scratch</li>
+						<li>Walls are detected automatically with per-material RF attenuation</li>
 						<li>Tap the canvas to place access points</li>
-						<li>Tap an AP to select it, drag to move</li>
-						<li>Drag empty space to pan around</li>
-						<li>Pinch to zoom (or scroll on desktop)</li>
-						<li>Channels are assigned automatically</li>
-						<li>Toggle the heatmap to see signal coverage</li>
+						<li>Select an AP model from 100+ real devices to auto-fill specs</li>
+						<li>Channels are assigned automatically using graph coloring</li>
+						<li>Toggle the heatmap to see signal coverage through walls</li>
+						<li>Run Optimize Placement to find the best AP positions</li>
+					</ul>
+				</section>
+
+				<section class="section">
+					<h3 class="section-heading">WALL MATERIALS</h3>
+					<ul class="quick-start">
+						<li>Change the default wall material in the sidebar dropdown</li>
+						<li>Click a wall to override its material (glass, brick, concrete, etc.)</li>
+						<li>Edit Walls mode lets you erase, draw, or paint materials with a brush</li>
+						<li>Each material has a realistic RF attenuation value (2-20 dB)</li>
+					</ul>
+				</section>
+
+				<section class="section">
+					<h3 class="section-heading">HEATMAP</h3>
+					<ul class="quick-start">
+						<li>Signal uses indoor path loss model with per-material wall attenuation</li>
+						<li>Coverage radius is derived from TX power (adjustable per AP)</li>
+						<li>Heatmap updates in real time as you move APs</li>
+						<li>Colors: green (excellent) to red (poor) to transparent (no signal)</li>
 					</ul>
 				</section>
 
@@ -62,8 +83,11 @@
 						<div class="shortcut-row"><kbd>G</kbd><span>Toggle grid</span></div>
 						<div class="shortcut-row"><kbd>W</kbd><span>Toggle walls</span></div>
 						<div class="shortcut-row"><kbd>H</kbd><span>Toggle heatmap</span></div>
+						<div class="shortcut-row"><kbd>L</kbd><span>Toggle labels</span></div>
 						<div class="shortcut-row"><kbd>Ctrl+Z</kbd><span>Undo</span></div>
-						<div class="shortcut-row"><kbd>Delete</kbd><span>Remove selected</span></div>
+						<div class="shortcut-row"><kbd>Ctrl+Shift+Z</kbd><span>Redo</span></div>
+						<div class="shortcut-row"><kbd>Delete</kbd><span>Remove selected AP(s)</span></div>
+						<div class="shortcut-row"><kbd>Ctrl+A</kbd><span>Select all APs</span></div>
 					</div>
 				</section>
 
@@ -72,15 +96,15 @@
 					<div class="bands">
 						<div class="band-row">
 							<span class="band-name">2.4 GHz</span>
-							<span class="band-desc">3 non-overlapping channels (1, 6, 11)</span>
+							<span class="band-desc">3 non-overlapping channels (1, 6, 11). Best range.</span>
 						</div>
 						<div class="band-row">
 							<span class="band-name">5 GHz</span>
-							<span class="band-desc">Up to 25 channels, wider bandwidth options</span>
+							<span class="band-desc">Up to 25 channels, wider bandwidth. Most common.</span>
 						</div>
 						<div class="band-row">
 							<span class="band-name">6 GHz</span>
-							<span class="band-desc">59 channels, newest and least congested</span>
+							<span class="band-desc">59 channels, newest and least congested. WiFi 6E/7.</span>
 						</div>
 					</div>
 				</section>
@@ -232,7 +256,7 @@
 	}
 
 	.shortcut-row kbd {
-		min-width: 64px;
+		min-width: 100px;
 		text-align: center;
 	}
 
