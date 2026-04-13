@@ -262,6 +262,8 @@
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
 				engine.resize(width, height);
+				// Force heatmap re-render at new dimensions
+				if (heatmapLayer) heatmapLayer.invalidateCache();
 			}
 		});
 		observer.observe(containerEl);
@@ -371,7 +373,7 @@
 		if (!heatmapLayer) return;
 		const mask = wallState.wallMask;
 		heatmapLayer.wallMaskBounds = mask ? { width: mask.width, height: mask.height } : null;
-		heatmapLayer.invalidateCache();
+		heatmapLayer.clearCache();
 		engine.markDirty();
 	});
 
@@ -568,9 +570,24 @@
 			touchMoved = false;
 			touchStartedOnAp = false;
 			pendingPan = false;
+
+			// Wall edit mode: single touch draws
+			if (appState.wallEditMode) {
+				e.preventDefault();
+				wallEditHandler.activeMaterial = wallEditMaterial;
+				wallEditHandler.defaultMaterial = wallState.wallMaterial;
+				wallEditHandler.handlePointerDown(
+					new PointerEvent('pointerdown', { clientX: t.clientX, clientY: t.clientY, button: 0 })
+				);
+				return;
+			}
 		} else if (activeTouches >= 2) {
 			e.preventDefault();
-			// Cancel single-finger state
+			// Cancel single-finger state (including wall edit stroke)
+			if (appState.wallEditMode) {
+				wallEditHandler.handlePointerUp();
+				brushCursorVisible = false;
+			}
 			pendingPan = false;
 			touchStartedOnAp = false;
 			touchMoved = true;
@@ -625,6 +642,20 @@
 		// Single-finger
 		if (e.touches.length !== 1) return;
 		const t = e.touches[0]!;
+
+		// Wall edit mode: single touch draws
+		if (appState.wallEditMode) {
+			e.preventDefault();
+			wallEditHandler.handlePointerMove(
+				new PointerEvent('pointermove', { clientX: t.clientX, clientY: t.clientY })
+			);
+			const rect = engine.canvas.getBoundingClientRect();
+			brushCursorX = t.clientX - rect.left;
+			brushCursorY = t.clientY - rect.top;
+			brushCursorVisible = true;
+			return;
+		}
+
 		const dx = t.clientX - touchStartX;
 		const dy = t.clientY - touchStartY;
 
@@ -660,6 +691,14 @@
 
 	function handleTouchEnd(e: TouchEvent) {
 		if (activeTouches === 1 && e.touches.length === 0) {
+			// Wall edit mode: end stroke
+			if (appState.wallEditMode) {
+				wallEditHandler.handlePointerUp();
+				brushCursorVisible = false;
+				activeTouches = 0;
+				return;
+			}
+
 			if (!touchMoved && engine) {
 				const rect = engine.canvas.getBoundingClientRect();
 				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps);
@@ -809,6 +848,7 @@
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
+		onpointerleave={() => { brushCursorVisible = false; }}
 		ontouchstart={handleTouchStart}
 		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}

@@ -11,6 +11,8 @@
 		ondone: () => void;
 	} = $props();
 
+	const mat = $derived(WALL_MATERIALS[activeMaterial] ?? WALL_MATERIALS[0]!);
+
 	function setMode(mode: 'erase' | 'draw' | 'material') {
 		appState.wallEditMode = mode;
 		appState.wallEditLastMode = mode;
@@ -18,66 +20,60 @@
 </script>
 
 <div class="wall-toolbar">
-	<div class="tool-group">
+	<div class="row-top">
 		<button
 			class="tool"
 			class:active={appState.wallEditMode === 'erase'}
 			onclick={() => setMode('erase')}
-			aria-label="Eraser"
 		>
 			<Icon name="eraser" size={14} />
-			<span>Erase</span>
+			<span class="tool-label">Erase</span>
 		</button>
 		<button
 			class="tool"
 			class:active={appState.wallEditMode === 'draw'}
 			onclick={() => setMode('draw')}
-			aria-label="Draw walls"
 		>
 			<Icon name="pencil" size={14} />
-			<span>Draw</span>
+			<span class="tool-label">Draw</span>
 		</button>
 		<button
 			class="tool"
 			class:active={appState.wallEditMode === 'material'}
 			onclick={() => setMode('material')}
-			aria-label="Paint material"
 		>
-			<span
-				class="mat-swatch"
-				style="background: rgb({WALL_MATERIALS[activeMaterial]?.color.join(',') ?? '200,200,210'})"
-			></span>
-			<span>Material</span>
+			<span class="mat-swatch" style="background: rgb({mat.color.join(',')})"></span>
+			<span class="tool-label">Material</span>
 		</button>
-	</div>
 
-	{#if appState.wallEditMode === 'material'}
-		<div class="mat-picker">
-			{#each WALL_MATERIALS as mat}
-				<button
-					class="mat-option"
-					class:active={activeMaterial === mat.id}
-					onclick={() => { activeMaterial = mat.id; }}
-					title="{mat.name} ({mat.attenuation} dB)"
-				>
-					<span class="mat-dot" style="background: rgb({mat.color.join(',')})"></span>
-				</button>
-			{/each}
-		</div>
-	{/if}
+		<span class="separator"></span>
 
-	<div class="brush-group">
-		<span class="brush-label">Size</span>
 		<input
 			type="range"
 			min="3"
 			max="40"
 			bind:value={appState.wallBrushSize}
 			class="brush-slider"
+			aria-label="Brush size"
 		/>
+
+		<button class="done-btn" onclick={ondone}>Done</button>
 	</div>
 
-	<button class="done-btn" onclick={ondone}>Done</button>
+	{#if appState.wallEditMode === 'material' || appState.wallEditMode === 'draw'}
+		<div class="row-bottom">
+			{#each WALL_MATERIALS as m}
+				<button
+					class="mat-chip"
+					class:active={activeMaterial === m.id}
+					onclick={() => { activeMaterial = m.id; }}
+				>
+					<span class="chip-dot" style="background: rgb({m.color.join(',')})"></span>
+					<span class="chip-name">{m.name}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -88,25 +84,33 @@
 		transform: translateX(-50%);
 		z-index: 20;
 		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-1) var(--space-2);
+		flex-direction: column;
+		gap: 4px;
+		padding: 6px 8px;
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-default);
 		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow-lg);
+		max-width: calc(100vw - 16px);
 	}
 
-	.tool-group {
+	.row-top {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.row-bottom {
 		display: flex;
 		gap: 2px;
+		flex-wrap: wrap;
 	}
 
 	.tool {
 		display: flex;
 		align-items: center;
 		gap: 4px;
-		padding: var(--space-1) var(--space-2);
+		padding: 4px 8px;
 		border: none;
 		border-radius: var(--radius-sm);
 		background: none;
@@ -115,6 +119,7 @@
 		font-size: var(--text-xs);
 		cursor: pointer;
 		transition: all var(--transition-fast);
+		white-space: nowrap;
 	}
 
 	.tool:hover {
@@ -136,63 +141,24 @@
 		width: 10px;
 		height: 10px;
 		border-radius: 2px;
+		flex-shrink: 0;
 	}
 
-	.mat-picker {
-		display: flex;
-		gap: 2px;
-		padding: 0 var(--space-1);
-		border-left: 1px solid var(--border-subtle);
-	}
-
-	.mat-option {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 22px;
-		height: 22px;
-		border: 1px solid transparent;
-		border-radius: var(--radius-sm);
-		background: none;
-		cursor: pointer;
-		transition: all var(--transition-fast);
-	}
-
-	.mat-option:hover {
-		background: var(--bg-hover);
-	}
-
-	.mat-option.active {
-		border-color: var(--accent-primary);
-	}
-
-	.mat-dot {
-		width: 12px;
-		height: 12px;
-		border-radius: 2px;
-	}
-
-	.brush-group {
-		display: flex;
-		align-items: center;
-		gap: var(--space-1);
-		padding: 0 var(--space-1);
-		border-left: 1px solid var(--border-subtle);
-	}
-
-	.brush-label {
-		font-size: var(--text-xs);
-		color: var(--text-tertiary);
+	.separator {
+		width: 1px;
+		height: 18px;
+		background: var(--border-subtle);
+		flex-shrink: 0;
 	}
 
 	.brush-slider {
-		width: 60px;
+		width: 50px;
 		accent-color: var(--accent-primary);
 		height: 4px;
 	}
 
 	.done-btn {
-		padding: var(--space-1) var(--space-3);
+		padding: 4px 12px;
 		border: none;
 		border-radius: var(--radius-sm);
 		background: var(--accent-primary);
@@ -208,8 +174,63 @@
 		opacity: 0.9;
 	}
 
-	.done-btn:focus-visible {
-		outline: 2px solid var(--accent-primary);
-		outline-offset: 1px;
+	/* Material chip row */
+	.mat-chip {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		padding: 3px 8px;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		background: var(--bg-surface);
+		color: var(--text-tertiary);
+		font-family: var(--font-sans);
+		font-size: 10px;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		white-space: nowrap;
+	}
+
+	.mat-chip:hover {
+		color: var(--text-primary);
+		background: var(--bg-hover);
+	}
+
+	.mat-chip.active {
+		border-color: var(--accent-primary);
+		color: var(--text-primary);
+		background: var(--accent-primary-glow);
+	}
+
+	.chip-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		flex-shrink: 0;
+	}
+
+	@media (max-width: 768px) {
+		.tool-label {
+			display: none;
+		}
+
+		/* Only show name on the active chip; others show just the dot */
+		.mat-chip:not(.active) .chip-name {
+			display: none;
+		}
+
+		.mat-chip:not(.active) {
+			padding: 4px;
+		}
+
+		.mat-chip:not(.active) .chip-dot {
+			width: 14px;
+			height: 14px;
+			border-radius: 3px;
+		}
+
+		.brush-slider {
+			width: 40px;
+		}
 	}
 </style>

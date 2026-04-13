@@ -49,9 +49,17 @@ export class HeatmapLayer implements Layer {
 		this.renderDirty = fn;
 	}
 
+	/** Soft invalidate: trigger re-render but keep the old frame visible until the new one arrives. */
 	invalidateCache(): void {
 		this.cacheKey = '';
+		this.lastWallVersion = -1;
+	}
+
+	/** Hard invalidate: clear the cached frame immediately (use when clip bounds change). */
+	clearCache(): void {
+		this.cacheKey = '';
 		this.cache = null;
+		this.lastWallVersion = -1;
 	}
 
 	/** Force a full-quality re-render (call on drag end). */

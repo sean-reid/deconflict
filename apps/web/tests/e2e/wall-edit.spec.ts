@@ -75,9 +75,9 @@ test.describe('Wall editing', () => {
 		await page.waitForTimeout(200);
 
 		// Material picker dots should appear
-		const matPicker = page.locator('.mat-picker');
+		const matPicker = page.locator('.row-bottom');
 		await expect(matPicker).toBeVisible();
-		await expect(matPicker.locator('.mat-option')).toHaveCount(6);
+		await expect(matPicker.locator('.mat-chip')).toHaveCount(6);
 
 		await page.screenshot({ path: 'test-results/wall-edit/material-paint-mode.png' });
 
