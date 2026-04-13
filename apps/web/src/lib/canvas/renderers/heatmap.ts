@@ -188,12 +188,13 @@ export class HeatmapLayer implements Layer {
 			this.lastHeight = height;
 
 			if (!this.inFlight) {
-				// No request pending — send immediately
 				this.sendRender(width, height, camera);
 			} else {
-				// Request in-flight — mark for update when it completes
 				this.needsUpdate = true;
 			}
+		} else if (!this.cache && !this.inFlight) {
+			// Recovery: cache was cleared (resize) but no render in-flight. Retry.
+			this.sendRender(width, height, camera);
 		}
 
 		if (this.cache) {

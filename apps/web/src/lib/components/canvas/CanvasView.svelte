@@ -262,8 +262,7 @@
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
 				engine.resize(width, height);
-				// Keep old frame visible while re-rendering at new dimensions
-				if (heatmapLayer) heatmapLayer.invalidateCache();
+				if (heatmapLayer) heatmapLayer.clearCache();
 			}
 		});
 		observer.observe(containerEl);
