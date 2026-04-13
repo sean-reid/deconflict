@@ -230,8 +230,7 @@ export class HeatmapLayer implements Layer {
 
 				// LUT color lookup (single array read, single write per pixel)
 				const ratio = best * invMax;
-				const color =
-					ratio <= 0 ? DEAD_COLOR : LUT[Math.min(255, (ratio * 255) | 0)]!;
+				const color = ratio <= 0 ? DEAD_COLOR : LUT[Math.min(255, (ratio * 255) | 0)]!;
 
 				const px0 = col * cellSize;
 				const px1 = Math.min(px0 + cellSize, width);
@@ -248,7 +247,9 @@ export class HeatmapLayer implements Layer {
 
 		const elapsed = performance.now() - t0;
 		if (elapsed > 10) {
-			console.log(`[heatmap] ${cols}x${rows} cells, ${n} APs, walls=${hasWalls}: ${elapsed.toFixed(1)}ms`);
+			console.log(
+				`[heatmap] ${cols}x${rows} cells, ${n} APs, walls=${hasWalls}: ${elapsed.toFixed(1)}ms`
+			);
 		}
 
 		return offscreen;

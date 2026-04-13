@@ -58,9 +58,11 @@ export function addAp(x: number, y: number): AccessPoint {
 		channelWidth: prev?.channelWidth ?? projectState.channelWidth,
 		fixedChannel: null,
 		assignedChannel: null,
-		interferenceRadius: prev?.interferenceRadius ?? (projectState.calibration
-			? Math.round(15 * projectState.calibration.worldUnitsPerMeter)
-			: 150),
+		interferenceRadius:
+			prev?.interferenceRadius ??
+			(projectState.calibration
+				? Math.round(15 * projectState.calibration.worldUnitsPerMeter)
+				: 150),
 		power: prev?.power ?? 20,
 		modelId: prev?.modelId ?? null,
 		modelLabel: prev?.modelLabel ?? null
