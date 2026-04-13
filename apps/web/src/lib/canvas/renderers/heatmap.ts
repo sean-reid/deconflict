@@ -173,15 +173,8 @@ export class HeatmapLayer implements Layer {
 			});
 		}
 
-		// Composite cached frame, stretching to fit if dimensions changed (resize transition)
-		// Composite cache, scaled to current viewport (smooth during resize)
 		if (this.cache) {
-			const { ctx, dpr } = rc;
-			ctx.save();
-			ctx.resetTransform();
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.drawImage(this.cache, 0, 0, width, height);
-			ctx.restore();
+			rc.compositeOffscreen(this.cache);
 		}
 	}
 }
