@@ -249,6 +249,34 @@ export function getAttenField(
 	return field;
 }
 
+// ─── Range from TX power ──────────────────────────────────────────
+
+/** Reference path loss at 1m (dB) by band — ITU indoor model. */
+const PL0: Record<string, number> = {
+	'2.4ghz': 40,
+	'5ghz': 47,
+	'6ghz': 49
+};
+
+/** Receiver sensitivity threshold (dBm). Typical WiFi client minimum. */
+const SENSITIVITY = -85;
+
+/** Indoor path loss exponent. 4.0 = office/residential with typical obstacles.
+ *  Consistent with the quartic signal model used by the heatmap renderer. */
+const PATH_LOSS_N = 4.0;
+
+/**
+ * Compute estimated indoor coverage range from TX power and band.
+ * Uses log-distance path loss model: PL(d) = PL₀ + 10·n·log₁₀(d)
+ * Returns range in meters.
+ */
+export function rangeFromPower(txPowerDbm: number, band: string): number {
+	const pl0 = PL0[band] ?? 47;
+	const budget = txPowerDbm - pl0 - SENSITIVITY; // link budget in dB
+	if (budget <= 0) return 1;
+	return Math.pow(10, budget / (10 * PATH_LOSS_N));
+}
+
 // ─── Base rate lookup ─────────────────────────────────────────────
 
 const BASE_RATES: Record<string, Record<number, number>> = {

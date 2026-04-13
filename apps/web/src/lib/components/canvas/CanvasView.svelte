@@ -13,7 +13,7 @@
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
-	import { projectState, removeAps } from '$state/project.svelte.js';
+	import { projectState, removeAps, getEffectiveWupm } from '$state/project.svelte.js';
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
@@ -326,9 +326,7 @@
 
 	$effect(() => {
 		if (!gridLayer) return;
-		// Default ~10 canvas units per foot so the grid shows feet even before calibration
-		const DEFAULT_WUPM = 10 * 3.28084; // 32.8 world units per meter
-		gridLayer.worldUnitsPerMeter = projectState.calibration?.worldUnitsPerMeter ?? DEFAULT_WUPM;
+		gridLayer.worldUnitsPerMeter = getEffectiveWupm();
 		gridLayer.unitSystem = projectState.unitSystem;
 		engine.markDirty();
 	});
