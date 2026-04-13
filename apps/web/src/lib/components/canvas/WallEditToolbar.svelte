@@ -214,15 +214,16 @@
 			display: none;
 		}
 
-		.chip-name {
+		/* Only show name on the active chip; others show just the dot */
+		.mat-chip:not(.active) .chip-name {
 			display: none;
 		}
 
-		.mat-chip {
+		.mat-chip:not(.active) {
 			padding: 4px;
 		}
 
-		.chip-dot {
+		.mat-chip:not(.active) .chip-dot {
 			width: 14px;
 			height: 14px;
 			border-radius: 3px;
