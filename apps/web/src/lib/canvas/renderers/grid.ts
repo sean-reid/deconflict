@@ -2,7 +2,7 @@ import type { Layer, RenderContext } from '../types.js';
 
 const MINOR_COLOR = '#1a1d27';
 const MAJOR_COLOR = '#252838';
-const LABEL_COLOR = '#3a3f52';
+const LABEL_COLOR = '#4d5370';
 
 const FEET_PER_METER = 3.28084;
 
@@ -125,6 +125,15 @@ export class GridLayer implements Layer {
 				const units = Math.round(x / unitScale);
 				if (units === 0) continue;
 				ctx.fillText(`${units}${unitLabel}`, x + 2 / zoom, topLeft.y + 2 / zoom);
+			}
+
+			// Y-axis labels
+			ctx.textAlign = 'left';
+			ctx.textBaseline = 'top';
+			for (let y = majorStartY; y <= majorEndY; y += major) {
+				const units = Math.round(y / unitScale);
+				if (units === 0) continue;
+				ctx.fillText(`${units}${unitLabel}`, topLeft.x + 2 / zoom, y + 2 / zoom);
 			}
 		}
 	}
