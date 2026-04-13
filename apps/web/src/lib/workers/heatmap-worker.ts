@@ -21,9 +21,9 @@ const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // --- Color LUT ---
 
-// Dead zone blends smoothly INTO the lowest signal color (no sharp transition)
+// Gradient fades to transparent at the edges — no visible boundary
 const STOPS: [number, number, number, number, number][] = [
-	[0.0, 100, 35, 35, 80],
+	[0.0, 100, 35, 35, 0],
 	[0.15, 220, 120, 20, 115],
 	[0.35, 210, 190, 30, 102],
 	[0.55, 130, 190, 60, 94],
@@ -36,7 +36,7 @@ function packColor(r: number, g: number, b: number, a: number): number {
 }
 
 const LUT = new Uint32Array(256);
-const DEAD_COLOR = packColor(100, 35, 35, 80); // matches lowest LUT stop
+const DEAD_COLOR = 0; // fully transparent — no signal = no heatmap overlay
 
 for (let i = 0; i < 256; i++) {
 	const ratio = i / 255;
