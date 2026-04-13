@@ -215,7 +215,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 					const field = attenFields[i];
 					if (field && signal > WALL_SIGNAL_THRESHOLD) {
 						const loss = lookupAtten(field, wx, wy);
-						if (loss > 0) tp *= Math.pow(10, -loss / 20);
+						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
 					}
 
 					if (ispSpeed > 0 && tp > ispSpeed) tp = ispSpeed;

@@ -12,18 +12,16 @@ export class WallLayer implements Layer {
 	private cachedImage: HTMLCanvasElement | null = null;
 	private cachedMaskRef: Uint8Array | null = null;
 	private cachedMatRef: Uint8Array | null = null;
-	private cachedDefaultMat: WallMaterialId = -1 as WallMaterialId; // force first render
+	private cachedDefaultMat: WallMaterialId = -1 as WallMaterialId;
 
-	/** Force the colorized image to regenerate on next render */
 	invalidateCache(): void {
 		this.cachedMaskRef = null;
 	}
 
 	render(rc: RenderContext): void {
 		if (!this.mask) return;
-		// Skip rendering empty masks (e.g. draw-from-scratch before any walls are drawn)
 		if (!this.cachedImage && !this.mask.data.some((v) => v)) return;
-		const { camera, width, height } = rc;
+		const { ctx, camera, dpr } = rc;
 
 		const needsRegen =
 			this.mask.data !== this.cachedMaskRef ||
@@ -37,16 +35,15 @@ export class WallLayer implements Layer {
 			this.cachedDefaultMat = this.defaultMaterial;
 		}
 
+		// Draw directly to main ctx with camera transform (no intermediate canvas)
 		const transform = camera.getTransform();
-		const offscreen = document.createElement('canvas');
-		offscreen.width = width;
-		offscreen.height = height;
-		const oc = offscreen.getContext('2d')!;
 		const [a, b, c, d, e, f] = transform;
-		oc.setTransform(a, b, c, d, e, f);
-		oc.drawImage(this.cachedImage!, 0, 0);
 
-		rc.compositeOffscreen(offscreen, 0.4);
+		ctx.save();
+		ctx.setTransform(a * dpr, b * dpr, c * dpr, d * dpr, e * dpr, f * dpr);
+		ctx.globalAlpha = 0.4;
+		ctx.drawImage(this.cachedImage!, 0, 0);
+		ctx.restore();
 	}
 }
 
