@@ -1,7 +1,11 @@
-import { projectState } from '$state/project.svelte.js';
+import { apState } from '$state/ap-state.svelte.js';
+import { floorplanState } from '$state/floorplan-state.svelte.js';
+import { wallState } from '$state/wall-state.svelte.js';
+import { projectMeta } from '$state/project-meta.svelte.js';
 import { appState } from '$state/app.svelte.js';
 import { clearSelection } from '$state/canvas.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
+import type { WallMaterialId } from '$canvas/materials.js';
 
 interface ProjectFile {
 	version: 2;
@@ -10,7 +14,7 @@ interface ProjectFile {
 	channelWidth: ChannelWidth;
 	regulatoryDomain: RegulatoryDomain;
 	unitSystem?: 'imperial' | 'metric';
-	floorplanImage?: string; // data URL of the floorplan image
+	floorplanImage?: string;
 	floorplanScale: number;
 	calibration?: { worldUnitsPerMeter: number };
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
@@ -35,13 +39,10 @@ interface ProjectFile {
 }
 
 async function floorplanToDataUrl(): Promise<string | undefined> {
-	const url = projectState.floorplanUrl;
+	const url = floorplanState.floorplanUrl;
 	if (!url) return undefined;
-
-	// If already a data URL, use it directly
 	if (url.startsWith('data:')) return url;
 
-	// Convert blob URL to data URL via canvas
 	try {
 		const img = new Image();
 		await new Promise<void>((resolve, reject) => {
@@ -65,22 +66,22 @@ export async function serialize(): Promise<string> {
 
 	const data: ProjectFile = {
 		version: 2,
-		name: projectState.name,
-		band: projectState.band,
-		channelWidth: projectState.channelWidth,
-		regulatoryDomain: projectState.regulatoryDomain,
-		unitSystem: projectState.unitSystem,
+		name: projectMeta.name,
+		band: apState.band,
+		channelWidth: apState.channelWidth,
+		regulatoryDomain: apState.regulatoryDomain,
+		unitSystem: floorplanState.unitSystem,
 		floorplanImage,
-		floorplanScale: projectState.floorplanScale,
-		calibration: projectState.calibration ?? undefined,
-		floorplanBoundary: projectState.floorplanBoundary ?? undefined,
-		wallMask: projectState.wallMask ? JSON.parse(JSON.stringify(projectState.wallMask)) : null,
-		wallAttenuation: projectState.wallAttenuation,
-		wallMaterial: projectState.wallMaterial,
-		materialMask: projectState.materialMask
-			? JSON.parse(JSON.stringify(projectState.materialMask))
+		floorplanScale: floorplanState.floorplanScale,
+		calibration: floorplanState.calibration ?? undefined,
+		floorplanBoundary: floorplanState.floorplanBoundary ?? undefined,
+		wallMask: wallState.wallMask ? JSON.parse(JSON.stringify(wallState.wallMask)) : null,
+		wallAttenuation: wallState.wallAttenuation,
+		wallMaterial: wallState.wallMaterial,
+		materialMask: wallState.materialMask
+			? JSON.parse(JSON.stringify(wallState.materialMask))
 			: null,
-		aps: projectState.aps.map((ap) => ({
+		aps: apState.aps.map((ap) => ({
 			id: ap.id,
 			name: ap.name,
 			x: Math.round(ap.x * 100) / 100,
@@ -113,28 +114,31 @@ export function deserialize(json: string): void {
 		throw new Error('Invalid project file: missing AP data');
 	}
 
-	projectState.name = data.name || 'Imported Project';
-	projectState.band = data.band || '5ghz';
-	projectState.channelWidth = data.channelWidth || 20;
-	projectState.regulatoryDomain = data.regulatoryDomain || 'fcc';
-	projectState.unitSystem = data.unitSystem ?? 'imperial';
-	projectState.floorplanScale = data.floorplanScale ?? 0.4;
-	projectState.calibration = data.calibration ?? null;
-	projectState.floorplanBoundary = data.floorplanBoundary ?? null;
-	projectState.wallMask = data.wallMask ?? null;
-	projectState.wallAttenuation = data.wallAttenuation ?? 5;
-	projectState.wallMaterial = (data.wallMaterial ??
-		0) as import('$canvas/materials.js').WallMaterialId;
-	projectState.materialMask = data.materialMask ?? null;
+	projectMeta.name = data.name || 'Imported Project';
+	projectMeta.ispSpeed = 0;
+	projectMeta.targetThroughput = data.aps.length > 0 ? 25 : 50;
 
-	// Restore floorplan image
+	apState.band = data.band || '5ghz';
+	apState.channelWidth = data.channelWidth || 20;
+	apState.regulatoryDomain = data.regulatoryDomain || 'fcc';
+
+	floorplanState.unitSystem = data.unitSystem ?? 'imperial';
+	floorplanState.floorplanScale = data.floorplanScale ?? 0.4;
+	floorplanState.calibration = data.calibration ?? null;
+	floorplanState.floorplanBoundary = data.floorplanBoundary ?? null;
+
+	wallState.wallMask = data.wallMask ?? null;
+	wallState.wallAttenuation = data.wallAttenuation ?? 5;
+	wallState.wallMaterial = (data.wallMaterial ?? 0) as WallMaterialId;
+	wallState.materialMask = data.materialMask ?? null;
+
 	if (data.floorplanImage) {
-		projectState.floorplanUrl = data.floorplanImage;
+		floorplanState.floorplanUrl = data.floorplanImage;
 	} else {
-		projectState.floorplanUrl = null;
+		floorplanState.floorplanUrl = null;
 	}
 
-	projectState.aps = data.aps.map((ap) => ({
+	apState.aps = data.aps.map((ap) => ({
 		id: ap.id || crypto.randomUUID(),
 		name: ap.name || 'AP',
 		x: ap.x ?? 0,
@@ -149,7 +153,6 @@ export function deserialize(json: string): void {
 		modelLabel: ap.modelLabel ?? null
 	}));
 
-	// Show the right sidebar tab and clear selection
 	clearSelection();
 	if (data.aps.length > 0) {
 		appState.sidebarPanel = 'aps';
@@ -165,7 +168,7 @@ export async function downloadJson(): Promise<void> {
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;
-	a.download = `${projectState.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.deconflict.json`;
+	a.download = `${projectMeta.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.deconflict.json`;
 	a.click();
 	URL.revokeObjectURL(url);
 }
