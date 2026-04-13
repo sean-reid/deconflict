@@ -85,7 +85,12 @@ export class HeatmapLayer implements Layer {
 					const h = height | 0;
 					const expected = w * h * 4;
 					if (!buf || !expected || buf.byteLength !== expected) {
+						// Stale result — discard but still process queued requests
 						this.inFlight = false;
+						if (this.needsUpdate && this.lastCamera) {
+							this.needsUpdate = false;
+							this.sendRender(this.lastWidth, this.lastHeight, this.lastCamera);
+						}
 						return;
 					}
 
