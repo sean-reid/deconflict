@@ -3,15 +3,61 @@ import type { AccessPoint } from '$state/ap-state.svelte.js';
 import type { DecodedWallMask } from '../wall-detect.js';
 import type { WallMaterialId } from '../materials.js';
 import { WALL_MATERIALS } from '../materials.js';
+import {
+	signalPower,
+	getBaseRate,
+	getAttenField,
+	lookupAtten,
+	invalidateAttenCache,
+	type AttenField
+} from '../../rf/propagation.js';
+
+const CELL_SIZE = 6;
+const MAX_RATIO_SQ = 9;
+const WALL_SIGNAL_THRESHOLD = 0.05;
+
+// Color LUT — 256 entries, built once
+const STOPS: [number, number, number, number, number][] = [
+	[0.0, 100, 35, 35, 0],
+	[0.15, 220, 120, 20, 115],
+	[0.35, 210, 190, 30, 102],
+	[0.55, 130, 190, 60, 94],
+	[0.75, 80, 170, 80, 89],
+	[1.0, 40, 150, 40, 89]
+];
+
+function packColor(r: number, g: number, b: number, a: number): number {
+	return ((a & 0xff) << 24) | ((b & 0xff) << 16) | ((g & 0xff) << 8) | (r & 0xff);
+}
+
+const LUT = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+	const ratio = i / 255;
+	let r = 40,
+		g = 150,
+		b = 40,
+		a = 89;
+	for (let s = 1; s < STOPS.length; s++) {
+		if (ratio <= STOPS[s]![0]) {
+			const lo = STOPS[s - 1]!;
+			const hi = STOPS[s]!;
+			const t = (ratio - lo[0]) / (hi[0] - lo[0]);
+			r = lo[1] + t * (hi[1] - lo[1]);
+			g = lo[2] + t * (hi[2] - lo[2]);
+			b = lo[3] + t * (hi[3] - lo[3]);
+			a = lo[4] + t * (hi[4] - lo[4]);
+			break;
+		}
+	}
+	LUT[i] = packColor(r, g, b, a);
+}
 
 /**
- * Heatmap layer — renders signal coverage via Web Worker.
+ * Heatmap layer — synchronous main-thread rendering.
  *
- * Simple model:
- *  - Compute a state fingerprint each frame
- *  - If it differs from the last request sent, and no request is in-flight, send one
- *  - When a result arrives, store it and check if state changed; if so, send again
- *  - Always composite whatever cached frame we have (never null it out)
+ * Wall attenuation uses precomputed fields from rf/propagation.ts (O(1) lookup).
+ * No Web Worker, no async state. Renders in the same frame as everything else.
+ * Typical render time: 2-7ms (well within 16ms frame budget).
  */
 export class HeatmapLayer implements Layer {
 	id = 'heatmap';
@@ -27,95 +73,34 @@ export class HeatmapLayer implements Layer {
 	floorplanBounds: { width: number; height: number } | null = null;
 	wallMaskBounds: { width: number; height: number } | null = null;
 
-	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
-	private sentKey = '';
-	private requestId = 0;
-	private inFlight = false;
-	private wallsDirty = true;
-	private renderDirty: (() => void) | null = null;
+	private cacheKey = '';
 
-	setDirtyCallback(fn: () => void): void {
-		this.renderDirty = fn;
-	}
-
-	/** Mark walls as changed so they're re-sent to the worker. */
 	markWallsDirty(): void {
-		this.wallsDirty = true;
+		this.cacheKey = '';
+		invalidateAttenCache();
 	}
 
-	private getWorker(): Worker {
-		if (!this.worker) {
-			this.worker = new Worker(new URL('../../workers/heatmap-worker.ts', import.meta.url), {
-				type: 'module'
-			});
-			this.worker.onmessage = (e: MessageEvent) => {
-				const { type, id, buf, width, height } = e.data;
-				if (type !== 'result' || id !== this.requestId) return;
+	render(rc: RenderContext): void {
+		if (this.aps.length === 0) return;
+		const { camera, width, height } = rc;
+		if (width <= 0 || height <= 0) return;
 
-				this.inFlight = false;
-
-				const w = width | 0;
-				const h = height | 0;
-				if (buf && buf.byteLength === w * h * 4 && w > 0 && h > 0) {
-					const offscreen = document.createElement('canvas');
-					offscreen.width = w;
-					offscreen.height = h;
-					const ctx = offscreen.getContext('2d')!;
-					ctx.putImageData(new ImageData(new Uint8ClampedArray(buf), w, h), 0, 0);
-					this.cache = offscreen;
-				}
-
-				this.renderDirty?.();
-			};
-			// Unblock pipeline if worker crashes (Safari module worker issues)
-			this.worker.onerror = () => {
-				this.inFlight = false;
-			};
+		const key = this.getCacheKey(camera, width, height);
+		if (key !== this.cacheKey) {
+			this.cacheKey = key;
+			this.cache = this.generate(width, height, camera);
 		}
-		return this.worker;
-	}
 
-	private syncWalls(): void {
-		if (!this.wallsDirty) return;
-		this.wallsDirty = false;
-
-		const worker = this.getWorker();
-		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
-		const defaultDb = WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
-
-		if (this.wallMask) {
-			const wallCopy = this.wallMask.data.slice();
-			const matCopy = this.materialMap?.slice() ?? null;
-			worker.postMessage(
-				{
-					type: 'setWalls',
-					wallData: wallCopy.buffer,
-					materialMap: matCopy?.buffer ?? null,
-					materialDb: matDb,
-					defaultDb,
-					width: this.wallMask.width,
-					height: this.wallMask.height
-				},
-				matCopy ? [wallCopy.buffer, matCopy.buffer] : [wallCopy.buffer]
-			);
-		} else {
-			worker.postMessage({
-				type: 'setWalls',
-				wallData: null,
-				materialMap: null,
-				materialDb: matDb,
-				defaultDb,
-				width: 0,
-				height: 0
-			});
+		if (this.cache) {
+			rc.compositeOffscreen(this.cache);
 		}
 	}
 
-	private fingerprint(
+	private getCacheKey(
+		camera: { state: { zoom: number; x: number; y: number } },
 		width: number,
-		height: number,
-		camera: { state: { zoom: number; x: number; y: number } }
+		height: number
 	): string {
 		return (
 			this.aps
@@ -131,50 +116,135 @@ export class HeatmapLayer implements Layer {
 		);
 	}
 
-	render(rc: RenderContext): void {
-		if (this.aps.length === 0) return;
+	private generate(
+		width: number,
+		height: number,
+		camera: { getInverseTransform: () => number[] }
+	): HTMLCanvasElement {
+		const offscreen = document.createElement('canvas');
+		offscreen.width = width;
+		offscreen.height = height;
+		const ctx = offscreen.getContext('2d')!;
+		const cellSize = CELL_SIZE;
+		const cols = Math.ceil(width / cellSize);
+		const rows = Math.ceil(height / cellSize);
 
-		const { camera, width, height } = rc;
-		if (width <= 0 || height <= 0) return;
+		let maxTp = 0;
+		for (const ap of this.aps) {
+			const base = getBaseRate(ap.band, ap.channelWidth) * 0.5;
+			if (base > maxTp) maxTp = base;
+		}
+		if (this.ispSpeed > 0 && this.ispSpeed < maxTp) maxTp = this.ispSpeed;
+		if (maxTp <= 0) maxTp = 100;
+		const invMax = 1 / maxTp;
 
-		// Send a new request if state changed and worker is free
-		const key = this.fingerprint(width, height, camera);
-		if (key !== this.sentKey && !this.inFlight) {
-			this.sentKey = key;
-			this.syncWalls();
-			this.inFlight = true;
+		const n = this.aps.length;
+		const apX = new Float64Array(n);
+		const apY = new Float64Array(n);
+		const apRadSq = new Float64Array(n);
+		const apCutSq = new Float64Array(n);
+		const apBase = new Float64Array(n);
+		const defaultDb = WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
+		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
+		const fast = this.isDragging;
 
-			const id = ++this.requestId;
-			const inv = camera.getInverseTransform();
-			const clipBounds = this.floorplanBounds
-				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
-				: this.wallMaskBounds
-					? { x: 0, y: 0, w: this.wallMaskBounds.width, h: this.wallMaskBounds.height }
-					: this.wallMask
-						? { x: 0, y: 0, w: this.wallMask.width, h: this.wallMask.height }
-						: null;
-
-			this.getWorker().postMessage({
-				type: 'render',
-				id,
-				aps: this.aps.map((ap) => ({
-					x: ap.x,
-					y: ap.y,
-					interferenceRadius: ap.interferenceRadius,
-					band: ap.band,
-					channelWidth: ap.channelWidth
-				})),
-				ispSpeed: this.ispSpeed,
-				fast: this.isDragging,
-				clipBounds,
-				cameraInverse: Array.from(inv),
-				viewWidth: width,
-				viewHeight: height
-			});
+		const fields: (AttenField | null)[] = [];
+		for (let i = 0; i < n; i++) {
+			const ap = this.aps[i]!;
+			apX[i] = ap.x;
+			apY[i] = ap.y;
+			const rSq = ap.interferenceRadius * ap.interferenceRadius;
+			apRadSq[i] = rSq;
+			apCutSq[i] = rSq * MAX_RATIO_SQ;
+			apBase[i] = getBaseRate(ap.band, ap.channelWidth) * 0.5;
+			fields.push(
+				this.wallMask
+					? getAttenField(
+							ap.x,
+							ap.y,
+							ap.interferenceRadius,
+							this.wallMask.data,
+							this.wallMask.width,
+							this.wallMask.height,
+							this.materialMap,
+							matDb,
+							defaultDb,
+							fast
+						)
+					: null
+			);
 		}
 
-		if (this.cache) {
-			rc.compositeOffscreen(this.cache);
+		const clip = this.floorplanBounds
+			? this.floorplanBounds
+			: this.wallMaskBounds
+				? this.wallMaskBounds
+				: this.wallMask
+					? { width: this.wallMask.width, height: this.wallMask.height }
+					: null;
+
+		const inv = camera.getInverseTransform();
+		const ia = inv[0]!,
+			ib = inv[1]!,
+			ic = inv[2]!,
+			idd = inv[3]!,
+			ie = inv[4]!,
+			ig = inv[5]!;
+
+		const imgData = ctx.createImageData(width, height);
+		const u32 = new Uint32Array(imgData.data.buffer);
+		const ispCap = this.ispSpeed;
+
+		for (let row = 0; row < rows; row++) {
+			const sy = row * cellSize + (cellSize >> 1);
+			const py0 = row * cellSize;
+			const py1 = Math.min(py0 + cellSize, height);
+
+			for (let col = 0; col < cols; col++) {
+				const sx = col * cellSize + (cellSize >> 1);
+				const wx = ia * sx + ic * sy + ie;
+				const wy = ib * sx + idd * sy + ig;
+
+				if (clip && (wx < 0 || wx > clip.width || wy < 0 || wy > clip.height)) {
+					continue;
+				}
+
+				let best = 0;
+				for (let i = 0; i < n; i++) {
+					const dx = wx - apX[i]!;
+					const dy = wy - apY[i]!;
+					const dSq = dx * dx + dy * dy;
+					if (dSq > apCutSq[i]!) continue;
+
+					const signal = signalPower(dSq, apRadSq[i]!);
+					let tp = apBase[i]! * signal;
+
+					const field = fields[i];
+					if (field && signal > WALL_SIGNAL_THRESHOLD) {
+						const loss = lookupAtten(field, wx, wy);
+						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
+					}
+
+					if (ispCap > 0 && tp > ispCap) tp = ispCap;
+					if (tp > best) best = tp;
+				}
+
+				const ratio = best * invMax;
+				const color = ratio <= 0 ? 0 : LUT[Math.min(255, (ratio * 255) | 0)]!;
+				if (!color) continue;
+
+				const px0 = col * cellSize;
+				const px1 = Math.min(px0 + cellSize, width);
+				for (let py = py0; py < py1; py++) {
+					const rowOff = py * width;
+					for (let px = px0; px < px1; px++) {
+						u32[rowOff + px] = color;
+					}
+				}
+			}
 		}
+
+		ctx.putImageData(imgData, 0, 0);
+		return offscreen;
 	}
 }
