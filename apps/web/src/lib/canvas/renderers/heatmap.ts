@@ -66,6 +66,14 @@ export class HeatmapLayer implements Layer {
 						width: number;
 						height: number;
 					};
+
+					// Validate buffer matches declared dimensions (race during resize)
+					const expected = width * height * 4;
+					if (!buf || buf.byteLength !== expected || width <= 0 || height <= 0) {
+						this.inFlight = false;
+						return;
+					}
+
 					const offscreen = document.createElement('canvas');
 					offscreen.width = width;
 					offscreen.height = height;
@@ -150,6 +158,7 @@ export class HeatmapLayer implements Layer {
 		if (this.aps.length === 0) return;
 
 		const { camera, width, height } = rc;
+		if (width <= 0 || height <= 0) return;
 		const key = this.getCacheKey(camera, width, height);
 
 		if (key !== this.cacheKey) {
