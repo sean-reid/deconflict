@@ -1,13 +1,7 @@
 /// <reference lib="webworker" />
 
 import { computeBuildingInterior } from '../canvas/morph-interior.js';
-import {
-	signalStrengthOptimizer,
-	countWallCrossings,
-	buildAttenField,
-	lookupAtten,
-	type AttenField
-} from '../rf/propagation.js';
+import { signalStrengthOptimizer, countWallCrossings } from '../rf/propagation.js';
 
 interface ApInput {
 	id: string;
@@ -54,7 +48,130 @@ self.onmessage = (event: MessageEvent<InMessage>) => {
 	}
 };
 
-// ─── Evaluation helpers ─────────────────────────────────────────────
+// ─── Precomputed wall-crossing cache ────────────────────────────────
+// Built ONCE before optimization. Maps from a fixed grid of source
+// positions to sample points. AP positions snap to nearest grid source
+// via O(1) grid lookup (no linear scan).
+
+interface WallCache {
+	/** dB attenuation from source i to sample j: table[i * numSamples + j] */
+	table: Float32Array;
+	numSources: number;
+	numSamples: number;
+	/** Grid-cell → source index lookup. -1 = no source in that cell. */
+	gridLookup: Int32Array;
+	gridStep: number;
+	gridCols: number;
+	gridRows: number;
+	srcX: Float32Array;
+	srcY: Float32Array;
+}
+
+function buildWallCache(
+	mask: Uint8Array,
+	w: number,
+	h: number,
+	interior: Uint8Array,
+	samples: Array<{ x: number; y: number }>,
+	wallAttenuation: number
+): WallCache {
+	const gridStep = 8;
+	const gridCols = Math.ceil(w / gridStep);
+	const gridRows = Math.ceil(h / gridStep);
+
+	// Build grid-to-source mapping
+	const gridLookup = new Int32Array(gridCols * gridRows).fill(-1);
+	const srcXArr: number[] = [];
+	const srcYArr: number[] = [];
+
+	for (let gr = 0; gr < gridRows; gr++) {
+		for (let gc = 0; gc < gridCols; gc++) {
+			const wx = gc * gridStep;
+			const wy = gr * gridStep;
+			if (wx < w && wy < h && interior[wy * w + wx]) {
+				gridLookup[gr * gridCols + gc] = srcXArr.length;
+				srcXArr.push(wx);
+				srcYArr.push(wy);
+			}
+		}
+	}
+
+	const numSources = srcXArr.length;
+	const numSamples = samples.length;
+	// Use Float32 to store dB attenuation (not just crossing count)
+	const table = new Float32Array(numSources * numSamples);
+
+	for (let si = 0; si < numSources; si++) {
+		for (let sj = 0; sj < numSamples; sj++) {
+			// Stride-3 DDA for fast cache build. Use flat dB per crossing.
+			const crossings = countWallCrossings(
+				mask,
+				w,
+				h,
+				srcXArr[si]!,
+				srcYArr[si]!,
+				samples[sj]!.x,
+				samples[sj]!.y,
+				3
+			);
+			table[si * numSamples + sj] = crossings * wallAttenuation;
+		}
+	}
+
+	return {
+		table,
+		numSources,
+		numSamples,
+		gridLookup,
+		gridStep,
+		gridCols,
+		gridRows,
+		srcX: new Float32Array(srcXArr),
+		srcY: new Float32Array(srcYArr)
+	};
+}
+
+/** O(1) grid-based source lookup — replaces linear scan. */
+function nearestSourceIdx(cache: WallCache, x: number, y: number): number {
+	const gc = Math.round(x / cache.gridStep);
+	const gr = Math.round(y / cache.gridStep);
+
+	// Check the target cell and its 8 neighbors (handles off-grid positions)
+	let bestIdx = -1;
+	let bestDist = Infinity;
+	for (let dr = -1; dr <= 1; dr++) {
+		for (let dc = -1; dc <= 1; dc++) {
+			const r = gr + dr;
+			const c = gc + dc;
+			if (r < 0 || r >= cache.gridRows || c < 0 || c >= cache.gridCols) continue;
+			const idx = cache.gridLookup[r * cache.gridCols + c]!;
+			if (idx < 0) continue;
+			const dx = cache.srcX[idx]! - x;
+			const dy = cache.srcY[idx]! - y;
+			const d = dx * dx + dy * dy;
+			if (d < bestDist) {
+				bestDist = d;
+				bestIdx = idx;
+			}
+		}
+	}
+
+	// Fallback: if no neighbor found, scan (rare — only at building edges)
+	if (bestIdx < 0) {
+		for (let i = 0; i < cache.numSources; i++) {
+			const dx = cache.srcX[i]! - x;
+			const dy = cache.srcY[i]! - y;
+			const d = dx * dx + dy * dy;
+			if (d < bestDist) {
+				bestDist = d;
+				bestIdx = i;
+			}
+		}
+	}
+	return bestIdx;
+}
+
+// ─── Evaluation ─────────────────────────────────────────────────────
 
 interface Position {
 	id: string;
@@ -63,30 +180,25 @@ interface Position {
 	radius: number;
 }
 
-/**
- * Evaluate coverage using precomputed attenuation fields (O(1) wall lookup).
- * Used by Lloyd's and PSO stages for fast iteration.
- */
-function evaluateFast(
+function evaluateCoverage(
 	positions: Position[],
 	samples: Array<{ x: number; y: number }>,
-	wallData: Uint8Array,
-	wallW: number,
-	wallH: number,
-	wallAttenuation: number,
-	attenFields: AttenField[]
+	cache: WallCache
 ): number {
 	let total = 0;
 	for (let s = 0; s < samples.length; s++) {
 		let best = 0;
-		for (let a = 0; a < positions.length; a++) {
-			const dx = samples[s]!.x - positions[a]!.x;
-			const dy = samples[s]!.y - positions[a]!.y;
+		for (const ap of positions) {
+			const dx = samples[s]!.x - ap.x;
+			const dy = samples[s]!.y - ap.y;
 			const dist = Math.sqrt(dx * dx + dy * dy);
-			let signal = signalStrengthOptimizer(dist, positions[a]!.radius);
-			if (signal > 0.001 && attenFields[a]) {
-				const loss = lookupAtten(attenFields[a]!, samples[s]!.x, samples[s]!.y);
-				if (loss > 0) signal *= Math.pow(10, -loss / 20);
+			let signal = signalStrengthOptimizer(dist, ap.radius);
+			if (signal > 0.001) {
+				const srcIdx = nearestSourceIdx(cache, ap.x, ap.y);
+				if (srcIdx >= 0) {
+					const dbLoss = cache.table[srcIdx * cache.numSamples + s]!;
+					if (dbLoss > 0) signal *= Math.pow(10, -dbLoss / 20);
+				}
 			}
 			if (signal > best) best = signal;
 		}
@@ -95,27 +207,6 @@ function evaluateFast(
 	return total / samples.length;
 }
 
-/**
- * Rebuild attenuation fields for all AP positions.
- * Each field is a coarse grid of dB attenuation from the AP.
- */
-function buildFields(
-	positions: Position[],
-	wallData: Uint8Array,
-	wallW: number,
-	wallH: number,
-	wallAttenuation: number
-): AttenField[] {
-	// Use flat dB per crossing: materialDb = [wallAttenuation], materialMap = null
-	const matDb = [wallAttenuation];
-	return positions.map((p) =>
-		buildAttenField(p.x, p.y, p.radius * 1.5, wallData, wallW, wallH, null, matDb, wallAttenuation)
-	);
-}
-
-/**
- * Exact evaluation using stride-1 ray march. Used for final polish only.
- */
 function evaluateExact(
 	positions: Position[],
 	samples: Array<{ x: number; y: number }>,
@@ -161,12 +252,17 @@ function snapToInterior(
 	return { x: bestIdx % w, y: Math.floor(bestIdx / w) };
 }
 
+// ─── Yield to event loop for cancel checks ──────────────────────────
+
+function yieldToEventLoop(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // ─── Main optimization pipeline ─────────────────────────────────────
 
 async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const { aps, wallMask: mask, maskWidth: w, maskHeight: h, wallAttenuation } = msg;
 
-	// Compute interior
 	const { interior } = computeBuildingInterior(mask, w, h, {
 		maxDim: 200,
 		dilateRatio: 0.04,
@@ -204,7 +300,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		samples.push({ x: idx % w, y: Math.floor(idx / w) });
 	}
 
-	// Precompute attenuation fields
+	// Build wall cache ONCE (stride-3 DDA, O(1) grid lookup)
 	self.postMessage({
 		type: 'progress',
 		positions: [],
@@ -213,7 +309,10 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		totalIterations: 100,
 		stage: 'Precomputing...'
 	});
+	const cache = buildWallCache(mask, w, h, interior, samples, wallAttenuation);
 
+	// Yield to let cancel message arrive
+	await yieldToEventLoop();
 	if (cancelled) {
 		self.postMessage({ type: 'cancelled' });
 		return;
@@ -223,7 +322,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 
 	const positions: Position[] = [];
 
-	// K-means++ initialization
+	// K-means++ init
 	const firstIdx = interiorPixels[Math.floor(Math.random() * interiorPixels.length)]!;
 	positions.push({
 		id: aps[0]!.id,
@@ -256,14 +355,12 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		});
 	}
 
-	// Lloyd's iterations with precomputed fields
+	// Lloyd's iterations
 	for (let iter = 0; iter < 30; iter++) {
 		if (cancelled) {
 			self.postMessage({ type: 'cancelled' });
 			return;
 		}
-
-		const fields = buildFields(positions, mask, w, h, wallAttenuation);
 
 		const buckets: Array<{ sumX: number; sumY: number; sumW: number }> = positions.map(() => ({
 			sumX: 0,
@@ -279,9 +376,12 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				const dy = samples[s]!.y - positions[a]!.y;
 				const dist = Math.sqrt(dx * dx + dy * dy);
 				let signal = signalStrengthOptimizer(dist, positions[a]!.radius);
-				if (signal > 0.001 && fields[a]) {
-					const loss = lookupAtten(fields[a]!, samples[s]!.x, samples[s]!.y);
-					if (loss > 0) signal *= Math.pow(10, -loss / 20);
+				if (signal > 0.001) {
+					const srcIdx = nearestSourceIdx(cache, positions[a]!.x, positions[a]!.y);
+					if (srcIdx >= 0) {
+						const dbLoss = cache.table[srcIdx * cache.numSamples + s]!;
+						if (dbLoss > 0) signal *= Math.pow(10, -dbLoss / 20);
+					}
 				}
 				if (signal > bestSignal) {
 					bestSignal = signal;
@@ -309,8 +409,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		if (maxMove < 1.0) break;
 	}
 
-	const lloydsFields = buildFields(positions, mask, w, h, wallAttenuation);
-	const lloydsScore = evaluateFast(positions, samples, mask, w, h, wallAttenuation, lloydsFields);
+	const lloydsScore = evaluateCoverage(positions, samples, cache);
 	self.postMessage({
 		type: 'progress',
 		positions: positions.map((p) => ({ id: p.id, x: p.x, y: p.y })),
@@ -319,6 +418,12 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		totalIterations: 100,
 		stage: "Lloyd's complete"
 	});
+
+	await yieldToEventLoop();
+	if (cancelled) {
+		self.postMessage({ type: 'cancelled' });
+		return;
+	}
 
 	// ─── Stage 2: PSO Refinement ────────────────────────────────────
 
@@ -361,8 +466,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				radius: aps[a]!.interferenceRadius
 			});
 		}
-		const fields = buildFields(tempPositions, mask, w, h, wallAttenuation);
-		return evaluateFast(tempPositions, samples, mask, w, h, wallAttenuation, fields);
+		return evaluateCoverage(tempPositions, samples, cache);
 	}
 
 	for (let p = 0; p < SWARM; p++) {
@@ -374,9 +478,13 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	}
 
 	for (let iter = 0; iter < PSO_ITERS; iter++) {
-		if (cancelled) {
-			self.postMessage({ type: 'cancelled' });
-			return;
+		// Yield every 5 iterations so cancel messages can arrive
+		if (iter % 5 === 0) {
+			await yieldToEventLoop();
+			if (cancelled) {
+				self.postMessage({ type: 'cancelled' });
+				return;
+			}
 		}
 
 		const inertia = 0.9 - 0.5 * (iter / PSO_ITERS);
@@ -435,6 +543,12 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 
 	// ─── Stage 3: Coordinate Descent Polish ─────────────────────────
 
+	await yieldToEventLoop();
+	if (cancelled) {
+		self.postMessage({ type: 'cancelled' });
+		return;
+	}
+
 	const finalPositions: Position[] = [];
 	for (let a = 0; a < numAps; a++) {
 		finalPositions.push({
@@ -459,6 +573,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const minStep = 0.5;
 
 	while (polishStep >= minStep) {
+		await yieldToEventLoop();
 		if (cancelled) {
 			self.postMessage({ type: 'cancelled' });
 			return;
@@ -467,10 +582,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		let bestScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
 
 		for (let a = 0; a < numAps; a++) {
-			if (cancelled) {
-				self.postMessage({ type: 'cancelled' });
-				return;
-			}
 			for (const [ddx, ddy] of DIRS) {
 				const oldX = finalPositions[a]!.x;
 				const oldY = finalPositions[a]!.y;
@@ -493,21 +604,10 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	}
 
 	const finalScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
-	const initFields = buildFields(
-		aps.map((a) => ({ ...a, radius: a.interferenceRadius })),
-		mask,
-		w,
-		h,
-		wallAttenuation
-	);
-	const initialScore = evaluateFast(
+	const initialScore = evaluateCoverage(
 		aps.map((a) => ({ ...a, radius: a.interferenceRadius })),
 		samples,
-		mask,
-		w,
-		h,
-		wallAttenuation,
-		initFields
+		cache
 	);
 	const improvement = initialScore > 0 ? ((finalScore - initialScore) / initialScore) * 100 : 0;
 
