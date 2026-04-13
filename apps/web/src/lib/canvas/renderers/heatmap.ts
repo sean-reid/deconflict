@@ -52,6 +52,8 @@ export class HeatmapLayer implements Layer {
 	invalidateCache(): void {
 		this.cacheKey = '';
 		this.cache = null;
+		// Force syncWalls to re-send data on next render (wall pixels may have changed in-place)
+		this.lastWallVersion = -1;
 	}
 
 	/** Force a full-quality re-render (call on drag end). */
