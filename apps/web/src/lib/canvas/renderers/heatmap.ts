@@ -173,9 +173,14 @@ export class HeatmapLayer implements Layer {
 			});
 		}
 
-		// Always composite whatever we have
+		// Composite cached frame, stretching to fit if dimensions changed (resize transition)
 		if (this.cache) {
-			rc.compositeOffscreen(this.cache);
+			const { ctx, dpr } = rc;
+			ctx.save();
+			ctx.resetTransform();
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.drawImage(this.cache, 0, 0, width, height);
+			ctx.restore();
 		}
 	}
 }
