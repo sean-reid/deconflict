@@ -24,3 +24,4 @@ Thumbs.db
 # Test artifacts
 test-results/
 playwright-report/
+MULTI_FLOOR_DESIGN.md
