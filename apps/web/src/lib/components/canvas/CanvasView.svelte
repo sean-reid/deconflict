@@ -371,7 +371,7 @@
 		if (!heatmapLayer) return;
 		const mask = wallState.wallMask;
 		heatmapLayer.wallMaskBounds = mask ? { width: mask.width, height: mask.height } : null;
-		heatmapLayer.invalidateCache();
+		heatmapLayer.clearCache();
 		engine.markDirty();
 	});
 
