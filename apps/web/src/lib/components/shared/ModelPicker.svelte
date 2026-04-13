@@ -63,12 +63,14 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="backdrop" onclick={() => { open = false; }}></div>
 		<div class="dropdown">
+			<!-- Stop keyboard propagation so Backspace/Delete don't trigger AP deletion -->
 			<input
 				bind:this={inputEl}
 				class="search"
 				type="text"
 				placeholder="Search models..."
 				bind:value={query}
+				onkeydown={(e) => e.stopPropagation()}
 			/>
 			<div class="results">
 				{#each [...filteredByVendor.entries()] as [vendor, models]}
