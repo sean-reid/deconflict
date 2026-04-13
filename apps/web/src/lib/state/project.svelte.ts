@@ -44,21 +44,26 @@ export const projectState = $state({
 
 export function addAp(x: number, y: number): AccessPoint {
 	pushState();
+
+	// Inherit model, band, width, power, and radius from the last placed AP
+	// so users can place multiple of the same vendor/model in a row
+	const prev = projectState.aps.length > 0 ? projectState.aps[projectState.aps.length - 1] : null;
+
 	const ap: AccessPoint = {
 		id: createId(),
 		name: `AP-${nextApNumber++}`,
 		x,
 		y,
-		band: projectState.band,
-		channelWidth: projectState.channelWidth,
+		band: prev?.band ?? projectState.band,
+		channelWidth: prev?.channelWidth ?? projectState.channelWidth,
 		fixedChannel: null,
 		assignedChannel: null,
-		interferenceRadius: projectState.calibration
+		interferenceRadius: prev?.interferenceRadius ?? (projectState.calibration
 			? Math.round(15 * projectState.calibration.worldUnitsPerMeter)
-			: 150,
-		power: 20,
-		modelId: null,
-		modelLabel: null
+			: 150),
+		power: prev?.power ?? 20,
+		modelId: prev?.modelId ?? null,
+		modelLabel: prev?.modelLabel ?? null
 	};
 	projectState.aps.push(ap);
 	scheduleSave();

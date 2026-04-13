@@ -290,10 +290,18 @@
 		};
 	});
 
-	// Sync state to layers via $effect
+	// Sync state to layers via $effect — read deep AP properties for reactivity
 	$effect(() => {
 		if (!apLayer) return;
-		apLayer.aps = projectState.aps;
+		const aps = projectState.aps;
+		for (const ap of aps) {
+			void ap.x;
+			void ap.y;
+			void ap.assignedChannel;
+			void ap.band;
+			void ap.name;
+		}
+		apLayer.aps = aps;
 		engine.markDirty();
 	});
 
@@ -317,7 +325,9 @@
 
 	$effect(() => {
 		if (!gridLayer) return;
-		gridLayer.worldUnitsPerMeter = projectState.calibration?.worldUnitsPerMeter ?? null;
+		// Default ~10 canvas units per foot so the grid shows feet even before calibration
+		const DEFAULT_WUPM = 10 * 3.28084; // 32.8 world units per meter
+		gridLayer.worldUnitsPerMeter = projectState.calibration?.worldUnitsPerMeter ?? DEFAULT_WUPM;
 		gridLayer.unitSystem = projectState.unitSystem;
 		engine.markDirty();
 	});
@@ -330,10 +340,23 @@
 
 	$effect(() => {
 		if (!heatmapLayer) return;
-		heatmapLayer.aps = projectState.aps;
+		// Read individual AP properties so Svelte tracks deep changes
+		// (band, channelWidth, power, radius, model etc. — not just the array ref)
+		const aps = projectState.aps;
+		for (const ap of aps) {
+			void ap.x;
+			void ap.y;
+			void ap.band;
+			void ap.channelWidth;
+			void ap.interferenceRadius;
+			void ap.assignedChannel;
+			void ap.power;
+		}
+		heatmapLayer.aps = aps;
 		heatmapLayer.ispSpeed = projectState.ispSpeed;
 		engine.markDirty();
 	});
+
 
 	// Decode wall mask + material mask (async, only when data URLs actually change)
 	let wallMaskVersion = 0;
@@ -444,12 +467,14 @@
 	});
 
 
-	// Auto-solve: debounce solver runs when APs change
-	// Auto-solve: only re-run when AP layout changes (count, positions, radii)
-	// NOT when channel assignments change (which would cause infinite loops)
+	// Auto-solve: debounce solver runs when AP layout or RF params change.
+	// Excludes assignedChannel to avoid infinite loops (solver writes channels).
 	let autoSolveKey = $derived(
 		projectState.aps
-			.map((ap) => `${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}`)
+			.map(
+				(ap) =>
+					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
+			)
 			.join('|')
 	);
 
