@@ -14,13 +14,16 @@ import {
 } from '../rf/propagation.js';
 
 const CELL_SIZE = 6;
-const MAX_RATIO_SQ = 4;
+// No hard cutoff — signal fades smoothly via 1/(1+r^4).
+// Skip cells where signal would be < 0.5% (perf optimization, no visual edge).
+const MAX_RATIO_SQ = 9; // ratio=3 → signal ≈ 1.2%
 const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // --- Color LUT ---
 
+// Dead zone blends smoothly INTO the lowest signal color (no sharp transition)
 const STOPS: [number, number, number, number, number][] = [
-	[0.0, 180, 40, 40, 128],
+	[0.0, 100, 35, 35, 80],
 	[0.15, 220, 120, 20, 115],
 	[0.35, 210, 190, 30, 102],
 	[0.55, 130, 190, 60, 94],
@@ -33,7 +36,7 @@ function packColor(r: number, g: number, b: number, a: number): number {
 }
 
 const LUT = new Uint32Array(256);
-const DEAD_COLOR = packColor(60, 30, 30, 115);
+const DEAD_COLOR = packColor(100, 35, 35, 80); // matches lowest LUT stop
 
 for (let i = 0; i < 256; i++) {
 	const ratio = i / 255;

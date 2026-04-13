@@ -21,6 +21,8 @@ export class WallLayer implements Layer {
 
 	render(rc: RenderContext): void {
 		if (!this.mask) return;
+		// Skip rendering empty masks (e.g. draw-from-scratch before any walls are drawn)
+		if (!this.cachedImage && !this.mask.data.some((v) => v)) return;
 		const { camera, width, height } = rc;
 
 		const needsRegen =
