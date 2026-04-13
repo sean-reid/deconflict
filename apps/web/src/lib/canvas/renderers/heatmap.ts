@@ -30,6 +30,8 @@ export class HeatmapLayer implements Layer {
 	private lastMaterialVersion = -1;
 	private lastDefaultMaterial: WallMaterialId = -1 as WallMaterialId;
 	private renderDirty: (() => void) | null = null;
+	isDragging = false;
+	private dragEndTimer: ReturnType<typeof setTimeout> | null = null;
 
 	/** Provide a callback so the worker result can trigger a canvas repaint. */
 	setDirtyCallback(fn: () => void): void {
@@ -132,21 +134,28 @@ export class HeatmapLayer implements Layer {
 
 		if (key !== this.cacheKey) {
 			this.cacheKey = key;
-			this.requestRender(width, height, camera);
+			// During drag: skip walls for instant feedback (~3ms).
+			// On drag end: re-render with walls for accuracy.
+			this.requestRender(width, height, camera, this.isDragging);
 		}
 
-		// Composite whatever we have (old frame while worker computes new one)
 		if (this.cache) {
 			rc.compositeOffscreen(this.cache);
 		}
 	}
 
+	/** Call when drag state changes to schedule a full re-render on drop. */
+	notifyDragEnd(): void {
+		this.cacheKey = ''; // force re-render with walls
+	}
+
 	private requestRender(
 		width: number,
 		height: number,
-		camera: { getInverseTransform: () => number[] }
+		camera: { getInverseTransform: () => number[] },
+		skipWalls = false
 	): void {
-		this.syncWalls();
+		if (!skipWalls) this.syncWalls();
 
 		const id = ++this.pendingId;
 		const inv = camera.getInverseTransform();
@@ -163,6 +172,7 @@ export class HeatmapLayer implements Layer {
 			id,
 			aps,
 			ispSpeed: this.ispSpeed,
+			skipWalls,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,
 			viewHeight: height

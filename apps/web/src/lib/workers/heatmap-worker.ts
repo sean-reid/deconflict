@@ -80,6 +80,7 @@ interface RenderMsg {
 	id: number;
 	aps: ApData[];
 	ispSpeed: number;
+	skipWalls?: boolean;
 	cameraInverse: number[];
 	viewWidth: number;
 	viewHeight: number;
@@ -110,7 +111,15 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 	}
 
 	if (msg.type === 'render') {
-		const { id, aps, ispSpeed, cameraInverse: inv, viewWidth: width, viewHeight: height } = msg;
+		const {
+			id,
+			aps,
+			ispSpeed,
+			skipWalls,
+			cameraInverse: inv,
+			viewWidth: width,
+			viewHeight: height
+		} = msg;
 		const cellSize = CELL_SIZE;
 		const cols = Math.ceil(width / cellSize);
 		const rows = Math.ceil(height / cellSize);
@@ -140,7 +149,7 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 			apCutSq[i] = rSq * MAX_RATIO_SQ;
 			apBase[i] = getBaseRate(ap.band, ap.channelWidth) * 0.5;
 			attenFields.push(
-				wallData
+				wallData && !skipWalls
 					? getAttenField(
 							ap.x,
 							ap.y,

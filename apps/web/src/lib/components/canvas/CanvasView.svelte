@@ -356,6 +356,16 @@
 		engine.markDirty();
 	});
 
+	// During drag: skip walls for instant heatmap. On drop: full re-render.
+	$effect(() => {
+		if (!heatmapLayer) return;
+		const dragging = canvasState.isDragging;
+		heatmapLayer.isDragging = dragging;
+		if (!dragging) {
+			heatmapLayer.notifyDragEnd();
+			engine.markDirty();
+		}
+	});
 
 	// Decode wall mask + material mask (async, only when data URLs actually change)
 	let wallMaskVersion = 0;
