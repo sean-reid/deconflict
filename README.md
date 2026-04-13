@@ -9,6 +9,7 @@ Place access points on a floorplan, see physics-based signal coverage through wa
 ## Features
 
 ### Core
+
 - **Physics-based heatmap** - indoor path loss model with per-material wall attenuation via ray marching, rendered in a Web Worker for real-time updates
 - **Auto channel solver** - DSatur graph coloring assigns channels in real time as you place APs
 - **AP placement optimizer** - 3-stage hybrid: Signal-Weighted Lloyd's, Particle Swarm Optimization, Coordinate Descent polish
@@ -16,6 +17,7 @@ Place access points on a floorplan, see physics-based signal coverage through wa
 - **Coverage radius from physics** - derived from TX power (dBm) using the indoor path loss model, not a manual slider
 
 ### Floorplan & Walls
+
 - **Auto wall detection** - walls extracted from floorplan images via adaptive local thresholding with OCR text removal
 - **6 wall materials** - Drywall (3 dB), Wood (5 dB), Glass (2 dB), Brick (8 dB), Concrete (12 dB), Metal (20 dB)
 - **Click-to-override** - click any wall to change its material; connected wall segments update together
@@ -25,6 +27,7 @@ Place access points on a floorplan, see physics-based signal coverage through wa
 - **Floorplan calibration** - auto-detect building boundary and calibrate to real-world units
 
 ### Interaction
+
 - **Smart interaction** - tap to place, drag to move, shift-click for multi-select, drag empty space to pan, pinch to zoom
 - **Undo/redo** - full history for AP moves, wall edits, and material changes
 - **Imperial/metric toggle** - feet or meters across the entire app
@@ -32,6 +35,7 @@ Place access points on a floorplan, see physics-based signal coverage through wa
 - **Export** - save projects as JSON, export to PNG or PDF
 
 ### Technical
+
 - **Offline-ready** - runs entirely in the browser, no server required
 - **Persistent** - everything survives page reloads via localStorage
 - **Mobile-friendly** - responsive with touch gestures and mobile sidebar
@@ -61,17 +65,17 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Keyboard Shortcuts
 
-| Key              | Action              |
-| ---------------- | ------------------- |
-| G                | Toggle grid         |
-| W                | Toggle walls        |
-| H                | Toggle heatmap      |
-| L                | Toggle labels       |
-| Ctrl/Cmd + Z     | Undo                |
-| Ctrl/Cmd + Shift + Z | Redo           |
-| Ctrl/Cmd + A     | Select all APs      |
-| Delete           | Remove selected APs |
-| Scroll           | Zoom                |
+| Key                  | Action              |
+| -------------------- | ------------------- |
+| G                    | Toggle grid         |
+| W                    | Toggle walls        |
+| H                    | Toggle heatmap      |
+| L                    | Toggle labels       |
+| Ctrl/Cmd + Z         | Undo                |
+| Ctrl/Cmd + Shift + Z | Redo                |
+| Ctrl/Cmd + A         | Select all APs      |
+| Delete               | Remove selected APs |
+| Scroll               | Zoom                |
 
 ## Architecture
 
