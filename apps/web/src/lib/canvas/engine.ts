@@ -45,8 +45,8 @@ export class CanvasEngine {
 		this.width = width;
 		this.height = height;
 		this.dpr = window.devicePixelRatio || 1;
-		this.canvas.width = width * this.dpr;
-		this.canvas.height = height * this.dpr;
+		// Don't set canvas.width/height here — that clears the canvas immediately,
+		// causing a flash before the next frame renders. Defer to render().
 		this.canvas.style.width = `${width}px`;
 		this.canvas.style.height = `${height}px`;
 		this.markDirty();
@@ -73,6 +73,14 @@ export class CanvasEngine {
 
 	private render(): void {
 		const { ctx, camera, width, height, dpr } = this;
+
+		// Resize backing buffer here (same frame as draw) to avoid blank flash
+		const bw = width * dpr;
+		const bh = height * dpr;
+		if (this.canvas.width !== bw || this.canvas.height !== bh) {
+			this.canvas.width = bw;
+			this.canvas.height = bh;
+		}
 
 		const compositeOffscreen = (offscreen: HTMLCanvasElement, alpha = 1): void => {
 			ctx.resetTransform();
