@@ -252,8 +252,8 @@
 		</div>
 		<div class="draw-scratch">
 			<Button variant="secondary" size="sm" onclick={() => {
-				const w = 4000;
-				const h = 3000;
+				const w = 2000;
+				const h = 1500;
 				const emptyData = new Uint8Array(w * h);
 				const dataUrl = encodeMask(emptyData, w, h);
 				projectState.wallMask = { dataUrl, width: w, height: h };

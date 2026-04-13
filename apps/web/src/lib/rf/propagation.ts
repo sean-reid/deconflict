@@ -156,15 +156,10 @@ export function buildAttenField(
 	defaultDb: number,
 	gridStep = ATTEN_GRID_STEP
 ): AttenField {
-	// Extend grid to cover full signal range, not just mask bounds.
-	// The ray from AP to an out-of-bounds destination still crosses
-	// in-bounds wall pixels, projecting the shadow cone correctly.
-	const originX = Math.min(0, Math.floor(apX - maxDist));
-	const originY = Math.min(0, Math.floor(apY - maxDist));
-	const endX = Math.max(wallW, Math.ceil(apX + maxDist));
-	const endY = Math.max(wallH, Math.ceil(apY + maxDist));
-	const cols = Math.ceil((endX - originX) / gridStep);
-	const rows = Math.ceil((endY - originY) / gridStep);
+	const originX = 0;
+	const originY = 0;
+	const cols = Math.ceil(wallW / gridStep);
+	const rows = Math.ceil(wallH / gridStep);
 	const grid = new Float32Array(cols * rows);
 	const maxDistSq = maxDist * maxDist;
 
