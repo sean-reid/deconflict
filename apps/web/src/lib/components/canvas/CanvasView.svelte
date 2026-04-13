@@ -262,6 +262,8 @@
 			for (const entry of entries) {
 				const { width, height } = entry.contentRect;
 				engine.resize(width, height);
+				// Force heatmap re-render at new dimensions
+				if (heatmapLayer) heatmapLayer.invalidateCache();
 			}
 		});
 		observer.observe(containerEl);
