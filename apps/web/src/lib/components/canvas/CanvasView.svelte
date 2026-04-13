@@ -136,6 +136,7 @@
 		wallLayer.invalidateCache();
 		heatmapLayer.materialMap = cachedMaterialData;
 		heatmapLayer.materialVersion++;
+		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 
 		// Encode and persist
