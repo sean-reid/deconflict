@@ -41,9 +41,9 @@ test.describe('Wall materials', () => {
 		await page.waitForTimeout(200);
 
 		// Material picker should show 6 options
-		const matPicker = page.locator('.mat-picker');
+		const matPicker = page.locator('.row-bottom');
 		await expect(matPicker).toBeVisible();
-		await expect(matPicker.locator('.mat-option')).toHaveCount(6);
+		await expect(matPicker.locator('.mat-chip')).toHaveCount(6);
 
 		// Done
 		await page.locator('.wall-toolbar').locator('text=Done').click();
