@@ -13,14 +13,17 @@
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
-	import { projectState, removeAps, getEffectiveWupm } from '$state/project.svelte.js';
+	import { apState, removeAps, getEffectiveWupm } from '$state/ap-state.svelte.js';
+	import { floorplanState } from '$state/floorplan-state.svelte.js';
+	import { wallState } from '$state/wall-state.svelte.js';
+	import { projectMeta } from '$state/project-meta.svelte.js';
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
 	import { solverState, runSolver } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
-	import { setEngineRef, setMaterialChangeHandler } from '$canvas/engine-ref.js';
+	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
@@ -45,16 +48,16 @@
 		}
 		// Re-encode edited masks and persist (use handler dimensions which may have expanded)
 		if (cachedWallData) {
-			const width = wallEditHandler.maskWidth || projectState.wallMask?.width || 800;
-			const height = wallEditHandler.maskHeight || projectState.wallMask?.height || 600;
+			const width = wallEditHandler.maskWidth || wallState.wallMask?.width || 800;
+			const height = wallEditHandler.maskHeight || wallState.wallMask?.height || 600;
 			const newWallUrl = encodeMask(cachedWallData, width, height);
 			const newMatUrl = cachedMaterialData ? encodeMaterialMask(cachedMaterialData, width, height) : null;
 
 			// Update URLs and pre-set lastUrls so the async decode effect skips re-decode
-			projectState.wallMask = { dataUrl: newWallUrl, width, height };
+			wallState.wallMask = { dataUrl: newWallUrl, width, height };
 			lastWallMaskUrl = newWallUrl;
 			if (newMatUrl) {
-				projectState.materialMask = { dataUrl: newMatUrl, width, height };
+				wallState.materialMask = { dataUrl: newMatUrl, width, height };
 				lastMatMaskUrl = newMatUrl;
 			}
 
@@ -102,7 +105,7 @@
 		const world = engine.camera.screenToWorld({ x: screenX, y: screenY });
 		const px = Math.round(world.x);
 		const py = Math.round(world.y);
-		const mask = projectState.wallMask;
+		const mask = wallState.wallMask;
 		if (!mask || px < 0 || px >= mask.width || py < 0 || py >= mask.height) return false;
 		const idx = py * mask.width + px;
 		if (!cachedWallData[idx]) return false;
@@ -110,20 +113,20 @@
 		const blobId = cachedWallLabels.labels[idx]!;
 		if (blobId < 0) return false;
 
-		const matId = cachedMaterialData ? (cachedMaterialData[idx] ?? projectState.wallMaterial) : projectState.wallMaterial;
+		const matId = cachedMaterialData ? (cachedMaterialData[idx] ?? wallState.wallMaterial) : wallState.wallMaterial;
 		wallPopup = { x: screenX, y: screenY, material: matId as WallMaterialId, blobId };
 		return true;
 	}
 
 	async function handleMaterialSelect(newMaterial: WallMaterialId) {
-		if (!wallPopup || !cachedWallLabels || !projectState.wallMask) return;
+		if (!wallPopup || !cachedWallLabels || !wallState.wallMask) return;
 		pushState(); // undo captures state before blob relabel
-		const mask = projectState.wallMask;
+		const mask = wallState.wallMask;
 
 		// Create or clone material mask
 		if (!cachedMaterialData) {
 			cachedMaterialData = new Uint8Array(mask.width * mask.height);
-			cachedMaterialData.fill(projectState.wallMaterial);
+			cachedMaterialData.fill(wallState.wallMaterial);
 		}
 
 		relabelBlob(cachedWallLabels.labels, cachedMaterialData, wallPopup.blobId, newMaterial);
@@ -137,7 +140,7 @@
 
 		// Encode and persist
 		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
-		projectState.materialMask = { dataUrl, width: mask.width, height: mask.height };
+		wallState.materialMask = { dataUrl, width: mask.width, height: mask.height };
 		scheduleSave();
 	}
 
@@ -156,7 +159,7 @@
 	let apLayer: ApLayer;
 	let wallLayer: WallLayer;
 	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
-	let showEmptyHint = $derived(projectState.aps.length === 0 && !projectState.floorplanUrl);
+	let showEmptyHint = $derived(apState.aps.length === 0 && !floorplanState.floorplanUrl);
 
 	function handleKeyDown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
@@ -208,15 +211,6 @@
 		window.addEventListener('keydown', handleKeyDown);
 		engine = new CanvasEngine(canvasEl);
 		setEngineRef(engine);
-		setMaterialChangeHandler((id) => {
-			wallLayer.defaultMaterial = id;
-			wallLayer.invalidateCache();
-			heatmapLayer.defaultMaterial = id;
-			heatmapLayer.materialVersion++;
-			heatmapLayer.invalidateCache();
-			engine.markDirty();
-		});
-
 		// Create layers
 		floorplanLayer = new FloorplanLayer();
 		gridLayer = new GridLayer();
@@ -291,10 +285,10 @@
 		};
 	});
 
-	// Sync state to layers via $effect — read deep AP properties for reactivity
+	// Sync AP layer — only tracks apState, not wall/floorplan state
 	$effect(() => {
 		if (!apLayer) return;
-		const aps = projectState.aps;
+		const aps = apState.aps;
 		for (const ap of aps) {
 			void ap.x;
 			void ap.y;
@@ -327,7 +321,7 @@
 	$effect(() => {
 		if (!gridLayer) return;
 		gridLayer.worldUnitsPerMeter = getEffectiveWupm();
-		gridLayer.unitSystem = projectState.unitSystem;
+		gridLayer.unitSystem = floorplanState.unitSystem;
 		engine.markDirty();
 	});
 
@@ -337,11 +331,10 @@
 		engine.markDirty();
 	});
 
+	// Sync heatmap APs — only tracks apState
 	$effect(() => {
 		if (!heatmapLayer) return;
-		// Read individual AP properties so Svelte tracks deep changes
-		// (band, channelWidth, power, radius, model etc. — not just the array ref)
-		const aps = projectState.aps;
+		const aps = apState.aps;
 		for (const ap of aps) {
 			void ap.x;
 			void ap.y;
@@ -352,7 +345,13 @@
 			void ap.power;
 		}
 		heatmapLayer.aps = aps;
-		heatmapLayer.ispSpeed = projectState.ispSpeed;
+		engine.markDirty();
+	});
+
+	// Sync heatmap ISP speed — only tracks projectMeta
+	$effect(() => {
+		if (!heatmapLayer) return;
+		heatmapLayer.ispSpeed = projectMeta.ispSpeed;
 		engine.markDirty();
 	});
 
@@ -367,14 +366,26 @@
 		}
 	});
 
-	// Decode wall mask + material mask (async, only when data URLs actually change)
+	// Sync wall material to renderers — only tracks wallState.wallMaterial
+	$effect(() => {
+		if (!wallLayer || !heatmapLayer) return;
+		const id = wallState.wallMaterial;
+		wallLayer.defaultMaterial = id;
+		wallLayer.invalidateCache();
+		heatmapLayer.defaultMaterial = id;
+		heatmapLayer.materialVersion++;
+		heatmapLayer.invalidateCache();
+		engine.markDirty();
+	});
+
+	// Decode wall mask + material mask — only tracks wallState (not apState)
 	let wallMaskVersion = 0;
 	let lastWallMaskUrl: string | null = null;
 	let lastMatMaskUrl: string | null = null;
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
-		const mask = projectState.wallMask;
-		const matMask = projectState.materialMask;
+		const mask = wallState.wallMask;
+		const matMask = wallState.materialMask;
 
 		// Skip re-decode if the data URLs haven't changed (avoids stale overwrites)
 		const wallUrl = mask?.dataUrl ?? null;
@@ -404,14 +415,14 @@
 			const matData = matPromise ? await matPromise : null;
 			if (wallMaskVersion !== thisVersion) return;
 
-			const defaultMat = projectState.wallMaterial;
+			const defaultMat = wallState.wallMaterial;
 			wallLayer.mask = decoded;
 			wallLayer.materialMap = matData ?? null;
 			wallLayer.defaultMaterial = defaultMat;
 			heatmapLayer.wallMask = decoded;
 			heatmapLayer.materialMap = matData ?? null;
 			heatmapLayer.defaultMaterial = defaultMat;
-			heatmapLayer.wallAttenuation = projectState.wallAttenuation;
+			heatmapLayer.wallAttenuation = wallState.wallAttenuation;
 
 			cachedWallData = decoded.data;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
@@ -457,7 +468,7 @@
 	// Sync floorplan image to layer
 	$effect(() => {
 		if (!floorplanLayer) return;
-		const url = projectState.floorplanUrl;
+		const url = floorplanState.floorplanUrl;
 		if (url) {
 			floorplanLayer.loadImage(url, () => {
 				engine.markDirty();
@@ -471,7 +482,7 @@
 	// Sync floorplan opacity (stored in floorplanScale)
 	$effect(() => {
 		if (!floorplanLayer) return;
-		floorplanLayer.opacity = projectState.floorplanScale;
+		floorplanLayer.opacity = floorplanState.floorplanScale;
 		engine.markDirty();
 	});
 
@@ -479,7 +490,7 @@
 	// Auto-solve: debounce solver runs when AP layout or RF params change.
 	// Excludes assignedChannel to avoid infinite loops (solver writes channels).
 	let autoSolveKey = $derived(
-		projectState.aps
+		apState.aps
 			.map(
 				(ap) =>
 					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
@@ -490,7 +501,7 @@
 	$effect(() => {
 		const auto = solverState.autoSolve;
 		const _key = autoSolveKey;
-		if (!auto || projectState.aps.length === 0) return;
+		if (!auto || apState.aps.length === 0) return;
 		if (solverState.isRunning) return;
 
 		if (autoSolveTimeout) clearTimeout(autoSolveTimeout);
@@ -504,8 +515,8 @@
 	let coverageTimeout: ReturnType<typeof setTimeout> | null = null;
 	$effect(() => {
 		const _key = autoSolveKey;
-		const _mask = projectState.wallMask;
-		if (projectState.aps.length === 0 || !_mask) return;
+		const _mask = wallState.wallMask;
+		if (apState.aps.length === 0 || !_mask) return;
 		if (coverageTimeout) clearTimeout(coverageTimeout);
 		coverageTimeout = setTimeout(() => updateCoverage(), 300);
 	});
@@ -603,7 +614,7 @@
 		if (!touchMoved && !touchStartedOnAp && !pendingPan && dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
 			touchMoved = true;
 			const rect = engine.canvas.getBoundingClientRect();
-			const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, projectState.aps);
+			const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps);
 
 			if (hit) {
 				touchStartedOnAp = true;
@@ -634,7 +645,7 @@
 		if (activeTouches === 1 && e.touches.length === 0) {
 			if (!touchMoved && engine) {
 				const rect = engine.canvas.getBoundingClientRect();
-				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, projectState.aps);
+				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps);
 
 				if (hit) {
 					selectHandler.handlePointerDown(new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 }));
@@ -660,7 +671,7 @@
 
 		const rect = engine.canvas.getBoundingClientRect();
 		const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-		const hit = hitTest(screenPoint, engine.camera, projectState.aps);
+		const hit = hitTest(screenPoint, engine.camera, apState.aps);
 
 		if (hit) {
 			selectHandler.handlePointerDown(e);
@@ -686,7 +697,7 @@
 		// Wall edit mode intercepts primary pointer
 		if (appState.wallEditMode) {
 			wallEditHandler.activeMaterial = wallEditMaterial;
-			wallEditHandler.defaultMaterial = projectState.wallMaterial;
+			wallEditHandler.defaultMaterial = wallState.wallMaterial;
 			wallEditHandler.handlePointerDown(e);
 			return;
 		}
