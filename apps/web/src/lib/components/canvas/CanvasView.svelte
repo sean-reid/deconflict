@@ -354,10 +354,10 @@
 		engine.markDirty();
 	});
 
-	// Sync drag state for adaptive quality (coarser walls during drag)
+	// Coarser wall grid during drag or wall editing for responsiveness
 	$effect(() => {
 		if (!heatmapLayer) return;
-		heatmapLayer.isDragging = canvasState.isDragging;
+		heatmapLayer.isDragging = canvasState.isDragging || !!appState.wallEditMode;
 		engine.markDirty();
 	});
 
