@@ -51,6 +51,7 @@ export class HeatmapLayer implements Layer {
 
 	invalidateCache(): void {
 		this.cacheKey = '';
+		this.cache = null;
 	}
 
 	/** Force a full-quality re-render (call on drag end). */
@@ -152,7 +153,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? 0}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? this.wallMask?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -213,7 +214,9 @@ export class HeatmapLayer implements Layer {
 				? { x: 0, y: 0, w: this.floorplanBounds.width, h: this.floorplanBounds.height }
 				: this.wallMaskBounds
 					? { x: 0, y: 0, w: this.wallMaskBounds.width, h: this.wallMaskBounds.height }
-					: null,
+					: this.wallMask
+						? { x: 0, y: 0, w: this.wallMask.width, h: this.wallMask.height }
+						: null,
 			cameraInverse: Array.from(inv),
 			viewWidth: width,
 			viewHeight: height
