@@ -184,12 +184,12 @@ export function buildAttenField(
 }
 
 /** O(1) wall attenuation lookup from a precomputed field.
- *  Out-of-bounds coordinates clamp to the nearest edge — a point beyond
- *  the wall mask still sees walls that were between it and the AP. */
+ *  Returns 0 for out-of-bounds (no wall data = free space). */
 export function lookupAtten(field: AttenField, wx: number, wy: number): number {
 	const s = field.step;
-	const gc = Math.max(0, Math.min(field.cols - 1, (wx / s + 0.5) | 0));
-	const gr = Math.max(0, Math.min(field.rows - 1, (wy / s + 0.5) | 0));
+	const gc = (wx / s + 0.5) | 0;
+	const gr = (wy / s + 0.5) | 0;
+	if (gc < 0 || gc >= field.cols || gr < 0 || gr >= field.rows) return 0;
 	return field.grid[gr * field.cols + gc]!;
 }
 
