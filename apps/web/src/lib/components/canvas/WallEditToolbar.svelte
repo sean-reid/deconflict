@@ -63,7 +63,18 @@
 					<span class="mat-dot" style="background: rgb({mat.color.join(',')})"></span>
 				</button>
 			{/each}
+			<span class="mat-label">
+				{WALL_MATERIALS[activeMaterial]?.name ?? 'Drywall'}
+				<span class="mat-db">{WALL_MATERIALS[activeMaterial]?.attenuation ?? 3} dB</span>
+			</span>
 		</div>
+	{/if}
+
+	{#if appState.wallEditMode === 'draw'}
+		<span class="mode-hint">
+			<span class="mat-dot-inline" style="background: rgb({WALL_MATERIALS[activeMaterial]?.color.join(',') ?? '200,200,210'})"></span>
+			{WALL_MATERIALS[activeMaterial]?.name ?? 'Drywall'}
+		</span>
 	{/if}
 
 	<div class="brush-group">
@@ -170,6 +181,37 @@
 		width: 12px;
 		height: 12px;
 		border-radius: 2px;
+	}
+
+	.mat-label {
+		font-size: var(--text-xs);
+		color: var(--text-primary);
+		font-weight: 500;
+		padding-left: var(--space-1);
+		white-space: nowrap;
+	}
+
+	.mat-db {
+		color: var(--text-tertiary);
+		font-weight: 400;
+	}
+
+	.mode-hint {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: var(--text-xs);
+		color: var(--text-secondary);
+		padding: 0 var(--space-1);
+		border-left: 1px solid var(--border-subtle);
+		white-space: nowrap;
+	}
+
+	.mat-dot-inline {
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		flex-shrink: 0;
 	}
 
 	.brush-group {
