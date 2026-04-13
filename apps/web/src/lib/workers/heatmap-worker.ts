@@ -191,14 +191,9 @@ self.onmessage = (e: MessageEvent<RenderMsg | SetWallsMsg>) => {
 				const wx = ia * sx + ic * sy + ie;
 				const wy = ib * sx + idd * sy + ig;
 
-				// Clip to floorplan bounds — leave outside cells transparent
-				if (
-					clipBounds &&
-					(wx < clipBounds.x ||
-						wx > clipBounds.x + clipBounds.w ||
-						wy < clipBounds.y ||
-						wy > clipBounds.y + clipBounds.h)
-				) {
+				// Clip to building bounds — floorplan image or wall mask
+				const cb = clipBounds ?? (wallData ? { x: 0, y: 0, w: wallW, h: wallH } : null);
+				if (cb && (wx < cb.x || wx > cb.x + cb.w || wy < cb.y || wy > cb.y + cb.h)) {
 					continue;
 				}
 
