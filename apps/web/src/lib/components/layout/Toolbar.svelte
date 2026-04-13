@@ -3,9 +3,7 @@
 	import { projectState } from '$state/project.svelte';
 	import { scheduleSave } from '$state/persistence.svelte';
 	import { undo, redo, canUndo, canRedo } from '$state/history.svelte';
-	import type { Band } from '@deconflict/channels';
 	import Icon from '$components/shared/Icon.svelte';
-	import Select from '$components/shared/Select.svelte';
 	import Dropdown from '$components/shared/Dropdown.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
 	import HelpDialog from '$components/dialogs/HelpDialog.svelte';
@@ -90,11 +88,6 @@
 		{ label: 'Export as PDF', action: handleExportPdf, shortcut: '' }
 	];
 
-	const bandOptions = [
-		{ value: '2.4ghz', label: '2.4 GHz' },
-		{ value: '5ghz', label: '5 GHz' },
-		{ value: '6ghz', label: '6 GHz' }
-	];
 </script>
 
 <header class="toolbar">
@@ -147,15 +140,6 @@
 					<Icon name="redo" size={14} />
 				</button>
 			</Tooltip>
-		</div>
-
-		<div class="band-select">
-			<Select
-				value={projectState.band}
-				options={bandOptions}
-				onchange={(val) => { projectState.band = val as Band; }}
-				aria-label="WiFi band"
-			/>
 		</div>
 
 		<Tooltip text="Toggle between imperial (ft) and metric (m) units" position="bottom">
@@ -289,11 +273,7 @@
 		gap: 1px;
 	}
 
-	.band-select {
-		margin-left: 4px;
-	}
-
-	.unit-btn {
+.unit-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;

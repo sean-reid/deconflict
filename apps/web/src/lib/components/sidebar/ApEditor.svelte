@@ -1,20 +1,31 @@
 <script lang="ts">
-	import { projectState, updateAp, removeAp, removeAps } from '$state/project.svelte';
+	import { projectState, updateAp, removeAp, removeAps, getEffectiveWupm, radiusFromPower } from '$state/project.svelte';
 	import { canvasState, clearSelection } from '$state/canvas.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
 	import { buildInterferenceGraph } from '@deconflict/geometry';
+	import { findModel, getBandSpec, type ApModel } from '$lib/data/ap-models.js';
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 	import NumberInput from '$components/shared/NumberInput.svelte';
 	import Tooltip from '$components/shared/Tooltip.svelte';
+	import ModelPicker from '$components/shared/ModelPicker.svelte';
 
-	const bandOptions = [
+	const allBandOptions = [
 		{ value: '2.4ghz', label: '2.4 GHz' },
 		{ value: '5ghz', label: '5 GHz' },
 		{ value: '6ghz', label: '6 GHz' }
 	];
+
+	// Constrain band options to what the selected model supports
+	let bandOptions = $derived.by(() => {
+		if (!singleAp?.modelId) return allBandOptions;
+		const model = findModel(singleAp.modelId);
+		if (!model) return allBandOptions;
+		const supportedBands = new Set(model.bands.map((b) => b.band));
+		return allBandOptions.filter((o) => supportedBands.has(o.value as Band));
+	});
 
 	const widthsByBand: Record<string, Array<{ value: string; label: string }>> = {
 		'2.4ghz': [
@@ -48,36 +59,43 @@
 	let singleAp = $derived(selectedAps.length === 1 ? selectedAps[0] : null);
 	let multiSelect = $derived(selectedAps.length > 1);
 
-	let batchRadius = $state(150);
+	let batchPower = $state(20);
 
 	let radiusDisplay = $derived.by(() => {
 		if (!singleAp) return '';
-		if (!projectState.calibration) return String(singleAp.interferenceRadius);
-		const meters = singleAp.interferenceRadius / projectState.calibration.worldUnitsPerMeter;
+		const meters = singleAp.interferenceRadius / getEffectiveWupm();
 		if (projectState.unitSystem === 'imperial') {
 			return (meters * 3.28084).toFixed(1);
 		}
 		return meters.toFixed(1);
 	});
 	let radiusUnit = $derived(
-		projectState.calibration
-			? projectState.unitSystem === 'imperial'
-				? 'ft'
-				: 'm'
-			: 'px'
+		projectState.unitSystem === 'imperial' ? 'ft' : 'm'
 	);
 
 	$effect(() => {
 		if (selectedAps.length > 0) {
-			batchRadius = selectedAps[0]?.interferenceRadius ?? 150;
+			batchPower = selectedAps[0]?.power ?? 20;
 		}
 	});
 
+	// Auto-derive interference radius from power for single AP
+	$effect(() => {
+		if (singleAp) {
+			const derived = radiusFromPower(singleAp.power, singleAp.band);
+			if (singleAp.interferenceRadius !== derived) {
+				updateAp(singleAp.id, { interferenceRadius: derived });
+			}
+		}
+	});
+
+	// Apply batch power to all selected APs
 	$effect(() => {
 		if (multiSelect) {
 			for (const ap of selectedAps) {
-				if (ap.interferenceRadius !== batchRadius) {
-					updateAp(ap.id, { interferenceRadius: batchRadius });
+				if (ap.power !== batchPower) {
+					const radius = radiusFromPower(batchPower, ap.band);
+					updateAp(ap.id, { power: batchPower, interferenceRadius: radius });
 				}
 			}
 		}
@@ -128,10 +146,12 @@
 	function handleBandChange(val: string) {
 		const band = val as Band;
 		if (singleAp) {
-			updateAp(singleAp.id, { band, fixedChannel: null, assignedChannel: null });
+			const interferenceRadius = radiusFromPower(singleAp.power, band);
+			updateAp(singleAp.id, { band, interferenceRadius, fixedChannel: null, assignedChannel: null });
 		} else if (multiSelect) {
 			for (const ap of selectedAps) {
-				updateAp(ap.id, { band, fixedChannel: null, assignedChannel: null });
+				const interferenceRadius = radiusFromPower(ap.power, band);
+				updateAp(ap.id, { band, interferenceRadius, fixedChannel: null, assignedChannel: null });
 			}
 		}
 	}
@@ -151,6 +171,29 @@
 		if (!singleAp) return;
 		const fixedChannel = val === '' ? null : Number(val);
 		updateAp(singleAp.id, { fixedChannel, assignedChannel: fixedChannel });
+	}
+
+	function handleModelChange(model: ApModel | null) {
+		if (!singleAp) return;
+		if (!model) {
+			updateAp(singleAp.id, { modelId: null, modelLabel: null });
+			return;
+		}
+		const spec =
+			getBandSpec(model, singleAp.band) ?? getBandSpec(model, projectState.band) ?? model.bands[0];
+		if (!spec) return;
+
+		// Set power from model spec — radius is auto-derived by the $effect
+		updateAp(singleAp.id, {
+			modelId: model.id,
+			modelLabel: `${model.vendor} ${model.model}`,
+			band: spec.band,
+			channelWidth: spec.maxChannelWidth,
+			power: spec.maxTxPower,
+			interferenceRadius: radiusFromPower(spec.maxTxPower, spec.band),
+			fixedChannel: null,
+			assignedChannel: null
+		});
 	}
 
 	function handleNameInput(e: Event) {
@@ -180,6 +223,13 @@
 			&larr; All APs ({projectState.aps.length})
 		</button>
 		<div class="section-header">PROPERTIES</div>
+
+		<div class="field">
+			<Tooltip text="Select your AP hardware model to auto-fill band, power, and range settings." position="left">
+				<span class="field-label">Model</span>
+			</Tooltip>
+			<ModelPicker value={singleAp.modelId} onchange={handleModelChange} />
+		</div>
 
 		<div class="field">
 			<Tooltip text="A label for this access point. Use something descriptive like 'Living Room' or 'Upstairs Hall'." position="left">
@@ -231,29 +281,17 @@
 		</div>
 
 		<div class="field">
-			<Tooltip text="How far this access point's signal reaches. Typical indoor range: 10-30m for 5 GHz, 30-50m for 2.4 GHz." position="left">
-				<span class="field-label">Coverage Radius</span>
-			</Tooltip>
-			<NumberInput
-				bind:value={singleAp.interferenceRadius}
-				min={50}
-				max={500}
-				step={10}
-				label={radiusUnit}
-			/>
-		</div>
-
-		<div class="field">
-			<Tooltip text="Transmit power in dBm. Typical home routers are 15-20 dBm. Higher means wider coverage but more interference." position="left">
-				<span class="field-label">Power</span>
+			<Tooltip text="Transmit power in dBm. Coverage range is derived from this using the indoor path loss model." position="left">
+				<span class="field-label">TX Power</span>
 			</Tooltip>
 			<NumberInput
 				bind:value={singleAp.power}
-				min={0}
-				max={30}
+				min={1}
+				max={36}
 				step={1}
 				label="dBm"
 			/>
+			<span class="field-hint">Est. range: {radiusDisplay} {radiusUnit}</span>
 		</div>
 
 		<div class="field">
@@ -326,14 +364,15 @@
 		</div>
 
 		<div class="field">
-			<Tooltip text="How far this access point's signal reaches. Increase for high-power routers, decrease for low-power ones." position="left">
-				<span class="field-label">Interference Radius</span>
+			<Tooltip text="Transmit power in dBm. Coverage range is derived from this." position="left">
+				<span class="field-label">TX Power</span>
 			</Tooltip>
 			<NumberInput
-				bind:value={batchRadius}
-				min={50}
-				max={500}
-				step={10}
+				bind:value={batchPower}
+				min={1}
+				max={36}
+				step={1}
+				label="dBm"
 			/>
 		</div>
 
@@ -484,10 +523,11 @@
 		border-top: 1px solid var(--border-subtle);
 	}
 
-	.radius-converted {
+	.field-hint {
 		font-family: var(--font-mono);
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
+		margin-top: 2px;
 	}
 
 	:global(.full-width) {

@@ -1,6 +1,21 @@
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
 import { pushState } from './history.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
+import { rangeFromPower } from '../rf/propagation.js';
+
+/** Default scale when no floorplan is calibrated (~10 world units per foot). */
+export const DEFAULT_WUPM = 10 * 3.28084; // 32.8 world units per meter
+
+/** Get the effective world-units-per-meter, falling back to the default grid scale. */
+export function getEffectiveWupm(): number {
+	return projectState.calibration?.worldUnitsPerMeter ?? DEFAULT_WUPM;
+}
+
+/** Derive interference radius (world units) from TX power and band. */
+export function radiusFromPower(power: number, band: string): number {
+	const meters = rangeFromPower(power, band);
+	return Math.round(meters * getEffectiveWupm());
+}
 
 export interface AccessPoint {
 	id: string;
@@ -13,6 +28,8 @@ export interface AccessPoint {
 	assignedChannel: number | null;
 	interferenceRadius: number;
 	power: number;
+	modelId: string | null;
+	modelLabel: string | null;
 }
 
 let nextApNumber = 1;
@@ -42,19 +59,26 @@ export const projectState = $state({
 
 export function addAp(x: number, y: number): AccessPoint {
 	pushState();
+
+	// Inherit model, band, width, power, and radius from the last placed AP
+	// so users can place multiple of the same vendor/model in a row
+	const prev = projectState.aps.length > 0 ? projectState.aps[projectState.aps.length - 1] : null;
+
 	const ap: AccessPoint = {
 		id: createId(),
 		name: `AP-${nextApNumber++}`,
 		x,
 		y,
-		band: projectState.band,
-		channelWidth: projectState.channelWidth,
+		band: prev?.band ?? projectState.band,
+		channelWidth: prev?.channelWidth ?? projectState.channelWidth,
 		fixedChannel: null,
 		assignedChannel: null,
-		interferenceRadius: projectState.calibration
-			? Math.round(15 * projectState.calibration.worldUnitsPerMeter)
-			: 150,
-		power: 20
+		interferenceRadius:
+			prev?.interferenceRadius ??
+			radiusFromPower(prev?.power ?? 20, prev?.band ?? projectState.band),
+		power: prev?.power ?? 20,
+		modelId: prev?.modelId ?? null,
+		modelLabel: prev?.modelLabel ?? null
 	};
 	projectState.aps.push(ap);
 	scheduleSave();

@@ -208,7 +208,9 @@ export function countWallCrossings(
 }
 
 /** Compute total wall attenuation (dB) along a ray, using per-pixel material IDs.
- *  Falls back to defaultAttenuation when no material mask is provided. */
+ *  Falls back to defaultAttenuation when no material mask is provided.
+ *  `stride` controls how many Bresenham steps between wall checks (1 = every pixel,
+ *  3 = every 3rd pixel — faster for heatmap visualization where walls are 3+ px thick). */
 export function computeWallAttenuation(
 	mask: DecodedWallMask,
 	materialMap: Uint8Array | null,
@@ -217,7 +219,8 @@ export function computeWallAttenuation(
 	x0: number,
 	y0: number,
 	x1: number,
-	y1: number
+	y1: number,
+	stride = 1
 ): number {
 	return bresenhamRayMarch(
 		mask.data,
@@ -229,12 +232,14 @@ export function computeWallAttenuation(
 		y1,
 		materialMap,
 		materialDb.length > 0 ? materialDb : null,
-		defaultAttenuation
+		defaultAttenuation,
+		stride
 	);
 }
 
-/** Shared Bresenham ray march. When materialDb is null, counts crossings.
- *  When materialDb is provided, returns total dB attenuation. */
+/** Shared ray march. When materialDb is null, counts crossings.
+ *  When materialDb is provided, returns total dB attenuation.
+ *  stride=1: precise Bresenham (every pixel). stride>1: DDA sampling every Nth pixel. */
 function bresenhamRayMarch(
 	data: Uint8Array,
 	width: number,
@@ -245,25 +250,66 @@ function bresenhamRayMarch(
 	y1: number,
 	materialMap: Uint8Array | null,
 	materialDb: readonly { attenuation: number }[] | null,
-	defaultAttenuation = 5
+	defaultAttenuation = 5,
+	stride = 1
 ): number {
-	let ix0 = Math.round(x0),
+	const ix0 = Math.round(x0),
 		iy0 = Math.round(y0);
 	const ix1 = Math.round(x1),
 		iy1 = Math.round(y1);
 
-	const dx = Math.abs(ix1 - ix0);
-	const dy = Math.abs(iy1 - iy0);
+	// For stride > 1, use DDA with fewer total iterations instead of
+	// Bresenham-every-pixel. True Nx speedup for heatmap visualization.
+	if (stride > 1) {
+		const lenX = ix1 - ix0;
+		const lenY = iy1 - iy0;
+		const steps = Math.max(Math.abs(lenX), Math.abs(lenY));
+		const n = Math.ceil(steps / stride);
+		if (n <= 0) return 0;
+		const dx = lenX / n;
+		const dy = lenY / n;
+
+		let total = 0;
+		let wasWall = false;
+		for (let s = 0; s <= n; s++) {
+			const px = Math.round(ix0 + s * dx);
+			const py = Math.round(iy0 + s * dy);
+			if (px >= 0 && px < width && py >= 0 && py < height) {
+				const idx = py * width + px;
+				const isWall = data[idx] === 1;
+				if (isWall && !wasWall) {
+					if (materialDb && materialMap) {
+						const matId = materialMap[idx] ?? 0;
+						total += materialDb[matId]?.attenuation ?? defaultAttenuation;
+					} else if (materialDb) {
+						total += defaultAttenuation;
+					} else {
+						total += 1;
+					}
+				}
+				wasWall = isWall;
+			} else {
+				wasWall = false;
+			}
+		}
+		return total;
+	}
+
+	// Precise Bresenham for stride=1 (optimizer, exact computation)
+	let cx = ix0,
+		cy = iy0;
+	const adx = Math.abs(ix1 - ix0);
+	const ady = Math.abs(iy1 - iy0);
 	const sx = ix0 < ix1 ? 1 : -1;
 	const sy = iy0 < iy1 ? 1 : -1;
-	let err = dx - dy;
+	let err = adx - ady;
 
 	let total = 0;
 	let wasWall = false;
 
 	while (true) {
-		if (ix0 >= 0 && ix0 < width && iy0 >= 0 && iy0 < height) {
-			const idx = iy0 * width + ix0;
+		if (cx >= 0 && cx < width && cy >= 0 && cy < height) {
+			const idx = cy * width + cx;
 			const isWall = data[idx] === 1;
 			if (isWall && !wasWall) {
 				if (materialDb && materialMap) {
@@ -272,7 +318,7 @@ function bresenhamRayMarch(
 				} else if (materialDb) {
 					total += defaultAttenuation;
 				} else {
-					total += 1; // counting mode
+					total += 1;
 				}
 			}
 			wasWall = isWall;
@@ -280,16 +326,16 @@ function bresenhamRayMarch(
 			wasWall = false;
 		}
 
-		if (ix0 === ix1 && iy0 === iy1) break;
+		if (cx === ix1 && cy === iy1) break;
 
 		const e2 = 2 * err;
-		if (e2 > -dy) {
-			err -= dy;
-			ix0 += sx;
+		if (e2 > -ady) {
+			err -= ady;
+			cx += sx;
 		}
-		if (e2 < dx) {
-			err += dx;
-			iy0 += sy;
+		if (e2 < adx) {
+			err += adx;
+			cy += sy;
 		}
 	}
 

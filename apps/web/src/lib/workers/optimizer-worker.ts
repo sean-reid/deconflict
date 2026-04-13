@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { computeBuildingInterior } from '../canvas/morph-interior.js';
+import { signalStrengthOptimizer, countWallCrossings } from '../rf/propagation.js';
 
 interface ApInput {
 	id: string;
@@ -47,66 +48,23 @@ self.onmessage = (event: MessageEvent<InMessage>) => {
 	}
 };
 
-// ─── Signal model ───────────────────────────────────────────────────
-
-function signalStrength(distance: number, radius: number): number {
-	if (distance <= 0) return 1;
-	const ratio = distance / radius;
-	if (ratio >= 1.5) return 0;
-	return Math.pow(1 - ratio / 1.5, 2);
-}
-
-function countWallCrossings(
-	mask: Uint8Array,
-	w: number,
-	h: number,
-	x0: number,
-	y0: number,
-	x1: number,
-	y1: number
-): number {
-	let ix = Math.round(x0),
-		iy = Math.round(y0);
-	const ex = Math.round(x1),
-		ey = Math.round(y1);
-	const dx = Math.abs(ex - ix);
-	const dy = Math.abs(ey - iy);
-	const sx = ix < ex ? 1 : -1;
-	const sy = iy < ey ? 1 : -1;
-	let err = dx - dy;
-	let crossings = 0;
-	let wasWall = false;
-	while (true) {
-		if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
-			const isWall = mask[iy * w + ix] === 1;
-			if (isWall && !wasWall) crossings++;
-			wasWall = isWall;
-		} else {
-			wasWall = false;
-		}
-		if (ix === ex && iy === ey) break;
-		const e2 = 2 * err;
-		if (e2 > -dy) {
-			err -= dy;
-			ix += sx;
-		}
-		if (e2 < dx) {
-			err += dx;
-			iy += sy;
-		}
-	}
-	return crossings;
-}
-
 // ─── Precomputed wall-crossing cache ────────────────────────────────
+// Built ONCE before optimization. Maps from a fixed grid of source
+// positions to sample points. AP positions snap to nearest grid source
+// via O(1) grid lookup (no linear scan).
 
 interface WallCache {
-	table: Uint8Array; // crossingsTable[srcIdx * numSamples + sampleIdx]
-	srcX: Float32Array;
-	srcY: Float32Array;
+	/** dB attenuation from source i to sample j: table[i * numSamples + j] */
+	table: Float32Array;
 	numSources: number;
+	numSamples: number;
+	/** Grid-cell → source index lookup. -1 = no source in that cell. */
+	gridLookup: Int32Array;
 	gridStep: number;
 	gridCols: number;
+	gridRows: number;
+	srcX: Float32Array;
+	srcY: Float32Array;
 }
 
 function buildWallCache(
@@ -114,63 +72,106 @@ function buildWallCache(
 	w: number,
 	h: number,
 	interior: Uint8Array,
-	samples: Array<{ x: number; y: number }>
+	samples: Array<{ x: number; y: number }>,
+	wallAttenuation: number
 ): WallCache {
 	const gridStep = 8;
 	const gridCols = Math.ceil(w / gridStep);
 	const gridRows = Math.ceil(h / gridStep);
 
-	const srcX: number[] = [];
-	const srcY: number[] = [];
+	// Build grid-to-source mapping
+	const gridLookup = new Int32Array(gridCols * gridRows).fill(-1);
+	const srcXArr: number[] = [];
+	const srcYArr: number[] = [];
 
 	for (let gr = 0; gr < gridRows; gr++) {
 		for (let gc = 0; gc < gridCols; gc++) {
 			const wx = gc * gridStep;
 			const wy = gr * gridStep;
 			if (wx < w && wy < h && interior[wy * w + wx]) {
-				srcX.push(wx);
-				srcY.push(wy);
+				gridLookup[gr * gridCols + gc] = srcXArr.length;
+				srcXArr.push(wx);
+				srcYArr.push(wy);
 			}
 		}
 	}
 
-	const numSources = srcX.length;
+	const numSources = srcXArr.length;
 	const numSamples = samples.length;
-	const table = new Uint8Array(numSources * numSamples);
+	// Use Float32 to store dB attenuation (not just crossing count)
+	const table = new Float32Array(numSources * numSamples);
 
 	for (let si = 0; si < numSources; si++) {
 		for (let sj = 0; sj < numSamples; sj++) {
-			table[si * numSamples + sj] = Math.min(
-				255,
-				countWallCrossings(mask, w, h, srcX[si]!, srcY[si]!, samples[sj]!.x, samples[sj]!.y)
+			// Stride-3 DDA for fast cache build. Use flat dB per crossing.
+			const crossings = countWallCrossings(
+				mask,
+				w,
+				h,
+				srcXArr[si]!,
+				srcYArr[si]!,
+				samples[sj]!.x,
+				samples[sj]!.y,
+				3
 			);
+			table[si * numSamples + sj] = crossings * wallAttenuation;
 		}
 	}
 
 	return {
 		table,
-		srcX: new Float32Array(srcX),
-		srcY: new Float32Array(srcY),
 		numSources,
+		numSamples,
+		gridLookup,
 		gridStep,
-		gridCols
+		gridCols,
+		gridRows,
+		srcX: new Float32Array(srcXArr),
+		srcY: new Float32Array(srcYArr)
 	};
 }
 
-function nearestSource(cache: WallCache, x: number, y: number): number {
-	let bestIdx = 0;
+/** O(1) grid-based source lookup — replaces linear scan. */
+function nearestSourceIdx(cache: WallCache, x: number, y: number): number {
+	const gc = Math.round(x / cache.gridStep);
+	const gr = Math.round(y / cache.gridStep);
+
+	// Check the target cell and its 8 neighbors (handles off-grid positions)
+	let bestIdx = -1;
 	let bestDist = Infinity;
-	for (let i = 0; i < cache.numSources; i++) {
-		const d = (cache.srcX[i]! - x) ** 2 + (cache.srcY[i]! - y) ** 2;
-		if (d < bestDist) {
-			bestDist = d;
-			bestIdx = i;
+	for (let dr = -1; dr <= 1; dr++) {
+		for (let dc = -1; dc <= 1; dc++) {
+			const r = gr + dr;
+			const c = gc + dc;
+			if (r < 0 || r >= cache.gridRows || c < 0 || c >= cache.gridCols) continue;
+			const idx = cache.gridLookup[r * cache.gridCols + c]!;
+			if (idx < 0) continue;
+			const dx = cache.srcX[idx]! - x;
+			const dy = cache.srcY[idx]! - y;
+			const d = dx * dx + dy * dy;
+			if (d < bestDist) {
+				bestDist = d;
+				bestIdx = idx;
+			}
+		}
+	}
+
+	// Fallback: if no neighbor found, scan (rare — only at building edges)
+	if (bestIdx < 0) {
+		for (let i = 0; i < cache.numSources; i++) {
+			const dx = cache.srcX[i]! - x;
+			const dy = cache.srcY[i]! - y;
+			const d = dx * dx + dy * dy;
+			if (d < bestDist) {
+				bestDist = d;
+				bestIdx = i;
+			}
 		}
 	}
 	return bestIdx;
 }
 
-// ─── Evaluation helpers ─────────────────────────────────────────────
+// ─── Evaluation ─────────────────────────────────────────────────────
 
 interface Position {
 	id: string;
@@ -182,8 +183,7 @@ interface Position {
 function evaluateCoverage(
 	positions: Position[],
 	samples: Array<{ x: number; y: number }>,
-	cache: WallCache,
-	wallAttenuation: number
+	cache: WallCache
 ): number {
 	let total = 0;
 	for (let s = 0; s < samples.length; s++) {
@@ -192,13 +192,40 @@ function evaluateCoverage(
 			const dx = samples[s]!.x - ap.x;
 			const dy = samples[s]!.y - ap.y;
 			const dist = Math.sqrt(dx * dx + dy * dy);
-			let signal = signalStrength(dist, ap.radius);
+			let signal = signalStrengthOptimizer(dist, ap.radius);
 			if (signal > 0.001) {
-				const srcIdx = nearestSource(cache, ap.x, ap.y);
-				const crossings = cache.table[srcIdx * samples.length + s] ?? 0;
-				if (crossings > 0) {
-					signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
+				const srcIdx = nearestSourceIdx(cache, ap.x, ap.y);
+				if (srcIdx >= 0) {
+					const dbLoss = cache.table[srcIdx * cache.numSamples + s]!;
+					if (dbLoss > 0) signal *= Math.pow(10, -dbLoss / 20);
 				}
+			}
+			if (signal > best) best = signal;
+		}
+		total += best;
+	}
+	return total / samples.length;
+}
+
+function evaluateExact(
+	positions: Position[],
+	samples: Array<{ x: number; y: number }>,
+	mask: Uint8Array,
+	w: number,
+	h: number,
+	wallAttenuation: number
+): number {
+	let total = 0;
+	for (const sample of samples) {
+		let best = 0;
+		for (const ap of positions) {
+			const dx = sample.x - ap.x;
+			const dy = sample.y - ap.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			let signal = signalStrengthOptimizer(dist, ap.radius);
+			if (signal > 0.001) {
+				const crossings = countWallCrossings(mask, w, h, ap.x, ap.y, sample.x, sample.y);
+				if (crossings > 0) signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
 			}
 			if (signal > best) best = signal;
 		}
@@ -225,17 +252,27 @@ function snapToInterior(
 	return { x: bestIdx % w, y: Math.floor(bestIdx / w) };
 }
 
+// ─── Yield to event loop for cancel checks ──────────────────────────
+
+function yieldToEventLoop(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // ─── Main optimization pipeline ─────────────────────────────────────
 
 async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const { aps, wallMask: mask, maskWidth: w, maskHeight: h, wallAttenuation } = msg;
 
-	// Compute interior
 	const { interior } = computeBuildingInterior(mask, w, h, {
 		maxDim: 200,
 		dilateRatio: 0.04,
 		minDilateR: 4
 	});
+
+	if (cancelled) {
+		self.postMessage({ type: 'cancelled' });
+		return;
+	}
 
 	const interiorPixels: number[] = [];
 	for (let i = 0; i < w * h; i++) {
@@ -263,7 +300,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		samples.push({ x: idx % w, y: Math.floor(idx / w) });
 	}
 
-	// Precompute wall-crossing cache (~100-200ms)
+	// Build wall cache ONCE (stride-3 DDA, O(1) grid lookup)
 	self.postMessage({
 		type: 'progress',
 		positions: [],
@@ -272,18 +309,20 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		totalIterations: 100,
 		stage: 'Precomputing...'
 	});
-	const cache = buildWallCache(mask, w, h, interior, samples);
+	const cache = buildWallCache(mask, w, h, interior, samples, wallAttenuation);
 
+	// Yield to let cancel message arrive
+	await yieldToEventLoop();
 	if (cancelled) {
 		self.postMessage({ type: 'cancelled' });
 		return;
 	}
 
-	// ─── Stage 1: Signal-Weighted Lloyd's (~200ms) ──────────────────
+	// ─── Stage 1: Signal-Weighted Lloyd's ──────────────────────────
 
 	const positions: Position[] = [];
 
-	// K-means++ initialization
+	// K-means++ init
 	const firstIdx = interiorPixels[Math.floor(Math.random() * interiorPixels.length)]!;
 	positions.push({
 		id: aps[0]!.id,
@@ -293,7 +332,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	});
 
 	for (let k = 1; k < numAps; k++) {
-		// Pick the interior point farthest from existing positions
 		let bestDist = -1;
 		let bestPx = interiorPixels[0]!;
 		for (const px of interiorPixels) {
@@ -324,7 +362,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 			return;
 		}
 
-		// Assign each sample to its strongest-signal AP
 		const buckets: Array<{ sumX: number; sumY: number; sumW: number }> = positions.map(() => ({
 			sumX: 0,
 			sumY: 0,
@@ -338,11 +375,13 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				const dx = samples[s]!.x - positions[a]!.x;
 				const dy = samples[s]!.y - positions[a]!.y;
 				const dist = Math.sqrt(dx * dx + dy * dy);
-				let signal = signalStrength(dist, positions[a]!.radius);
+				let signal = signalStrengthOptimizer(dist, positions[a]!.radius);
 				if (signal > 0.001) {
-					const srcIdx = nearestSource(cache, positions[a]!.x, positions[a]!.y);
-					const crossings = cache.table[srcIdx * samples.length + s] ?? 0;
-					if (crossings > 0) signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
+					const srcIdx = nearestSourceIdx(cache, positions[a]!.x, positions[a]!.y);
+					if (srcIdx >= 0) {
+						const dbLoss = cache.table[srcIdx * cache.numSamples + s]!;
+						if (dbLoss > 0) signal *= Math.pow(10, -dbLoss / 20);
+					}
 				}
 				if (signal > bestSignal) {
 					bestSignal = signal;
@@ -370,7 +409,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		if (maxMove < 1.0) break;
 	}
 
-	const lloydsScore = evaluateCoverage(positions, samples, cache, wallAttenuation);
+	const lloydsScore = evaluateCoverage(positions, samples, cache);
 	self.postMessage({
 		type: 'progress',
 		positions: positions.map((p) => ({ id: p.id, x: p.x, y: p.y })),
@@ -380,7 +419,13 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		stage: "Lloyd's complete"
 	});
 
-	// ─── Stage 2: PSO Refinement (~2-3s) ────────────────────────────
+	await yieldToEventLoop();
+	if (cancelled) {
+		self.postMessage({ type: 'cancelled' });
+		return;
+	}
+
+	// ─── Stage 2: PSO Refinement ────────────────────────────────────
 
 	const SWARM = 20;
 	const PSO_ITERS = 60;
@@ -393,7 +438,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const gBest = new Float32Array(dim);
 	let gBestScore = -Infinity;
 
-	// Particle 0 = Lloyd's result, rest = jittered copies
 	for (let a = 0; a < numAps; a++) {
 		pos[a * 2] = positions[a]!.x;
 		pos[a * 2 + 1] = positions[a]!.y;
@@ -412,7 +456,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		pBest.set(pos.subarray(p * dim, (p + 1) * dim), p * dim);
 	}
 
-	// Helper: evaluate a particle
 	function evalParticle(pIdx: number): number {
 		const tempPositions: Position[] = [];
 		for (let a = 0; a < numAps; a++) {
@@ -423,10 +466,9 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				radius: aps[a]!.interferenceRadius
 			});
 		}
-		return evaluateCoverage(tempPositions, samples, cache, wallAttenuation);
+		return evaluateCoverage(tempPositions, samples, cache);
 	}
 
-	// Initialize scores
 	for (let p = 0; p < SWARM; p++) {
 		pBestScore[p] = evalParticle(p);
 		if (pBestScore[p]! > gBestScore) {
@@ -435,11 +477,14 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		}
 	}
 
-	// PSO iterations
 	for (let iter = 0; iter < PSO_ITERS; iter++) {
-		if (cancelled) {
-			self.postMessage({ type: 'cancelled' });
-			return;
+		// Yield every 5 iterations so cancel messages can arrive
+		if (iter % 5 === 0) {
+			await yieldToEventLoop();
+			if (cancelled) {
+				self.postMessage({ type: 'cancelled' });
+				return;
+			}
 		}
 
 		const inertia = 0.9 - 0.5 * (iter / PSO_ITERS);
@@ -457,7 +502,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 					c2 * r2 * (gBest[d]! - pos[off]!);
 				pos[off] = pos[off]! + vel[off]!;
 			}
-			// Snap each AP to interior
 			for (let a = 0; a < numAps; a++) {
 				const px = pos[p * dim + a * 2]!;
 				const py = pos[p * dim + a * 2 + 1]!;
@@ -497,9 +541,14 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		}
 	}
 
-	// ─── Stage 3: Coordinate Descent Polish (~500ms) ────────────────
+	// ─── Stage 3: Coordinate Descent Polish ─────────────────────────
 
-	// Start from PSO best
+	await yieldToEventLoop();
+	if (cancelled) {
+		self.postMessage({ type: 'cancelled' });
+		return;
+	}
+
 	const finalPositions: Position[] = [];
 	for (let a = 0; a < numAps; a++) {
 		finalPositions.push({
@@ -508,27 +557,6 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 			y: Math.round(gBest[a * 2 + 1]!),
 			radius: aps[a]!.interferenceRadius
 		});
-	}
-
-	// Use exact ray marching for final polish (not cached)
-	function evalExact(pts: Position[]): number {
-		let total = 0;
-		for (const sample of samples) {
-			let best = 0;
-			for (const ap of pts) {
-				const dx = sample.x - ap.x;
-				const dy = sample.y - ap.y;
-				const dist = Math.sqrt(dx * dx + dy * dy);
-				let signal = signalStrength(dist, ap.radius);
-				if (signal > 0.001) {
-					const crossings = countWallCrossings(mask, w, h, ap.x, ap.y, sample.x, sample.y);
-					if (crossings > 0) signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
-				}
-				if (signal > best) best = signal;
-			}
-			total += best;
-		}
-		return total / samples.length;
 	}
 
 	const DIRS = [
@@ -545,12 +573,13 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const minStep = 0.5;
 
 	while (polishStep >= minStep) {
+		await yieldToEventLoop();
 		if (cancelled) {
 			self.postMessage({ type: 'cancelled' });
 			return;
 		}
 		let improved = false;
-		let bestScore = evalExact(finalPositions);
+		let bestScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
 
 		for (let a = 0; a < numAps; a++) {
 			for (const [ddx, ddy] of DIRS) {
@@ -561,7 +590,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				if (nx < 0 || nx >= w || ny < 0 || ny >= h || !interior[ny * w + nx]) continue;
 				finalPositions[a]!.x = nx;
 				finalPositions[a]!.y = ny;
-				const score = evalExact(finalPositions);
+				const score = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
 				if (score > bestScore) {
 					bestScore = score;
 					improved = true;
@@ -574,12 +603,11 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		if (!improved) polishStep *= 0.5;
 	}
 
-	const finalScore = evalExact(finalPositions);
+	const finalScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
 	const initialScore = evaluateCoverage(
 		aps.map((a) => ({ ...a, radius: a.interferenceRadius })),
 		samples,
-		cache,
-		wallAttenuation
+		cache
 	);
 	const improvement = initialScore > 0 ? ((finalScore - initialScore) / initialScore) * 100 : 0;
 

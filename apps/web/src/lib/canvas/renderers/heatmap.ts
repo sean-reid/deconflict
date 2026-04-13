@@ -1,44 +1,131 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/project.svelte.js';
 import type { DecodedWallMask } from '../wall-detect.js';
-import { computeWallAttenuation } from '../wall-detect.js';
-import { WALL_MATERIALS, type WallMaterialId } from '../materials.js';
-import { getBaseRate } from '@deconflict/channels';
+import type { WallMaterialId } from '../materials.js';
+import { WALL_MATERIALS } from '../materials.js';
 
-const CELL_SIZE = 8;
-
-function signalStrength(distance: number, radius: number): number {
-	if (distance <= 0) return 1;
-	const ratio = distance / radius;
-	if (ratio >= 3) return 0;
-	return Math.max(0, Math.pow(1 - ratio / 3, 2));
-}
-
-function throughputColor(ratio: number): string {
-	if (ratio <= 0) return 'rgba(60, 30, 30, 0.45)';
-	if (ratio < 0.1) return 'rgba(180, 40, 40, 0.50)';
-	if (ratio < 0.3) return 'rgba(220, 120, 20, 0.45)';
-	if (ratio < 0.55) return 'rgba(210, 190, 30, 0.40)';
-	if (ratio < 0.8) return 'rgba(100, 180, 80, 0.35)';
-	return 'rgba(40, 150, 40, 0.35)';
-}
-
+/**
+ * Heatmap layer — delegates computation to a Web Worker.
+ *
+ * Uses a pipeline model: at most one render request in-flight.
+ * When the worker finishes, if the state has changed, it immediately
+ * sends the next request with the latest data. This prevents request
+ * queueing (which causes lag during drag) while keeping the heatmap
+ * as fresh as the worker can compute.
+ */
 export class HeatmapLayer implements Layer {
 	id = 'heatmap';
 	visible = false;
 	aps: AccessPoint[] = [];
 	ispSpeed = 0;
 	wallMask: DecodedWallMask | null = null;
-	wallAttenuation = 5; // legacy fallback
+	wallAttenuation = 5;
 	materialMap: Uint8Array | null = null;
-	materialVersion = 0; // incremented on any material change
+	materialVersion = 0;
 	defaultMaterial: WallMaterialId = 0;
 
+	isDragging = false;
+
+	private worker: Worker | null = null;
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
+	private lastWallVersion = -1;
+	private lastDefaultMaterial: WallMaterialId = -1 as WallMaterialId;
+	private renderDirty: (() => void) | null = null;
+
+	// Pipeline state: at most one request in-flight
+	private pendingId = 0;
+	private inFlight = false;
+	private needsUpdate = false;
+	private lastCamera: { getInverseTransform: () => number[] } | null = null;
+	private lastWidth = 0;
+	private lastHeight = 0;
+
+	setDirtyCallback(fn: () => void): void {
+		this.renderDirty = fn;
+	}
 
 	invalidateCache(): void {
 		this.cacheKey = '';
+	}
+
+	/** Force a full-quality re-render (call on drag end). */
+	notifyDragEnd(): void {
+		this.cacheKey = '';
+	}
+
+	private getWorker(): Worker {
+		if (!this.worker) {
+			this.worker = new Worker(new URL('../../workers/heatmap-worker.ts', import.meta.url), {
+				type: 'module'
+			});
+			this.worker.onmessage = (e: MessageEvent) => {
+				if (e.data.type === 'result' && e.data.id === this.pendingId) {
+					const { buf, width, height } = e.data as {
+						buf: ArrayBuffer;
+						width: number;
+						height: number;
+					};
+					const offscreen = document.createElement('canvas');
+					offscreen.width = width;
+					offscreen.height = height;
+					const ctx = offscreen.getContext('2d')!;
+					const imgData = new ImageData(new Uint8ClampedArray(buf), width, height);
+					ctx.putImageData(imgData, 0, 0);
+					this.cache = offscreen;
+
+					// Pipeline: request completed. If state changed, send next immediately.
+					this.inFlight = false;
+					if (this.needsUpdate && this.lastCamera) {
+						this.needsUpdate = false;
+						this.sendRender(this.lastWidth, this.lastHeight, this.lastCamera);
+					}
+
+					this.renderDirty?.();
+				}
+			};
+		}
+		return this.worker;
+	}
+
+	private syncWalls(): void {
+		const wallVer = (this.wallMask ? 1 : 0) * 1000 + this.materialVersion + this.defaultMaterial;
+		if (wallVer === this.lastWallVersion && this.lastDefaultMaterial === this.defaultMaterial) {
+			return;
+		}
+		this.lastWallVersion = wallVer;
+		this.lastDefaultMaterial = this.defaultMaterial;
+
+		const worker = this.getWorker();
+		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
+		const defaultDb = WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
+
+		if (this.wallMask) {
+			const wallCopy = this.wallMask.data.slice();
+			const matCopy = this.materialMap?.slice() ?? null;
+			worker.postMessage(
+				{
+					type: 'setWalls',
+					wallData: wallCopy.buffer,
+					materialMap: matCopy?.buffer ?? null,
+					materialDb: matDb,
+					defaultDb,
+					width: this.wallMask.width,
+					height: this.wallMask.height
+				},
+				matCopy ? [wallCopy.buffer, matCopy.buffer] : [wallCopy.buffer]
+			);
+		} else {
+			worker.postMessage({
+				type: 'setWalls',
+				wallData: null,
+				materialMap: null,
+				materialDb: matDb,
+				defaultDb,
+				width: 0,
+				height: 0
+			});
+		}
 	}
 
 	private getCacheKey(
@@ -50,7 +137,7 @@ export class HeatmapLayer implements Layer {
 			this.aps
 				.map(
 					(ap) =>
-						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}`
+						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
 				)
 				.join('|') +
 			`|isp:${this.ispSpeed}|wm:${this.wallMask ? 1 : 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
@@ -65,94 +152,53 @@ export class HeatmapLayer implements Layer {
 		const { camera, width, height } = rc;
 		const key = this.getCacheKey(camera, width, height);
 
-		if (key !== this.cacheKey || !this.cache) {
-			this.cache = this.generateHeatmap(width, height, camera);
+		if (key !== this.cacheKey) {
 			this.cacheKey = key;
-		}
+			this.lastCamera = camera;
+			this.lastWidth = width;
+			this.lastHeight = height;
 
-		rc.compositeOffscreen(this.cache);
-	}
-
-	private generateHeatmap(
-		width: number,
-		height: number,
-		camera: { screenToWorld: (p: { x: number; y: number }) => { x: number; y: number } }
-	): HTMLCanvasElement {
-		const offscreen = document.createElement('canvas');
-		offscreen.width = width;
-		offscreen.height = height;
-		const ctx = offscreen.getContext('2d')!;
-
-		const cellSize = CELL_SIZE;
-		const cols = Math.ceil(width / cellSize);
-		const rows = Math.ceil(height / cellSize);
-
-		let maxThroughput = 0;
-		for (const ap of this.aps) {
-			const base = getBaseRate(ap.band, ap.channelWidth) * 0.5;
-			if (base > maxThroughput) maxThroughput = base;
-		}
-		if (this.ispSpeed > 0 && this.ispSpeed < maxThroughput) {
-			maxThroughput = this.ispSpeed;
-		}
-		if (maxThroughput <= 0) maxThroughput = 100;
-
-		for (let row = 0; row < rows; row++) {
-			for (let col = 0; col < cols; col++) {
-				const screenX = col * cellSize + cellSize / 2;
-				const screenY = row * cellSize + cellSize / 2;
-				const worldPoint = camera.screenToWorld({ x: screenX, y: screenY });
-
-				let bestSignal = 0;
-				let bestAp: AccessPoint | null = null;
-
-				for (const ap of this.aps) {
-					const dx = worldPoint.x - ap.x;
-					const dy = worldPoint.y - ap.y;
-					const dist = Math.sqrt(dx * dx + dy * dy);
-					const signal = signalStrength(dist, ap.interferenceRadius);
-					if (signal > bestSignal) {
-						bestSignal = signal;
-						bestAp = ap;
-					}
-				}
-
-				if (bestAp && bestSignal > 0.001) {
-					const base = getBaseRate(bestAp.band, bestAp.channelWidth) * 0.5;
-					let throughput = base * bestSignal;
-
-					// Wall attenuation via ray marching with per-material dB values
-					if (this.wallMask) {
-						const defaultDb =
-							WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
-						const wallLoss = computeWallAttenuation(
-							this.wallMask,
-							this.materialMap,
-							WALL_MATERIALS,
-							defaultDb,
-							bestAp.x,
-							bestAp.y,
-							worldPoint.x,
-							worldPoint.y
-						);
-						if (wallLoss > 0) {
-							throughput *= Math.pow(10, -wallLoss / 20);
-						}
-					}
-
-					if (this.ispSpeed > 0) {
-						throughput = Math.min(throughput, this.ispSpeed);
-					}
-					const ratio = throughput / maxThroughput;
-					ctx.fillStyle = throughputColor(ratio);
-				} else {
-					ctx.fillStyle = 'rgba(60, 30, 30, 0.45)';
-				}
-
-				ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+			if (!this.inFlight) {
+				// No request pending — send immediately
+				this.sendRender(width, height, camera);
+			} else {
+				// Request in-flight — mark for update when it completes
+				this.needsUpdate = true;
 			}
 		}
 
-		return offscreen;
+		if (this.cache) {
+			rc.compositeOffscreen(this.cache);
+		}
+	}
+
+	private sendRender(
+		width: number,
+		height: number,
+		camera: { getInverseTransform: () => number[] }
+	): void {
+		this.syncWalls();
+		this.inFlight = true;
+
+		const id = ++this.pendingId;
+		const inv = camera.getInverseTransform();
+		const aps = this.aps.map((ap) => ({
+			x: ap.x,
+			y: ap.y,
+			interferenceRadius: ap.interferenceRadius,
+			band: ap.band,
+			channelWidth: ap.channelWidth
+		}));
+
+		this.getWorker().postMessage({
+			type: 'render',
+			id,
+			aps,
+			ispSpeed: this.ispSpeed,
+			fast: this.isDragging,
+			cameraInverse: Array.from(inv),
+			viewWidth: width,
+			viewHeight: height
+		});
 	}
 }

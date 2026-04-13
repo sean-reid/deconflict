@@ -29,6 +29,8 @@ interface ProjectFile {
 		assignedChannel: number | null;
 		interferenceRadius: number;
 		power: number;
+		modelId?: string | null;
+		modelLabel?: string | null;
 	}>;
 }
 
@@ -88,7 +90,9 @@ export async function serialize(): Promise<string> {
 			fixedChannel: ap.fixedChannel,
 			assignedChannel: ap.assignedChannel,
 			interferenceRadius: ap.interferenceRadius,
-			power: ap.power
+			power: ap.power,
+			modelId: ap.modelId ?? null,
+			modelLabel: ap.modelLabel ?? null
 		}))
 	};
 	return JSON.stringify(data, null, '\t');
@@ -140,7 +144,9 @@ export function deserialize(json: string): void {
 		fixedChannel: ap.fixedChannel ?? null,
 		assignedChannel: ap.assignedChannel ?? null,
 		interferenceRadius: ap.interferenceRadius ?? 150,
-		power: ap.power ?? 20
+		power: ap.power ?? 20,
+		modelId: ap.modelId ?? null,
+		modelLabel: ap.modelLabel ?? null
 	}));
 
 	// Show the right sidebar tab and clear selection

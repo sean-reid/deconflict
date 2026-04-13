@@ -104,17 +104,22 @@
 			realAreaSqm = val * 0.092903;
 		}
 		const worldUnitsPerMeter = Math.sqrt(worldArea / realAreaSqm);
-		const isFirstCalibration = projectState.calibration === null;
+		const oldCalibration = projectState.calibration;
 		projectState.calibration = { worldUnitsPerMeter };
 
-		// Only adjust AP radii on first calibration, not recalibration
-		if (isFirstCalibration) {
-			const defaultRadiusMeters = 15;
-			const defaultRadiusWorld = Math.round(defaultRadiusMeters * worldUnitsPerMeter);
+		if (oldCalibration === null) {
+			// First calibration: set uncalibrated APs (radius=150) to real 15m
+			const defaultRadiusWorld = Math.round(15 * worldUnitsPerMeter);
 			for (const ap of projectState.aps) {
 				if (ap.interferenceRadius === 150) {
 					ap.interferenceRadius = defaultRadiusWorld;
 				}
+			}
+		} else {
+			// Recalibration: scale all AP radii proportionally to preserve real-world meters
+			const ratio = worldUnitsPerMeter / oldCalibration.worldUnitsPerMeter;
+			for (const ap of projectState.aps) {
+				ap.interferenceRadius = Math.round(ap.interferenceRadius * ratio);
 			}
 		}
 
