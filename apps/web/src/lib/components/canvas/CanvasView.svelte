@@ -221,6 +221,7 @@
 		floorplanLayer = new FloorplanLayer();
 		gridLayer = new GridLayer();
 		heatmapLayer = new HeatmapLayer();
+		heatmapLayer.setDirtyCallback(() => engine.markDirty());
 		wallLayer = new WallLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
