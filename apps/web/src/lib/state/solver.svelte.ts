@@ -207,14 +207,15 @@ async function buildSerializedGraph() {
 			// Same floor: wall attenuation
 			const mask = masks.get(apA.floorId);
 			if (mask) {
-				totalDb = getWallLoss(
-					mask,
-					apA.x,
-					apA.y,
-					apB.x,
-					apB.y,
-					floorByIdCache.get(apA.floorId)?.wallMaterial ?? 0
-				);
+				// Use wallState for current floor (always up-to-date), floor entity for others
+				const defMat =
+					apA.floorId === floorState.currentFloorId
+						? wallState.wallMaterial
+						: (floorByIdCache.get(apA.floorId)?.wallMaterial ?? 0);
+				totalDb = getWallLoss(mask, apA.x, apA.y, apB.x, apB.y, defMat);
+				console.log(`[solver] ${apA.id}→${apB.id}: wallLoss=${totalDb.toFixed(1)}dB, hasMaterialMap=${!!mask.materialMap}, defMat=${defMat}`);
+			} else {
+				console.log(`[solver] ${apA.id}→${apB.id}: no wall mask for floor ${apA.floorId}`);
 			}
 		} else {
 			// Cross-floor: slab attenuation (use worst-case band for conservative estimate)
@@ -230,7 +231,10 @@ async function buildSerializedGraph() {
 			const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 			const effectiveDist = dist * distMultiplier;
 			const radiusSum = apA.interferenceRadius + apB.interferenceRadius;
+			console.log(`[solver] edge ${apA.id}→${apB.id}: dist=${dist.toFixed(0)}, effectiveDist=${effectiveDist.toFixed(0)}, radiusSum=${radiusSum.toFixed(0)}, ${effectiveDist >= radiusSum ? 'REMOVED' : 'KEPT'}`);
 			if (effectiveDist >= radiusSum) continue; // attenuated signal doesn't reach
+		} else {
+			console.log(`[solver] edge ${apA.id}→${apB.id}: no attenuation, KEPT`);
 		}
 
 		filteredEdges.push(edge);
