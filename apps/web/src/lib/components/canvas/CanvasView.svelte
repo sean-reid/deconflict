@@ -446,11 +446,10 @@
 		engine?.markDirty();
 	});
 
-	// Sync wall mask dimensions for heatmap clipping (synchronous, no decode needed)
+	// When wall mask changes, invalidate heatmap wall cache
 	$effect(() => {
 		if (!heatmapLayer) return;
-		const mask = wallState.wallMask;
-		heatmapLayer.wallMaskBounds = mask ? { width: mask.width, height: mask.height } : null;
+		wallState.wallMask; // track
 		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 	});
@@ -554,24 +553,16 @@
 		engine.markDirty();
 	});
 
-	// Sync floorplan image to layer + heatmap clip bounds
+	// Sync floorplan image to layer
 	$effect(() => {
-		if (!floorplanLayer || !heatmapLayer) return;
+		if (!floorplanLayer) return;
 		const url = floorplanState.floorplanUrl;
 		if (url) {
 			floorplanLayer.loadImage(url, () => {
-				// Set heatmap clip bounds to floorplan image size
-				if (floorplanLayer.imageWidth > 0) {
-					heatmapLayer.floorplanBounds = {
-						width: floorplanLayer.imageWidth,
-						height: floorplanLayer.imageHeight
-					};
-				}
 				engine.markDirty();
 			});
 		} else {
 			floorplanLayer.clearImage();
-			heatmapLayer.floorplanBounds = null;
 		}
 		engine.markDirty();
 	});

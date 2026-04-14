@@ -78,8 +78,6 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 	isDragging = false;
 	worldUnitsPerMeter = 32.8; // updated from getEffectiveWupm()
-	floorplanBounds: { width: number; height: number } | null = null;
-	wallMaskBounds: { width: number; height: number } | null = null;
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -118,7 +116,6 @@ export class HeatmapLayer implements Layer {
 				)
 				.join('|') +
 			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
-			`|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? this.wallMask?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -192,13 +189,24 @@ export class HeatmapLayer implements Layer {
 			);
 		}
 
-		const clip = this.floorplanBounds
-			? this.floorplanBounds
-			: this.wallMaskBounds
-				? this.wallMaskBounds
-				: this.wallMask
-					? { width: this.wallMask.width, height: this.wallMask.height }
-					: null;
+		// Clip to the union of all AP signal reach areas so cross-floor APs
+		// with different floorplan sizes still propagate fully.
+		let clipMinX = Infinity,
+			clipMinY = Infinity,
+			clipMaxX = -Infinity,
+			clipMaxY = -Infinity;
+		for (let i = 0; i < n; i++) {
+			const reach = Math.sqrt(apCutSq[i]!);
+			const x0 = apX[i]! - reach;
+			const y0 = apY[i]! - reach;
+			const x1 = apX[i]! + reach;
+			const y1 = apY[i]! + reach;
+			if (x0 < clipMinX) clipMinX = x0;
+			if (y0 < clipMinY) clipMinY = y0;
+			if (x1 > clipMaxX) clipMaxX = x1;
+			if (y1 > clipMaxY) clipMaxY = y1;
+		}
+		const hasClip = clipMinX < clipMaxX && clipMinY < clipMaxY;
 
 		const inv = camera.getInverseTransform();
 		const ia = inv[0]!,
@@ -222,7 +230,7 @@ export class HeatmapLayer implements Layer {
 				const wx = ia * sx + ic * sy + ie;
 				const wy = ib * sx + idd * sy + ig;
 
-				if (clip && (wx < 0 || wx > clip.width || wy < 0 || wy > clip.height)) {
+				if (hasClip && (wx < clipMinX || wx > clipMaxX || wy < clipMinY || wy > clipMaxY)) {
 					continue;
 				}
 
