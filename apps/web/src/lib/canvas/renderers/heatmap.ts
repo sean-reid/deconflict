@@ -160,8 +160,7 @@ export class HeatmapLayer implements Layer {
 
 		// Per-AP cross-floor parameters
 		const vertOffSq = new Float64Array(n); // vertical offset² in world units²
-		const floorDbThickness = new Float64Array(n); // dbPerMeter * thickness (vertical path)
-		const vertOffWorld = new Float64Array(n); // vertical offset in world units (for cosTheta)
+		const floorDbThickness = new Float64Array(n); // ITU aggregate floor isolation (dB)
 
 		const fields: (AttenField | null)[] = [];
 		for (let i = 0; i < n; i++) {
@@ -170,7 +169,6 @@ export class HeatmapLayer implements Layer {
 			apY[i] = ap.y;
 			const vo = ap.verticalOffset ?? 0;
 			vertOffSq[i] = vo * vo * wupmSq;
-			vertOffWorld[i] = vo * wupm;
 			floorDbThickness[i] = (ap.floorDbPerMeter ?? 0) * (ap.floorThickness ?? 0);
 			const rSq = ap.interferenceRadius * ap.interferenceRadius;
 			apRadSq[i] = rSq;
@@ -245,18 +243,15 @@ export class HeatmapLayer implements Layer {
 						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
 					}
 
-					// Oblique floor attenuation: signal at angle through slab loses more dB.
-					// effectiveLoss = dbPerMeter * thickness / cosTheta
-					// cosTheta = verticalOffset / sqrt(horizDist² + verticalOffset²)
+					// Floor slab attenuation (ITU-R P.1238 empirical model).
+					// Uses measured aggregate floor isolation that accounts for
+					// direct penetration + diffraction + multipath. Applied as
+					// flat dB loss. The 3D distance (via vertOffSq above) already
+					// captures the oblique geometry — closer floors = shorter 3D
+					// path = stronger signal, steeper angles = longer 3D path.
 					const fdt = floorDbThickness[i]!;
 					if (fdt > 0) {
-						const horizDistSq = dx * dx + dy * dy;
-						const vow = vertOffWorld[i]!;
-						// cosTheta = vow / sqrt(horizDistSq + vow²)
-						// effectiveLoss = fdt / cosTheta = fdt * sqrt(horizDistSq + vow²) / vow
-						// Cap at 3× vertical loss to avoid infinity at extreme angles
-						const pathRatio = Math.min(3, Math.sqrt(horizDistSq + vow * vow) / vow);
-						tp *= Math.exp(fdt * pathRatio * -0.11512925464);
+						tp *= Math.exp(fdt * -0.11512925464);
 					}
 
 					if (ispCap > 0 && tp > ispCap) tp = ispCap;
