@@ -7,8 +7,56 @@ import { appState } from '$state/app.svelte.js';
 import { clearSelection } from '$state/canvas.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
 import type { WallMaterialId } from '$canvas/materials.js';
+import type { FloorMaterialId } from '$canvas/floor-materials.js';
 
-interface ProjectFile {
+// ─── V3 format (multi-floor) ───────────────────────────────────────
+
+interface ProjectFloorV3 {
+	id: string;
+	name: string;
+	level: number;
+	ceilingHeight: number;
+	floorMaterial: FloorMaterialId;
+	floorplanImage?: string;
+	floorplanScale: number;
+	calibration?: { worldUnitsPerMeter: number };
+	floorplanBoundary?: Array<{ x: number; y: number }> | null;
+	wallMask?: { dataUrl: string; width: number; height: number } | null;
+	wallAttenuation?: number;
+	wallMaterial?: number;
+	materialMask?: { dataUrl: string; width: number; height: number } | null;
+}
+
+interface ProjectFileV3 {
+	version: 3;
+	name: string;
+	band: Band;
+	channelWidth: ChannelWidth;
+	regulatoryDomain: RegulatoryDomain;
+	unitSystem?: 'imperial' | 'metric';
+	ispSpeed?: number;
+	targetThroughput?: number;
+	floors: ProjectFloorV3[];
+	aps: Array<{
+		id: string;
+		name: string;
+		x: number;
+		y: number;
+		band: Band;
+		channelWidth: ChannelWidth;
+		fixedChannel: number | null;
+		assignedChannel: number | null;
+		interferenceRadius: number;
+		power: number;
+		modelId?: string | null;
+		modelLabel?: string | null;
+		floorId: string;
+	}>;
+}
+
+// ─── V2 format (legacy single-floor) ───────────────────────────────
+
+interface ProjectFileV2 {
 	version: 2;
 	name: string;
 	band: Band;
@@ -36,11 +84,15 @@ interface ProjectFile {
 		power: number;
 		modelId?: string | null;
 		modelLabel?: string | null;
+		floorId?: string;
 	}>;
 }
 
-async function floorplanToDataUrl(): Promise<string | undefined> {
-	const url = floorplanState.floorplanUrl;
+type ProjectFile = ProjectFileV2 | ProjectFileV3;
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+async function floorplanToDataUrl(url: string | null): Promise<string | undefined> {
 	if (!url) return undefined;
 	if (url.startsWith('data:')) return url;
 
@@ -62,26 +114,40 @@ async function floorplanToDataUrl(): Promise<string | undefined> {
 	}
 }
 
-export async function serialize(): Promise<string> {
-	const floorplanImage = await floorplanToDataUrl();
+// ─── Serialize (always v3) ──────────────────────────────────────────
 
-	const data: ProjectFile = {
-		version: 2,
+export async function serialize(): Promise<string> {
+	const floors: ProjectFloorV3[] = [];
+
+	for (const floor of floorState.floors) {
+		const floorplanImage = await floorplanToDataUrl(floor.floorplanUrl);
+		floors.push({
+			id: floor.id,
+			name: floor.name,
+			level: floor.level,
+			ceilingHeight: floor.ceilingHeight,
+			floorMaterial: floor.floorMaterial,
+			floorplanImage,
+			floorplanScale: floor.floorplanScale,
+			calibration: floor.calibration ?? undefined,
+			floorplanBoundary: floor.floorplanBoundary ?? undefined,
+			wallMask: floor.wallMask ? JSON.parse(JSON.stringify(floor.wallMask)) : null,
+			wallAttenuation: floor.wallAttenuation,
+			wallMaterial: floor.wallMaterial,
+			materialMask: floor.materialMask ? JSON.parse(JSON.stringify(floor.materialMask)) : null
+		});
+	}
+
+	const data: ProjectFileV3 = {
+		version: 3,
 		name: projectMeta.name,
 		band: apState.band,
 		channelWidth: apState.channelWidth,
 		regulatoryDomain: apState.regulatoryDomain,
 		unitSystem: floorplanState.unitSystem,
-		floorplanImage,
-		floorplanScale: floorplanState.floorplanScale,
-		calibration: floorplanState.calibration ?? undefined,
-		floorplanBoundary: floorplanState.floorplanBoundary ?? undefined,
-		wallMask: wallState.wallMask ? JSON.parse(JSON.stringify(wallState.wallMask)) : null,
-		wallAttenuation: wallState.wallAttenuation,
-		wallMaterial: wallState.wallMaterial,
-		materialMask: wallState.materialMask
-			? JSON.parse(JSON.stringify(wallState.materialMask))
-			: null,
+		ispSpeed: projectMeta.ispSpeed,
+		targetThroughput: projectMeta.targetThroughput,
+		floors,
 		aps: apState.aps.map((ap) => ({
 			id: ap.id,
 			name: ap.name,
@@ -101,45 +167,104 @@ export async function serialize(): Promise<string> {
 	return JSON.stringify(data, null, '\t');
 }
 
+// ─── Deserialize (v2 or v3) ─────────────────────────────────────────
+
+function migrateV2(data: ProjectFileV2): ProjectFileV3 {
+	const floorId = crypto.randomUUID();
+	return {
+		version: 3,
+		name: data.name || 'Imported Project',
+		band: data.band || '5ghz',
+		channelWidth: data.channelWidth || 20,
+		regulatoryDomain: data.regulatoryDomain || 'fcc',
+		unitSystem: data.unitSystem ?? 'imperial',
+		floors: [
+			{
+				id: floorId,
+				name: 'Floor 1',
+				level: 0,
+				ceilingHeight: 3.0,
+				floorMaterial: 1,
+				floorplanImage: data.floorplanImage,
+				floorplanScale: data.floorplanScale ?? 0.4,
+				calibration: data.calibration,
+				floorplanBoundary: data.floorplanBoundary,
+				wallMask: data.wallMask,
+				wallAttenuation: data.wallAttenuation,
+				wallMaterial: data.wallMaterial,
+				materialMask: data.materialMask
+			}
+		],
+		aps: (data.aps || []).map((ap) => ({
+			...ap,
+			floorId: ap.floorId ?? floorId,
+			modelId: ap.modelId ?? null,
+			modelLabel: ap.modelLabel ?? null
+		}))
+	};
+}
+
 export function deserialize(json: string): void {
-	let data: ProjectFile;
+	let parsed: ProjectFile;
 	try {
-		data = JSON.parse(json);
+		parsed = JSON.parse(json);
 	} catch {
 		throw new Error('Invalid JSON file');
 	}
 
-	if (!data.version) {
+	if (!parsed.version) {
 		throw new Error('Unsupported file version');
 	}
-	if (!Array.isArray(data.aps)) {
-		throw new Error('Invalid project file: missing AP data');
+
+	const data: ProjectFileV3 = parsed.version === 2 ? migrateV2(parsed) : parsed;
+
+	if (!data.floors || data.floors.length === 0) {
+		throw new Error('Invalid project file: no floors');
 	}
 
+	// Project meta
 	projectMeta.name = data.name || 'Imported Project';
-	projectMeta.ispSpeed = 0;
-	projectMeta.targetThroughput = data.aps.length > 0 ? 25 : 50;
+	projectMeta.ispSpeed = data.ispSpeed ?? 0;
+	projectMeta.targetThroughput = data.targetThroughput ?? 25;
 
+	// AP defaults
 	apState.band = data.band || '5ghz';
 	apState.channelWidth = data.channelWidth || 20;
 	apState.regulatoryDomain = data.regulatoryDomain || 'fcc';
 
+	// Unit system
 	floorplanState.unitSystem = data.unitSystem ?? 'imperial';
-	floorplanState.floorplanScale = data.floorplanScale ?? 0.4;
-	floorplanState.calibration = data.calibration ?? null;
-	floorplanState.floorplanBoundary = data.floorplanBoundary ?? null;
 
-	wallState.wallMask = data.wallMask ?? null;
-	wallState.wallAttenuation = data.wallAttenuation ?? 5;
-	wallState.wallMaterial = (data.wallMaterial ?? 0) as WallMaterialId;
-	wallState.materialMask = data.materialMask ?? null;
+	// Floors
+	floorState.floors = data.floors.map((f) => ({
+		id: f.id,
+		name: f.name,
+		level: f.level,
+		ceilingHeight: f.ceilingHeight ?? 3.0,
+		floorMaterial: (f.floorMaterial ?? 1) as FloorMaterialId,
+		floorplanUrl: f.floorplanImage ?? null,
+		floorplanScale: f.floorplanScale ?? 0.4,
+		calibration: f.calibration ?? null,
+		floorplanBoundary: f.floorplanBoundary ?? null,
+		wallMask: f.wallMask ?? null,
+		wallAttenuation: f.wallAttenuation ?? 5,
+		wallMaterial: (f.wallMaterial ?? 0) as WallMaterialId,
+		materialMask: f.materialMask ?? null
+	}));
+	floorState.currentFloorId = floorState.floors[0]!.id;
 
-	if (data.floorplanImage) {
-		floorplanState.floorplanUrl = data.floorplanImage;
-	} else {
-		floorplanState.floorplanUrl = null;
-	}
+	// Sync current floor to legacy atoms
+	const cur = floorState.floors[0]!;
+	floorplanState.floorplanUrl = cur.floorplanUrl;
+	floorplanState.floorplanScale = cur.floorplanScale;
+	floorplanState.calibration = cur.calibration;
+	floorplanState.floorplanBoundary = cur.floorplanBoundary;
+	wallState.wallMask = cur.wallMask;
+	wallState.wallAttenuation = cur.wallAttenuation;
+	wallState.wallMaterial = cur.wallMaterial;
+	wallState.materialMask = cur.materialMask;
 
+	// APs
 	apState.aps = data.aps.map((ap) => ({
 		id: ap.id || crypto.randomUUID(),
 		name: ap.name || 'AP',
@@ -153,14 +278,14 @@ export function deserialize(json: string): void {
 		power: ap.power ?? 20,
 		modelId: ap.modelId ?? null,
 		modelLabel: ap.modelLabel ?? null,
-		floorId: (ap as any).floorId ?? floorState.currentFloorId
+		floorId: ap.floorId ?? floorState.currentFloorId
 	}));
 
 	clearSelection();
 	if (data.aps.length > 0) {
 		appState.sidebarPanel = 'aps';
 		appState.sidebarOpen = true;
-	} else if (data.floorplanImage) {
+	} else if (data.floors[0]?.floorplanImage) {
 		appState.sidebarPanel = 'floorplan';
 	}
 }
