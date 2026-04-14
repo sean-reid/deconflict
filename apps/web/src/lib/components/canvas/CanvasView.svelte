@@ -496,10 +496,25 @@
 		wallState.wallMaterial = floor.wallMaterial;
 		wallState.materialMask = floor.materialMask;
 
-		// Force wall mask re-decode on floor switch (prevent stale cache)
+		// Force wall mask re-decode on floor switch (prevent stale cache).
+		// Clear renderer references immediately so stale wall data from
+		// the previous floor doesn't render while the decode is in-flight.
 		lastWallMaskUrl = null;
 		lastMatMaskUrl = null;
 		cachedWallData = null;
+		cachedMaterialData = null;
+		cachedWallLabels = null;
+		cachedTiledMask = null;
+		if (wallLayer) {
+			wallLayer.mask = null;
+			wallLayer.materialMap = null;
+			wallLayer.invalidateCache();
+		}
+		if (heatmapLayer) {
+			heatmapLayer.wallMask = null;
+			heatmapLayer.materialMap = null;
+			heatmapLayer.markWallsDirty();
+		}
 
 		lastSyncedFloorId = id;
 		clearSelection();
