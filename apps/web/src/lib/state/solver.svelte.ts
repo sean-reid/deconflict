@@ -69,15 +69,14 @@ const floorMaskCache = new Map<string, DecodedFloorMask>();
 /** Get decoded wall mask for a floor. Uses current wallState for active floor. */
 async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 	const floor = floorState.floors.find((f) => f.id === floorId);
-	if (!floor?.wallMask) return null;
 
-	const key = `${floorId}:${floor.wallMask.width}x${floor.wallMask.height}:${floor.wallMaterial}`;
-	const cached = floorMaskCache.get(floorId);
-	if (cached && cached.sourceKey === key) return cached;
-
-	// For current floor, use already-decoded wallState
+	// For current floor, prefer wallState (always up-to-date) over floor entity (synced on switch)
 	if (floorId === floorState.currentFloorId && wallState.wallMask) {
 		const wm = wallState.wallMask;
+		const key = `${floorId}:${wm.width}x${wm.height}:${wallState.wallMaterial}`;
+		const cached = floorMaskCache.get(floorId);
+		if (cached && cached.sourceKey === key) return cached;
+
 		const decoded = await decodeMask(wm.dataUrl, wm.width, wm.height);
 		const mm = wallState.materialMask;
 		const matMask = mm ? await decodeMaterialMask(mm.dataUrl, mm.width, mm.height) : null;
@@ -93,7 +92,12 @@ async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 	}
 
 	// Other floors: decode from floor entity
+	if (!floor?.wallMask) return null;
 	const wm = floor.wallMask;
+	const key = `${floorId}:${wm.width}x${wm.height}:${floor.wallMaterial}`;
+	const cached = floorMaskCache.get(floorId);
+	if (cached && cached.sourceKey === key) return cached;
+
 	const decoded = await decodeMask(wm.dataUrl, wm.width, wm.height);
 	const mm = floor.materialMask;
 	const matMask = mm ? await decodeMaterialMask(mm.dataUrl, mm.width, mm.height) : null;
