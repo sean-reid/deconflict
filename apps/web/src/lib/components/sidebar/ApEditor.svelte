@@ -101,12 +101,14 @@
 		}
 	});
 
-	let neighbors = $derived.by(() => {
-		if (!singleAp) return [];
+	/** APs on the same channel whose signal reaches this AP — actual co-channel interference. */
+	let interferers = $derived.by(() => {
+		if (!singleAp || singleAp.assignedChannel === null) return [];
 		const aps = projectState.aps;
-		const results: Array<{ name: string; signalPct: number; sameChannel: boolean }> = [];
+		const results: Array<{ name: string; signalPct: number }> = [];
 		for (const other of aps) {
 			if (other.id === singleAp.id) continue;
+			if (other.assignedChannel !== singleAp.assignedChannel) continue;
 			// Signal from other AP at this AP's position (inverse quartic)
 			const dx = singleAp.x - other.x;
 			const dy = singleAp.y - other.y;
@@ -119,13 +121,9 @@
 				if (slabDb > 0) signal *= Math.pow(10, -slabDb / 10);
 			}
 			if (signal < 0.005) continue; // below CCA threshold
-			const sameChannel = singleAp.assignedChannel !== null
-				&& other.assignedChannel !== null
-				&& singleAp.assignedChannel === other.assignedChannel;
 			results.push({
 				name: other.name,
-				signalPct: Math.round(signal * 100),
-				sameChannel
+				signalPct: Math.round(signal * 100)
 			});
 		}
 		return results.sort((a, b) => b.signalPct - a.signalPct);
@@ -311,18 +309,15 @@
 			</div>
 		</div>
 
-		{#if neighbors.length > 0}
-			<div class="section-header">INTERFERENCE ({neighbors.length})</div>
+		{#if interferers.length > 0}
+			<div class="section-header">CO-CHANNEL INTERFERENCE ({interferers.length})</div>
 			<div class="neighbors">
-				{#each neighbors.slice(0, 5) as n}
+				{#each interferers.slice(0, 5) as n}
 					<div class="neighbor-row">
 						<span class="neighbor-name">{n.name}</span>
-						<span class="neighbor-overlap" class:low={n.signalPct < 20} class:med={n.signalPct >= 20 && n.signalPct < 50} class:high={n.signalPct >= 50}>
+						<span class="neighbor-overlap high">
 							{n.signalPct}%
 						</span>
-						{#if n.sameChannel}
-							<span class="conflict-badge">conflict</span>
-						{/if}
 					</div>
 				{/each}
 			</div>
