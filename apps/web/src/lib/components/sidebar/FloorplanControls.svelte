@@ -383,7 +383,7 @@
 				const h = 1500;
 				const emptyData = new Uint8Array(w * h);
 				const dataUrl = encodeMask(emptyData, w, h);
-				wallState.wallMask = { dataUrl, width: w, height: h };
+				wallState.wallMask = { dataUrl, width: w, height: h, originX: 0, originY: 0 };
 				appState.wallEditMode = 'draw';
 				scheduleSave();
 			}}>

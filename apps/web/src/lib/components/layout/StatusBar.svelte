@@ -23,26 +23,33 @@
 		const engine = getEngineRef();
 		if (!engine) return;
 
-		// Collect bounding points: AP coverage circles + floorplan corners
 		const points: Array<{ x: number; y: number }> = [];
 
-		for (const ap of projectState.aps) {
-			const r = ap.interferenceRadius;
-			points.push({ x: ap.x - r, y: ap.y - r });
-			points.push({ x: ap.x + r, y: ap.y + r });
-		}
-
-		// Include floorplan image bounds or wall mask bounds (draw-from-scratch)
+		// Priority 1: floorplan image bounds
 		const fp = engine.layers.find((l) => l.id === 'floorplan') as { imageWidth?: number; imageHeight?: number } | undefined;
 		if (fp && fp.imageWidth && fp.imageWidth > 0) {
 			points.push({ x: 0, y: 0 });
 			points.push({ x: fp.imageWidth, y: fp.imageHeight ?? 0 });
 		} else if (wallState.wallMask) {
-			points.push({ x: 0, y: 0 });
-			points.push({ x: wallState.wallMask.width, y: wallState.wallMask.height });
+			// Priority 2: wall mask bounds (draw-from-scratch)
+			const ox = wallState.wallMask.originX ?? 0;
+			const oy = wallState.wallMask.originY ?? 0;
+			points.push({ x: ox, y: oy });
+			points.push({ x: ox + wallState.wallMask.width, y: oy + wallState.wallMask.height });
 		}
 
-		if (points.length === 0) return;
+		// If no floorplan/walls, fit to AP centers (no radius inflation)
+		if (points.length === 0) {
+			for (const ap of projectState.aps) {
+				points.push({ x: ap.x, y: ap.y });
+			}
+		}
+
+		if (points.length === 0) {
+			engine.camera.reset();
+			engine.markDirty();
+			return;
+		}
 
 		const rect = engine.canvas.getBoundingClientRect();
 		engine.camera.fitToBounds(points, rect.width, rect.height);

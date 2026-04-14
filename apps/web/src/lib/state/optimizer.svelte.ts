@@ -85,7 +85,7 @@ export async function updateCoverage(): Promise<void> {
 			let signal = Math.pow(1 - ratio / 1.5, 2);
 			if (signal > 0.001) {
 				const wallLoss = computeWallAttenuation(
-					{ data, width, height },
+					{ data, width, height, originX: 0, originY: 0 },
 					matData,
 					WALL_MATERIALS,
 					defaultDb,

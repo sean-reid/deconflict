@@ -22,10 +22,22 @@ interface ProjectFloorV3 {
 	floorplanScale: number;
 	calibration?: { worldUnitsPerMeter: number };
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
-	wallMask?: { dataUrl: string; width: number; height: number } | null;
+	wallMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 	wallAttenuation?: number;
 	wallMaterial?: number;
-	materialMask?: { dataUrl: string; width: number; height: number } | null;
+	materialMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 }
 
 interface ProjectFileV3 {
@@ -68,10 +80,22 @@ interface ProjectFileV2 {
 	floorplanScale: number;
 	calibration?: { worldUnitsPerMeter: number };
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
-	wallMask?: { dataUrl: string; width: number; height: number } | null;
+	wallMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 	wallAttenuation?: number;
 	wallMaterial?: number;
-	materialMask?: { dataUrl: string; width: number; height: number } | null;
+	materialMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 	aps: Array<{
 		id: string;
 		name: string;
@@ -250,10 +274,18 @@ export function deserialize(json: string): void {
 		floorplanScale: f.floorplanScale ?? 0.4,
 		calibration: f.calibration ?? null,
 		floorplanBoundary: f.floorplanBoundary ?? null,
-		wallMask: f.wallMask ?? null,
+		wallMask: f.wallMask
+			? { ...f.wallMask, originX: f.wallMask.originX ?? 0, originY: f.wallMask.originY ?? 0 }
+			: null,
 		wallAttenuation: f.wallAttenuation ?? 5,
 		wallMaterial: (f.wallMaterial ?? 0) as WallMaterialId,
-		materialMask: f.materialMask ?? null
+		materialMask: f.materialMask
+			? {
+					...f.materialMask,
+					originX: f.materialMask.originX ?? 0,
+					originY: f.materialMask.originY ?? 0
+				}
+			: null
 	}));
 	floorState.currentFloorId = floorState.floors[0]!.id;
 
