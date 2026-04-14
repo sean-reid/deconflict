@@ -2,6 +2,7 @@
 	import { wallState } from '$state/wall-state.svelte.js';
 	import { floorplanState } from '$state/floorplan-state.svelte.js';
 	import { apState } from '$state/ap-state.svelte.js';
+	import { floorState, switchFloor, addFloor } from '$state/floor-state.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
@@ -221,6 +222,20 @@
 </script>
 
 <div class="floorplan-controls">
+	{#if floorState.floors.length > 1}
+		<div class="floor-strip">
+			{#each floorState.floors as floor}
+				<button
+					class="floor-pill"
+					class:active={floor.id === floorState.currentFloorId}
+					onclick={() => switchFloor(floor.id)}
+				>
+					{floor.name}
+				</button>
+			{/each}
+			<button class="floor-pill add" onclick={() => addFloor()} aria-label="Add floor">+</button>
+		</div>
+	{/if}
 	{#if !hasFloorplan}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -349,6 +364,50 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
+	}
+
+	.floor-strip {
+		display: flex;
+		gap: 4px;
+		overflow-x: auto;
+		padding-bottom: var(--space-2);
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.floor-pill {
+		padding: 4px 10px;
+		border: 1px solid var(--border-default);
+		border-radius: 999px;
+		background: var(--bg-surface);
+		color: var(--text-secondary);
+		font-family: var(--font-sans);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all var(--transition-fast);
+	}
+
+	.floor-pill:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.floor-pill.active {
+		border-color: var(--accent-primary);
+		color: var(--accent-primary);
+		background: var(--accent-primary-glow);
+	}
+
+	.floor-pill.add {
+		border-style: dashed;
+		color: var(--text-tertiary);
+		min-width: 28px;
+		text-align: center;
+	}
+
+	.floor-pill.add:hover {
+		border-color: var(--accent-primary-dim);
+		color: var(--accent-primary);
 	}
 
 	.drop-zone {

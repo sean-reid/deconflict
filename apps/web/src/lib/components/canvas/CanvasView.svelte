@@ -28,6 +28,8 @@
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
+	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
+	import FloorDots from '$components/canvas/FloorDots.svelte';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
@@ -360,6 +362,22 @@
 		if (!heatmapLayer) return;
 		heatmapLayer.isDragging = canvasState.isDragging || !!appState.wallEditMode;
 		engine.markDirty();
+	});
+
+	// Sync current floor data to legacy atoms when switching floors
+	$effect(() => {
+		const floor = currentFloor();
+		void floorState.currentFloorId; // track switches
+		floorplanState.floorplanUrl = floor.floorplanUrl;
+		floorplanState.floorplanScale = floor.floorplanScale;
+		floorplanState.calibration = floor.calibration;
+		floorplanState.floorplanBoundary = floor.floorplanBoundary;
+		wallState.wallMask = floor.wallMask;
+		wallState.wallAttenuation = floor.wallAttenuation;
+		wallState.wallMaterial = floor.wallMaterial;
+		wallState.materialMask = floor.materialMask;
+		clearSelection();
+		engine?.markDirty();
 	});
 
 	// Sync wall mask dimensions for heatmap clipping (synchronous, no decode needed)
@@ -848,6 +866,7 @@
 		ontouchend={handleTouchEnd}
 		ontouchcancel={handleTouchEnd}
 	></canvas>
+	<FloorDots />
 	<LayerPanel />
 	{#if appState.wallEditMode}
 		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
