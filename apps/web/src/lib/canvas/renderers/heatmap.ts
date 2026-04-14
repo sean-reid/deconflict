@@ -20,7 +20,7 @@ import {
 } from '../../rf/propagation.js';
 
 const CELL_SIZE = 6;
-const MAX_RATIO_SQ = 16;
+const MAX_RATIO_SQ = 25;
 const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // Color LUT — 256 entries, built once
@@ -78,7 +78,6 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 	isDragging = false;
 	worldUnitsPerMeter = 32.8; // updated from getEffectiveWupm()
-
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';

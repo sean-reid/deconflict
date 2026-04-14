@@ -41,6 +41,10 @@ export class TiledMask {
 	private maxTY = -Infinity;
 	private dirty = true;
 
+	/** Minimum bounds the materialization must cover (e.g., original mask dimensions). */
+	minBoundsWidth = 0;
+	minBoundsHeight = 0;
+
 	// Cached flat materialization
 	private cachedData: Uint8Array | null = null;
 	private cachedMaterial: Uint8Array | null = null;
@@ -128,14 +132,22 @@ export class TiledMask {
 		return this.tiles.size === 0;
 	}
 
-	/** Get the bounding box in world pixels. */
+	/** Get the bounding box in world pixels (includes minBounds). */
 	get bounds(): { originX: number; originY: number; width: number; height: number } | null {
-		if (this.minTX > this.maxTX) return null;
+		if (this.minTX > this.maxTX && this.minBoundsWidth <= 0) return null;
+		const tileOX = this.minTX <= this.maxTX ? this.minTX * TILE_SIZE : 0;
+		const tileOY = this.minTY <= this.maxTY ? this.minTY * TILE_SIZE : 0;
+		const tileW = this.minTX <= this.maxTX ? (this.maxTX - this.minTX + 1) * TILE_SIZE : 0;
+		const tileH = this.minTY <= this.maxTY ? (this.maxTY - this.minTY + 1) * TILE_SIZE : 0;
+		const originX = Math.min(tileOX, 0);
+		const originY = Math.min(tileOY, 0);
+		const endX = Math.max(tileOX + tileW, this.minBoundsWidth);
+		const endY = Math.max(tileOY + tileH, this.minBoundsHeight);
 		return {
-			originX: this.minTX * TILE_SIZE,
-			originY: this.minTY * TILE_SIZE,
-			width: (this.maxTX - this.minTX + 1) * TILE_SIZE,
-			height: (this.maxTY - this.minTY + 1) * TILE_SIZE
+			originX,
+			originY,
+			width: endX - originX,
+			height: endY - originY
 		};
 	}
 
@@ -232,6 +244,8 @@ export class TiledMask {
 		defaultMaterial?: number
 	): TiledMask {
 		const mask = new TiledMask();
+		mask.minBoundsWidth = width;
+		mask.minBoundsHeight = height;
 		for (let y = 0; y < height; y++) {
 			for (let x = 0; x < width; x++) {
 				if (data[y * width + x]) {
