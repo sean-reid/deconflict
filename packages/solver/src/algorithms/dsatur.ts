@@ -39,19 +39,37 @@ export function dsatur(graph: Graph, options: SolverOptions): SolverResult {
 
 		if (bestNode === undefined) break;
 
-		const neighborColors = new Set<number>();
+		// Count how many neighbors use each color
+		const neighborColorCount = new Map<number, number>();
 		for (const nb of neighbors(graph, bestNode)) {
 			const c = assignment.get(nb);
 			if (c !== undefined) {
-				neighborColors.add(c);
+				neighborColorCount.set(c, (neighborColorCount.get(c) ?? 0) + 1);
 			}
 		}
 
+		// Pick the first conflict-free color
+		let assigned = false;
 		for (const color of options.availableColors) {
-			if (!neighborColors.has(color)) {
+			if (!neighborColorCount.has(color)) {
 				assignment.set(bestNode, color);
+				assigned = true;
 				break;
 			}
+		}
+
+		// No conflict-free color: pick the one with least neighbor usage (minimize contention)
+		if (!assigned && options.availableColors.length > 0) {
+			let bestColor = options.availableColors[0]!;
+			let leastConflicts = Infinity;
+			for (const color of options.availableColors) {
+				const count = neighborColorCount.get(color) ?? 0;
+				if (count < leastConflicts) {
+					leastConflicts = count;
+					bestColor = color;
+				}
+			}
+			assignment.set(bestNode, bestColor);
 		}
 
 		uncolored.delete(bestNode);

@@ -1,6 +1,9 @@
 import { apState } from './ap-state.svelte.js';
 import { wallState } from './wall-state.svelte.js';
+import { floorState } from './floor-state.svelte.js';
+import { floorplanState } from './floorplan-state.svelte.js';
 import type { AccessPoint } from './ap-state.svelte.js';
+import type { Floor } from './floor-state.svelte.js';
 import type { WallMaterialId } from '$canvas/materials.js';
 
 const MAX_HISTORY = 50;
@@ -22,6 +25,8 @@ interface Snapshot {
 		originY: number;
 	} | null;
 	wallMaterial: WallMaterialId;
+	floors: Floor[];
+	currentFloorId: string;
 }
 
 let undoStack: Snapshot[] = $state([]);
@@ -32,16 +37,32 @@ function takeSnapshot(): Snapshot {
 		aps: JSON.parse(JSON.stringify(apState.aps)),
 		wallMask: wallState.wallMask ? { ...wallState.wallMask } : null,
 		materialMask: wallState.materialMask ? { ...wallState.materialMask } : null,
-		wallMaterial: wallState.wallMaterial
+		wallMaterial: wallState.wallMaterial,
+		floors: JSON.parse(JSON.stringify(floorState.floors)),
+		currentFloorId: floorState.currentFloorId
 	};
 }
 
 function applySnapshot(snap: Snapshot): void {
 	apState.aps = snap.aps;
-	wallState.wallMask = snap.wallMask;
-	wallState.materialMask = snap.materialMask;
-	// Setting wallMaterial triggers the $effect in CanvasView that syncs renderers
-	wallState.wallMaterial = snap.wallMaterial;
+	floorState.floors = snap.floors;
+	floorState.currentFloorId = snap.currentFloorId;
+	// Sync current floor's wall data to legacy atoms
+	const cur = snap.floors.find((f) => f.id === snap.currentFloorId) ?? snap.floors[0];
+	if (cur) {
+		wallState.wallMask = cur.wallMask;
+		wallState.materialMask = cur.materialMask;
+		wallState.wallMaterial = cur.wallMaterial;
+		wallState.wallAttenuation = cur.wallAttenuation;
+		floorplanState.floorplanUrl = cur.floorplanUrl;
+		floorplanState.floorplanScale = cur.floorplanScale;
+		floorplanState.calibration = cur.calibration;
+		floorplanState.floorplanBoundary = cur.floorplanBoundary;
+	} else {
+		wallState.wallMask = snap.wallMask;
+		wallState.materialMask = snap.materialMask;
+		wallState.wallMaterial = snap.wallMaterial;
+	}
 }
 
 export function pushState(): void {

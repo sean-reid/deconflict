@@ -7,6 +7,17 @@
 	import { floorState, switchFloor, getFloor } from '$state/floor-state.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
+	import ConfirmDialog from '$components/dialogs/ConfirmDialog.svelte';
+
+	let confirmOpen = $state(false);
+	let confirmMessage = $state('');
+	let confirmAction = $state<(() => void) | null>(null);
+
+	function showConfirm(message: string, action: () => void) {
+		confirmMessage = message;
+		confirmAction = action;
+		confirmOpen = true;
+	}
 
 	const bandLabels: Record<string, string> = {
 		'2.4ghz': '2.4G',
@@ -53,13 +64,17 @@
 	}
 
 	function deleteSelected() {
-		removeAps([...canvasState.selectedApIds]);
-		clearSelection();
+		showConfirm('Delete selected access points?', () => {
+			removeAps([...canvasState.selectedApIds]);
+			clearSelection();
+		});
 	}
 
 	function clearAll() {
-		removeAps(projectState.aps.map((ap) => ap.id));
-		clearSelection();
+		showConfirm('Delete all access points on this floor?', () => {
+			removeAps(projectState.aps.map((ap) => ap.id));
+			clearSelection();
+		});
 	}
 </script>
 
@@ -172,6 +187,14 @@
 		</div>
 	{/if}
 </div>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Delete"
+	message={confirmMessage}
+	confirmLabel="Delete"
+	onconfirm={() => { confirmAction?.(); }}
+/>
 
 <style>
 	.ap-list {

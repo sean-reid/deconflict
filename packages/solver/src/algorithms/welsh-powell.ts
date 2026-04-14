@@ -30,6 +30,29 @@ export function welshPowell(graph: Graph, options: SolverOptions): SolverResult 
 		}
 	}
 
+	// Any remaining uncolored nodes: assign the least-conflicting color
+	for (const node of sorted) {
+		if (!uncolored.has(node)) continue;
+		const neighborColorCount = new Map<number, number>();
+		for (const nb of neighbors(graph, node)) {
+			const c = assignment.get(nb);
+			if (c !== undefined) {
+				neighborColorCount.set(c, (neighborColorCount.get(c) ?? 0) + 1);
+			}
+		}
+		let bestColor = options.availableColors[0]!;
+		let least = Infinity;
+		for (const color of options.availableColors) {
+			const count = neighborColorCount.get(color) ?? 0;
+			if (count < least) {
+				least = count;
+				bestColor = color;
+			}
+		}
+		assignment.set(node, bestColor);
+		uncolored.delete(node);
+	}
+
 	const { conflicts } = validate(graph, assignment);
 	const usedColors = new Set(assignment.values());
 	const timeMs = performance.now() - start;

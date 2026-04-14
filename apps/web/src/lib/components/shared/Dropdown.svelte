@@ -11,12 +11,16 @@
 
 	let { items, children }: { items: MenuItem[]; children: any } = $props();
 	let open = $state(false);
+	let highlighted = $state(-1);
 	let menuEl: HTMLDivElement;
 	let triggerEl: HTMLButtonElement;
 	let menuStyle = $state('');
 
+	const actionableItems = $derived(items.filter((i) => !i.separator && !i.disabled));
+
 	function toggle() {
 		open = !open;
+		highlighted = -1;
 		if (open && triggerEl) {
 			const rect = triggerEl.getBoundingClientRect();
 			menuStyle = `top: ${rect.bottom + 4}px; left: ${rect.left}px;`;
@@ -27,6 +31,32 @@
 		if (item.disabled) return;
 		item.action();
 		open = false;
+	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (!open) {
+			if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				toggle();
+			}
+			return;
+		}
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			highlighted = (highlighted + 1) % actionableItems.length;
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			highlighted = highlighted <= 0 ? actionableItems.length - 1 : highlighted - 1;
+		} else if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			if (highlighted >= 0 && highlighted < actionableItems.length) {
+				handleClick(actionableItems[highlighted]!);
+			}
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			open = false;
+			triggerEl?.focus();
+		}
 	}
 
 	function handleClickOutside(e: MouseEvent) {
@@ -41,6 +71,7 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleKeyDown} />
 <div class="dropdown" bind:this={menuEl}>
 	<button class="dropdown-trigger" bind:this={triggerEl} onclick={toggle} class:open>
 		{@render children()}
@@ -63,13 +94,14 @@
 	</button>
 	{#if open}
 		<div class="dropdown-menu" style={menuStyle}>
-			{#each items as item}
+			{#each items as item, idx}
 				{#if item.separator}
 					<div class="dropdown-separator"></div>
 				{:else}
 					<button
 						class="dropdown-item"
 						class:disabled={item.disabled}
+						class:highlighted={highlighted >= 0 && actionableItems[highlighted] === item}
 						onclick={() => handleClick(item)}
 					>
 						<span class="item-label">{item.label}</span>
@@ -166,7 +198,8 @@
 		text-align: left;
 	}
 
-	.dropdown-item:hover {
+	.dropdown-item:hover,
+	.dropdown-item.highlighted {
 		background: var(--bg-hover);
 	}
 

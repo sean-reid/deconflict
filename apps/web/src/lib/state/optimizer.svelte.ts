@@ -2,10 +2,9 @@ import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
 import { decodeMask, computeWallAttenuation, type DecodedWallMask } from '$canvas/wall-detect.js';
 import { WALL_MATERIALS } from '$canvas/materials.js';
-import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
 import { computeBuildingInterior } from '$canvas/morph-interior.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
-import { floorState } from './floor-state.svelte.js';
+import { floorState, getFloorSlabAttenuation } from './floor-state.svelte.js';
 import type { Band } from '@deconflict/channels';
 
 const bridge = new OptimizerBridge();
@@ -17,6 +16,21 @@ export const optimizerState = $state({
 	coverage: 0, // real-time coverage percentage, updated on AP/mask changes
 	error: null as string | null
 });
+
+/** Per-floor coverage cache: floorId → { coverage %, sampleCount (proxy for area) }. */
+export const floorCoverage = new Map<string, { coverage: number; samples: number }>();
+
+/** Weighted average coverage across all floors with data. */
+export function getBuildingCoverage(): number {
+	if (floorCoverage.size === 0) return 0;
+	let totalWeighted = 0;
+	let totalSamples = 0;
+	for (const { coverage, samples } of floorCoverage.values()) {
+		totalWeighted += coverage * samples;
+		totalSamples += samples;
+	}
+	return totalSamples > 0 ? Math.round(totalWeighted / totalSamples) : 0;
+}
 
 // Cached interior sample points and decoded mask for real-time coverage
 let cachedMaskUrl: string | null = null;
@@ -77,32 +91,16 @@ export async function updateCoverage(): Promise<void> {
 	}
 	// Include virtual APs from other floors as fixed signal sources
 	const curFloorId = floorState.currentFloorId;
-	const curFloor = floorState.floors.find((f) => f.id === curFloorId);
 	const localAps = projectState.aps.filter((ap) => ap.floorId === curFloorId);
 	const virtualAps: Array<(typeof projectState.aps)[0] & { signalScale: number }> = [];
-	if (curFloor) {
-		const sorted = [...floorState.floors].sort((a, b) => a.level - b.level);
-		for (const otherFloor of floorState.floors) {
-			if (otherFloor.id === curFloorId) continue;
-			const otherAps = projectState.aps.filter((ap) => ap.floorId === otherFloor.id);
-			if (otherAps.length === 0) continue;
-			// Compute floor slab attenuation
-			const loLevel = Math.min(curFloor.level, otherFloor.level);
-			const hiLevel = Math.max(curFloor.level, otherFloor.level);
-			let slabDb = 0;
-			for (const f of sorted) {
-				if (f.level < loLevel || f.level >= hiLevel) continue;
-				const upperIdx = sorted.findIndex((s) => s.level === f.level + 1);
-				if (upperIdx >= 0) {
-					const upper = sorted[upperIdx]!;
-					const mat = FLOOR_MATERIALS[upper.floorMaterial];
-					if (mat) slabDb += (mat.dbPerMeter['5ghz' as Band] ?? 100) * upper.floorThickness;
-				}
-			}
-			const signalScale = Math.pow(10, -slabDb / 20);
-			for (const ap of otherAps) {
-				virtualAps.push({ ...ap, signalScale });
-			}
+	for (const otherFloor of floorState.floors) {
+		if (otherFloor.id === curFloorId) continue;
+		const otherAps = projectState.aps.filter((ap) => ap.floorId === otherFloor.id);
+		if (otherAps.length === 0) continue;
+		const slabDb = getFloorSlabAttenuation(curFloorId, otherFloor.id, '5ghz' as Band);
+		const signalScale = Math.pow(10, -slabDb / 20);
+		for (const ap of otherAps) {
+			virtualAps.push({ ...ap, signalScale });
 		}
 	}
 	const allAps = [...localAps.map((ap) => ({ ...ap, signalScale: 1 })), ...virtualAps];
@@ -120,7 +118,7 @@ export async function updateCoverage(): Promise<void> {
 			let signal = Math.pow(1 - ratio / 1.5, 2);
 			if (signal > 0.001) {
 				const wallLoss = computeWallAttenuation(
-					{ data, width, height, originX: 0, originY: 0 },
+					{ data, width, height, originX: cachedMask.originX, originY: cachedMask.originY },
 					matData,
 					WALL_MATERIALS,
 					defaultDb,
@@ -138,6 +136,12 @@ export async function updateCoverage(): Promise<void> {
 	}
 
 	optimizerState.coverage = Math.round((totalSignal / cachedSamples.length) * 100);
+
+	// Cache per-floor coverage (weighted by sample count as area proxy)
+	floorCoverage.set(curFloorId, {
+		coverage: optimizerState.coverage,
+		samples: cachedSamples.length
+	});
 }
 
 export async function runOptimizer(): Promise<void> {
@@ -174,40 +178,25 @@ export async function runOptimizer(): Promise<void> {
 		}
 
 		// Virtual APs from other floors — fixed signal sources (not moved)
-		const curFloor = floorState.floors.find((f) => f.id === curFloorId);
 		const fixedAps: Array<{
 			x: number;
 			y: number;
 			interferenceRadius: number;
 			signalScale: number;
 		}> = [];
-		if (curFloor) {
-			const sorted = [...floorState.floors].sort((a, b) => a.level - b.level);
-			for (const otherFloor of floorState.floors) {
-				if (otherFloor.id === curFloorId) continue;
-				const otherAps = projectState.aps.filter((ap) => ap.floorId === otherFloor.id);
-				if (otherAps.length === 0) continue;
-				const loLevel = Math.min(curFloor.level, otherFloor.level);
-				const hiLevel = Math.max(curFloor.level, otherFloor.level);
-				let slabDb = 0;
-				for (const f of sorted) {
-					if (f.level < loLevel || f.level >= hiLevel) continue;
-					const upperIdx = sorted.findIndex((s) => s.level === f.level + 1);
-					if (upperIdx >= 0) {
-						const upper = sorted[upperIdx]!;
-						const mat = FLOOR_MATERIALS[upper.floorMaterial];
-						if (mat) slabDb += (mat.dbPerMeter['5ghz' as Band] ?? 100) * upper.floorThickness;
-					}
-				}
-				const signalScale = Math.pow(10, -slabDb / 20);
-				for (const ap of otherAps) {
-					fixedAps.push({
-						x: ap.x,
-						y: ap.y,
-						interferenceRadius: ap.interferenceRadius,
-						signalScale
-					});
-				}
+		for (const otherFloor of floorState.floors) {
+			if (otherFloor.id === curFloorId) continue;
+			const otherAps = projectState.aps.filter((ap) => ap.floorId === otherFloor.id);
+			if (otherAps.length === 0) continue;
+			const slabDb = getFloorSlabAttenuation(curFloorId, otherFloor.id, '5ghz' as Band);
+			const signalScale = Math.pow(10, -slabDb / 20);
+			for (const ap of otherAps) {
+				fixedAps.push({
+					x: ap.x,
+					y: ap.y,
+					interferenceRadius: ap.interferenceRadius,
+					signalScale
+				});
 			}
 		}
 

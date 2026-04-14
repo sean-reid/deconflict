@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { projectState, updateAp, removeAp, removeAps, getEffectiveWupm, radiusFromPower } from '$state/project.svelte';
-	import { canvasState, clearSelection } from '$state/canvas.svelte';
+	import { canvasState, clearSelection, selectAp } from '$state/canvas.svelte';
+	import { pushState } from '$state/history.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
-	import { buildInterferenceGraph } from '@deconflict/geometry';
+	import { floorState, getFloor, getFloorSlabAttenuation } from '$state/floor-state.svelte.js';
 	import { findModel, getBandSpec, type ApModel } from '$lib/data/ap-models.js';
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
@@ -101,31 +102,33 @@
 		}
 	});
 
-	let neighbors = $derived.by(() => {
-		if (!singleAp) return [];
+	/** APs on the same channel whose signal reaches this AP — actual co-channel interference. */
+	let interferers = $derived.by(() => {
+		if (!singleAp || singleAp.assignedChannel === null) return [];
 		const aps = projectState.aps;
-		const positions = aps.map(ap => ({
-			id: ap.id, x: ap.x, y: ap.y,
-			interferenceRadius: ap.interferenceRadius
-		}));
-		const { edges } = buildInterferenceGraph(positions);
-		return edges
-			.filter(e => e.a === singleAp.id || e.b === singleAp.id)
-			.map(e => {
-				const otherId = e.a === singleAp.id ? e.b : e.a;
-				const other = aps.find(a => a.id === otherId);
-				if (!other) return null;
-				const sameChannel = singleAp.assignedChannel !== null
-					&& other.assignedChannel !== null
-					&& singleAp.assignedChannel === other.assignedChannel;
-				return {
-					name: other.name,
-					overlap: e.overlapFraction,
-					sameChannel
-				};
-			})
-			.filter((n): n is { name: string; overlap: number; sameChannel: boolean } => n !== null)
-			.sort((a, b) => b.overlap - a.overlap);
+		const results: Array<{ id: string; name: string; signalPct: number }> = [];
+		for (const other of aps) {
+			if (other.id === singleAp.id) continue;
+			if (other.assignedChannel !== singleAp.assignedChannel) continue;
+			// Signal from other AP at this AP's position (inverse quartic)
+			const dx = singleAp.x - other.x;
+			const dy = singleAp.y - other.y;
+			const dSq = dx * dx + dy * dy;
+			const rSq = other.interferenceRadius * other.interferenceRadius;
+			let signal = rSq > 0 ? 1 / (1 + (dSq * dSq) / (rSq * rSq)) : 0;
+			// Cross-floor slab attenuation
+			if (singleAp.floorId !== other.floorId) {
+				const slabDb = getFloorSlabAttenuation(singleAp.floorId, other.floorId, other.band as Band);
+				if (slabDb > 0) signal *= Math.pow(10, -slabDb / 10);
+			}
+			if (signal < 0.005) continue; // below CCA threshold
+			results.push({
+				id: other.id,
+				name: other.name,
+				signalPct: Math.round(signal * 100)
+			});
+		}
+		return results.sort((a, b) => b.signalPct - a.signalPct);
 	});
 
 	let channelOptions = $derived.by(() => {
@@ -144,6 +147,7 @@
 	});
 
 	function handleBandChange(val: string) {
+		pushState();
 		const band = val as Band;
 		if (singleAp) {
 			const interferenceRadius = radiusFromPower(singleAp.power, band);
@@ -157,6 +161,7 @@
 	}
 
 	function handleWidthChange(val: string) {
+		pushState();
 		const channelWidth = Number(val) as ChannelWidth;
 		if (singleAp) {
 			updateAp(singleAp.id, { channelWidth });
@@ -168,12 +173,14 @@
 	}
 
 	function handleChannelChange(val: string) {
+		pushState();
 		if (!singleAp) return;
 		const fixedChannel = val === '' ? null : Number(val);
 		updateAp(singleAp.id, { fixedChannel, assignedChannel: fixedChannel });
 	}
 
 	function handleModelChange(model: ApModel | null) {
+		pushState();
 		if (!singleAp) return;
 		if (!model) {
 			updateAp(singleAp.id, { modelId: null, modelLabel: null });
@@ -194,6 +201,10 @@
 			fixedChannel: null,
 			assignedChannel: null
 		});
+	}
+
+	function handleNameFocus() {
+		pushState();
 	}
 
 	function handleNameInput(e: Event) {
@@ -240,6 +251,7 @@
 				type="text"
 				value={singleAp.name}
 				oninput={handleNameInput}
+				onfocus={handleNameFocus}
 				aria-label="AP name"
 			/>
 		</div>
@@ -308,19 +320,16 @@
 			</div>
 		</div>
 
-		{#if neighbors.length > 0}
-			<div class="section-header">NEARBY ({neighbors.length})</div>
+		{#if interferers.length > 0}
+			<div class="section-header">CO-CHANNEL INTERFERENCE ({interferers.length})</div>
 			<div class="neighbors">
-				{#each neighbors.slice(0, 3) as n}
-					<div class="neighbor-row">
+				{#each interferers.slice(0, 5) as n}
+					<button class="neighbor-row clickable" onclick={() => selectAp(n.id)}>
 						<span class="neighbor-name">{n.name}</span>
-						<span class="neighbor-overlap" class:low={n.overlap < 0.3} class:med={n.overlap >= 0.3 && n.overlap < 0.6} class:high={n.overlap >= 0.6}>
-							{Math.round(n.overlap * 100)}%
+						<span class="neighbor-overlap high">
+							{n.signalPct}%
 						</span>
-						{#if n.sameChannel}
-							<span class="conflict-badge">conflict</span>
-						{/if}
-					</div>
+					</button>
 				{/each}
 			</div>
 		{/if}
@@ -478,8 +487,20 @@
 		gap: var(--space-2);
 		padding: var(--space-1) var(--space-2);
 		background: var(--bg-surface);
+		border: none;
 		border-radius: var(--radius-md);
 		font-size: var(--text-sm);
+		font-family: var(--font-sans);
+		width: 100%;
+		text-align: left;
+	}
+
+	.neighbor-row.clickable {
+		cursor: pointer;
+	}
+
+	.neighbor-row.clickable:hover {
+		background: var(--bg-hover);
 	}
 
 	.neighbor-name {

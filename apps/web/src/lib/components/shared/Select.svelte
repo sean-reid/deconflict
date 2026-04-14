@@ -15,6 +15,7 @@
 
 	let open = $state(false);
 	let triggerEl = $state<HTMLButtonElement>();
+	let highlightedIndex = $state(-1);
 
 	let selectedLabel = $derived(
 		options.find((o) => o.value === value)?.label ?? options[0]?.label ?? ''
@@ -22,19 +23,45 @@
 
 	function toggle() {
 		open = !open;
+		if (open) {
+			// Initialize highlight to current selection
+			const idx = options.findIndex((o) => o.value === value);
+			highlightedIndex = idx >= 0 ? idx : 0;
+		}
 	}
 
 	function select(val: string) {
 		value = val;
 		onchange?.(val);
 		open = false;
+		highlightedIndex = -1;
 		triggerEl?.focus();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			open = false;
+			highlightedIndex = -1;
 			triggerEl?.focus();
+		} else if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			if (!open) {
+				open = true;
+				const idx = options.findIndex((o) => o.value === value);
+				highlightedIndex = idx >= 0 ? idx : 0;
+			} else {
+				highlightedIndex = (highlightedIndex + 1) % options.length;
+			}
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			if (open) {
+				highlightedIndex = (highlightedIndex - 1 + options.length) % options.length;
+			}
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			if (open && highlightedIndex >= 0 && highlightedIndex < options.length) {
+				select(options[highlightedIndex]!.value);
+			}
 		}
 	}
 </script>
@@ -47,6 +74,7 @@
 		class="trigger"
 		type="button"
 		onclick={toggle}
+		onkeydown={handleKeydown}
 		aria-label={ariaLabel}
 		aria-expanded={open}
 		aria-haspopup="listbox"
@@ -61,10 +89,11 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="backdrop" onclick={() => { open = false; }}></div>
 		<div class="dropdown" role="listbox">
-			{#each options as opt}
+			{#each options as opt, i}
 				<button
 					class="option"
 					class:selected={opt.value === value}
+					class:highlighted={i === highlightedIndex}
 					role="option"
 					aria-selected={opt.value === value}
 					onclick={() => select(opt.value)}
@@ -159,7 +188,8 @@
 		white-space: nowrap;
 	}
 
-	.option:hover {
+	.option:hover,
+	.option.highlighted {
 		background: var(--bg-hover);
 		color: var(--text-primary);
 	}
