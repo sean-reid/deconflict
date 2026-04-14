@@ -4,6 +4,7 @@
 	import { solverState } from '$state/solver.svelte';
 	import { optimizerState, runOptimizer, cancelOptimizer } from '$state/optimizer.svelte';
 	import { channelColor } from '@deconflict/channels';
+	import { floorState, switchFloor, getFloor } from '$state/floor-state.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
 
@@ -24,7 +25,26 @@
 		return canvasState.selectedApIds.includes(id);
 	}
 
-	function handleRowClick(id: string, e: MouseEvent) {
+	let apsByFloor = $derived.by(() => {
+		const groups: Array<{ floor: { id: string; name: string }; aps: typeof projectState.aps }> = [];
+		for (const floor of floorState.floors) {
+			const aps = projectState.aps.filter((ap) => ap.floorId === floor.id);
+			if (aps.length > 0) groups.push({ floor: { id: floor.id, name: floor.name }, aps });
+		}
+		// Add any APs with orphaned floorIds
+		const knownFloorIds = new Set(floorState.floors.map((f) => f.id));
+		const orphans = projectState.aps.filter((ap) => !knownFloorIds.has(ap.floorId));
+		if (orphans.length > 0) groups.push({ floor: { id: '', name: 'Unknown Floor' }, aps: orphans });
+		return groups;
+	});
+
+	let multiFloor = $derived(floorState.floors.length > 1);
+
+	function handleRowClick(id: string, floorId: string, e: MouseEvent) {
+		// Switch to the AP's floor if different
+		if (floorId && floorId !== floorState.currentFloorId) {
+			switchFloor(floorId);
+		}
 		selectAp(id, e.shiftKey);
 	}
 
@@ -71,11 +91,19 @@
 		</div>
 	{:else}
 		<div class="list">
-			{#each projectState.aps as ap (ap.id)}
+			{#each apsByFloor as group}
+				{#if multiFloor}
+					<div class="floor-group-header" class:active-floor={group.floor.id === floorState.currentFloorId}>
+						{group.floor.name}
+						<span class="floor-group-count">{group.aps.length}</span>
+					</div>
+				{/if}
+				{#each group.aps as ap (ap.id)}
 				<button
 					class="row"
 					class:selected={isSelected(ap.id)}
-					onclick={(e) => handleRowClick(ap.id, e)}
+					class:other-floor={multiFloor && ap.floorId !== floorState.currentFloorId}
+					onclick={(e) => handleRowClick(ap.id, ap.floorId, e)}
 				>
 					<span
 						class="dot"
@@ -102,6 +130,7 @@
 						</span>
 					{/if}
 				</button>
+			{/each}
 			{/each}
 		</div>
 	{/if}
@@ -148,6 +177,32 @@
 	.ap-list {
 		display: flex;
 		flex-direction: column;
+	}
+
+	.floor-group-header {
+		padding: 4px 8px;
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		font-weight: 600;
+		color: var(--text-tertiary);
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.floor-group-header.active-floor {
+		color: var(--accent-primary);
+	}
+
+	.floor-group-count {
+		font-weight: 400;
+		opacity: 0.6;
+	}
+
+	.row.other-floor {
+		opacity: 0.5;
 	}
 
 	.header {
