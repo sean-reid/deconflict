@@ -409,15 +409,14 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		padding: var(--space-3) 0 0;
-		border-top: 1px solid var(--border-subtle);
 		position: sticky;
-		bottom: 0;
+		bottom: -1px;
 		background: var(--bg-secondary);
 		margin: 0 calc(-1 * var(--space-4));
-		padding-left: var(--space-4);
-		padding-right: var(--space-4);
-		padding-bottom: var(--space-2);
+		padding: var(--space-3) var(--space-4) var(--space-4);
+		border-top: 1px solid var(--border-subtle);
+		box-shadow: 0 -8px 16px var(--bg-secondary);
+		z-index: 1;
 	}
 
 	.coverage-section :global(.btn) {
