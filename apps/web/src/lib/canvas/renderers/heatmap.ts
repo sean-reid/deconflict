@@ -218,6 +218,7 @@ export class HeatmapLayer implements Layer {
 					const dy = wy - apY[i]!;
 					const dSq = dx * dx + dy * dy + vertOffSq[i]!;
 					const signal = signalPower(dSq, apRadSq[i]!);
+					if (signal < 0.001) continue; // below visible threshold, skip expensive lookups
 					let tp = apBase[i]! * signal;
 
 					// Wall attenuation (precomputed field, O(1) lookup)
@@ -258,7 +259,9 @@ export class HeatmapLayer implements Layer {
 		}
 
 		ctx.putImageData(imgData, 0, 0);
-		console.log(`[heatmap] ${cols}x${rows} cells, ${n} APs, ${(performance.now() - t0).toFixed(1)}ms`);
+		console.log(
+			`[heatmap] ${cols}x${rows} cells, ${n} APs, ${(performance.now() - t0).toFixed(1)}ms`
+		);
 		return offscreen;
 	}
 }

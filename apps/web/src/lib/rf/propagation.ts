@@ -311,7 +311,7 @@ export function getAttenField(
 		field = buildAttenField(
 			apX,
 			apY,
-			radius * 5,
+			radius * 3,
 			wallData,
 			wallW,
 			wallH,
