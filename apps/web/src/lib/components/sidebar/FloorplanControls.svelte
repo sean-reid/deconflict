@@ -404,6 +404,7 @@
 				const dataUrl = encodeMask(emptyData, w, h);
 				wallState.wallMask = { dataUrl, width: w, height: h, originX: 0, originY: 0 };
 				appState.wallEditMode = 'draw';
+				if (window.innerWidth < 768) appState.sidebarOpen = false;
 				scheduleSave();
 			}}>
 				<Icon name="pencil" size={14} />
@@ -478,6 +479,7 @@
 			<Button variant="secondary" size="sm" onclick={() => {
 				pushState();
 				appState.wallEditMode = appState.wallEditLastMode;
+				if (window.innerWidth < 768) appState.sidebarOpen = false;
 			}}>
 				<Icon name="eraser" size={14} />
 				Edit Walls
