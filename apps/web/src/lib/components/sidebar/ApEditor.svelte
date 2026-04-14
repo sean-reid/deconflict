@@ -4,7 +4,7 @@
 	import { pushState } from '$state/history.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
-	import { solverState } from '$state/solver.svelte.js';
+	import { solverState, edgeSignals } from '$state/solver.svelte.js';
 	import { findModel, getBandSpec, type ApModel } from '$lib/data/ap-models.js';
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
@@ -102,20 +102,21 @@
 		}
 	});
 
-	/** APs the solver identified as actual co-channel conflicts (same channel + interfering). */
+	/** APs the solver identified as co-channel conflicts, with real attenuated signal. */
 	let interferers = $derived.by(() => {
 		if (!singleAp || !solverState.lastResult) return [];
 		const conflicts = solverState.lastResult.conflicts;
-		const results: Array<{ id: string; name: string }> = [];
+		const results: Array<{ id: string; name: string; signalPct: number }> = [];
 		for (const [a, b] of conflicts) {
 			const otherId = a === singleAp.id ? b : b === singleAp.id ? a : null;
 			if (!otherId) continue;
 			const other = projectState.aps.find((ap) => ap.id === otherId);
-			if (other) {
-				results.push({ id: other.id, name: other.name });
-			}
+			if (!other) continue;
+			const pairKey = [singleAp.id, other.id].sort().join(':');
+			const signal = edgeSignals.get(pairKey) ?? 0;
+			results.push({ id: other.id, name: other.name, signalPct: Math.round(signal * 100) });
 		}
-		return results;
+		return results.sort((a, b) => b.signalPct - a.signalPct);
 	});
 
 	let channelOptions = $derived.by(() => {
@@ -313,7 +314,9 @@
 				{#each interferers.slice(0, 5) as n}
 					<button class="neighbor-row clickable" onclick={() => selectAp(n.id)}>
 						<span class="neighbor-name">{n.name}</span>
-						<span class="neighbor-overlap high">same ch.</span>
+						<span class="neighbor-overlap" class:low={n.signalPct < 20} class:med={n.signalPct >= 20 && n.signalPct < 50} class:high={n.signalPct >= 50}>
+							{n.signalPct}%
+						</span>
 					</button>
 				{/each}
 			</div>

@@ -18,6 +18,9 @@ type Algorithm = 'greedy' | 'dsatur' | 'welsh-powell' | 'backtracking';
 
 const bridge = new SolverBridge();
 
+/** Attenuated signal between AP pairs: "apIdA:apIdB" → signal (0-1). */
+export const edgeSignals = new Map<string, number>();
+
 export const solverState = $state({
 	algorithm: 'dsatur' as Algorithm,
 	isRunning: false,
@@ -201,6 +204,7 @@ function getWallLoss(
 
 async function buildSerializedGraph() {
 	prepareSortedFloors();
+	edgeSignals.clear();
 	const aps = getApPositions();
 	const apMap = new Map(projectState.aps.map((ap) => [ap.id, ap]));
 
@@ -240,25 +244,24 @@ async function buildSerializedGraph() {
 			totalDb = getFloorSlabAttenuation(apA.floorId, apB.floorId, apA.band as Band);
 		}
 
-		if (totalDb > 0) {
-			// Compute signal at this distance with wall loss, compare to CCA threshold.
-			// Signal model: 1/(1+(d/r)⁴). Wall loss: 10^(-dB/10).
-			//
-			// CCA energy detect (802.11): ~20 dB below the signal at coverage edge.
-			// At d=r, signal=0.5 (~-75 dBm). CCA-ED ~-82 dBm → 0.5 * 10^(-20/10) ≈ 0.005.
-			// Below this, the interfering signal won't trigger carrier sense.
-			const CCI_THRESHOLD = 0.005;
-			const dx = apA.x - apB.x;
-			const dy = apA.y - apB.y;
-			const dz = (apZMap.get(apA.id) ?? 0) - (apZMap.get(apB.id) ?? 0);
-			const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			const r = Math.max(apA.interferenceRadius, apB.interferenceRadius);
-			const ratio = dist / r;
-			const r4 = ratio * ratio * ratio * ratio;
-			const signal = 1 / (1 + r4);
-			const attenFactor = Math.pow(10, -totalDb / 10);
-			if (signal * attenFactor < CCI_THRESHOLD) continue;
-		}
+		// Compute attenuated signal between this AP pair
+		const CCI_THRESHOLD = 0.005;
+		const dx = apA.x - apB.x;
+		const dy = apA.y - apB.y;
+		const dz = (apZMap.get(apA.id) ?? 0) - (apZMap.get(apB.id) ?? 0);
+		const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+		const r = Math.max(apA.interferenceRadius, apB.interferenceRadius);
+		const ratio = dist / r;
+		const r4 = ratio * ratio * ratio * ratio;
+		const signal = 1 / (1 + r4);
+		const attenFactor = totalDb > 0 ? Math.pow(10, -totalDb / 10) : 1;
+		const effectiveSignal = signal * attenFactor;
+
+		if (effectiveSignal < CCI_THRESHOLD) continue;
+
+		// Store attenuated signal for UI display
+		const pairKey = [apA.id, apB.id].sort().join(':');
+		edgeSignals.set(pairKey, effectiveSignal);
 
 		filteredEdges.push(edge);
 	}
