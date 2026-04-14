@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { projectState } from '$state/project.svelte.js';
 import { solverState } from '$state/solver.svelte.js';
-import { getBuildingCoverage, floorCoverage } from '$state/optimizer.svelte.js';
+import { getBuildingCoverage, floorCoverage, updateCoverage } from '$state/optimizer.svelte.js';
 import { floorState, switchFloor } from '$state/floor-state.svelte.js';
 import type { CanvasEngine } from '$canvas/engine.js';
 
@@ -79,82 +79,131 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	const floorCount = floorState.floors.length;
 	const sortedFloors = [...floorState.floors].sort((a, b) => a.level - b.level);
 
-	// ─── PAGE 1: Cover + Layout ──────────────────────────────────────
+	// Pre-compute coverage for every floor
+	const originalFloorId = floorState.currentFloorId;
+	for (const floor of sortedFloors) {
+		if (!floorCoverage.has(floor.id)) {
+			switchFloor(floor.id);
+			engine.markDirty();
+			await waitForRender();
+			await updateCoverage();
+		}
+	}
+	// Restore before rendering cover
+	if (floorState.currentFloorId !== originalFloorId) {
+		switchFloor(originalFloorId);
+		engine.markDirty();
+		await waitForRender();
+	}
+
+	// ─── COVER PAGE ──────────────────────────────────────────────────
 
 	drawHeader(doc, pageWidth, margin);
 
-	// Layout pages — one per floor
-	const originalFloorId = floorState.currentFloorId;
-	let isFirstLayout = true;
-	let y = 0;
+	let y = 50;
+	doc.setFontSize(28);
+	doc.setFont('helvetica', 'bold');
+	doc.setTextColor(...DARK);
+	doc.text(projectState.name, margin, y);
+
+	y += 12;
+	doc.setFontSize(11);
+	doc.setFont('helvetica', 'normal');
+	doc.setTextColor(...GRAY);
+	doc.text(dateStr, margin, y);
+
+	y += 14;
+	doc.setFontSize(10);
+	doc.setTextColor(...DARK);
+
+	const stats: string[] = [
+		`${apCount} access point${apCount !== 1 ? 's' : ''}`,
+		`${floorCount} floor${floorCount !== 1 ? 's' : ''}`
+	];
+	if (solverState.lastResult) {
+		stats.push(
+			`${solverState.lastResult.colorCount} channel${solverState.lastResult.colorCount !== 1 ? 's' : ''} used`
+		);
+		if (solverState.lastResult.conflicts.length > 0) {
+			stats.push(
+				`${solverState.lastResult.conflicts.length} conflict${solverState.lastResult.conflicts.length !== 1 ? 's' : ''}`
+			);
+		}
+	}
+	const buildingCov = getBuildingCoverage();
+	if (buildingCov > 0) {
+		stats.push(`${buildingCov}% building coverage`);
+	}
+
+	for (const stat of stats) {
+		doc.text(`•  ${stat}`, margin + 2, y);
+		y += 6;
+	}
+
+	// Per-floor coverage breakdown
+	if (floorCoverage.size > 0 && floorCount > 1) {
+		y += 4;
+		doc.setFontSize(9);
+		doc.setFont('helvetica', 'bold');
+		doc.text('Coverage by floor', margin, y);
+		y += 6;
+		doc.setFont('helvetica', 'normal');
+		for (const floor of sortedFloors) {
+			const fc = floorCoverage.get(floor.id);
+			if (fc) {
+				doc.text(`${floor.name}: ${fc.coverage}%`, margin + 4, y);
+				y += 5;
+			}
+		}
+	}
+
+	drawFooter(doc, pageWidth, pageHeight, margin);
+
+	// ─── FLOOR LAYOUT PAGES (consistent image size) ──────────────────
+
+	// Fixed image area: same Y start and max height on every page
+	const layoutImgY = 28;
+	const layoutMaxH = pageHeight - layoutImgY - margin - 5;
 
 	for (const floor of sortedFloors) {
-		// Switch to this floor and wait for rendering to settle
 		if (floor.id !== floorState.currentFloorId) {
 			switchFloor(floor.id);
 			engine.markDirty();
 			await waitForRender();
 		}
 
-		if (!isFirstLayout) {
-			doc.addPage();
-		}
+		doc.addPage();
 		drawHeader(doc, pageWidth, margin);
 
-		if (isFirstLayout) {
-			// Title block on first page only
-			y = 26;
-			doc.setFontSize(20);
-			doc.setFont('helvetica', 'bold');
-			doc.setTextColor(...DARK);
-			doc.text(projectState.name, margin, y);
-
-			y += 8;
-			doc.setFontSize(9);
-			doc.setFont('helvetica', 'normal');
-			doc.setTextColor(...GRAY);
-			doc.text(
-				`${dateStr}  •  ${apCount} access point${apCount !== 1 ? 's' : ''}  •  ${floorCount} floor${floorCount !== 1 ? 's' : ''}`,
-				margin,
-				y
-			);
-			doc.setTextColor(...DARK);
-			y += 10;
-		} else {
-			y = 24;
-		}
-
-		// Floor label
-		doc.setFontSize(11);
+		// Floor label + coverage
+		y = 24;
+		doc.setFontSize(12);
 		doc.setFont('helvetica', 'bold');
 		doc.setTextColor(...DARK);
 		doc.text(floor.name, margin, y);
 
 		const fc = floorCoverage.get(floor.id);
 		if (fc) {
-			doc.setFontSize(8);
+			doc.setFontSize(9);
 			doc.setFont('helvetica', 'normal');
 			doc.setTextColor(...GRAY);
 			doc.text(`Coverage: ${fc.coverage}%`, pageWidth - margin, y, { align: 'right' });
 		}
 		doc.setTextColor(...DARK);
-		y += 6;
 
+		// Canvas capture with consistent sizing
 		const canvasImg = captureCanvas(engine);
-		const imgY = y;
-		const maxImgHeight = pageHeight - imgY - margin - 5;
 		const aspectRatio = canvasImg.width / canvasImg.height;
 		let imgWidth = contentWidth;
 		let imgHeight = imgWidth / aspectRatio;
-		if (imgHeight > maxImgHeight) {
-			imgHeight = maxImgHeight;
+		if (imgHeight > layoutMaxH) {
+			imgHeight = layoutMaxH;
 			imgWidth = imgHeight * aspectRatio;
 		}
 		const imgX = margin + (contentWidth - imgWidth) / 2;
-		doc.addImage(canvasImg.data, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+		doc.addImage(canvasImg.data, 'JPEG', imgX, layoutImgY, imgWidth, imgHeight);
 
 		drawFooter(doc, pageWidth, pageHeight, margin);
-		isFirstLayout = false;
 	}
 
 	// Restore original floor
