@@ -5,6 +5,8 @@ import type { SolverResult, ComparisonResult } from '@deconflict/solver';
 import { projectState, updateAp, clearAssignments } from './project.svelte.js';
 import { appState } from './app.svelte.js';
 import { SolverBridge } from '../workers/solver-bridge.js';
+import { floorState } from './floor-state.svelte.js';
+import { getEffectiveWupm } from './ap-state.svelte.js';
 
 type Algorithm = 'greedy' | 'dsatur' | 'welsh-powell' | 'backtracking';
 
@@ -21,13 +23,32 @@ export const solverState = $state({
 	throughputEstimates: [] as ThroughputEstimate[]
 });
 
-function buildSerializedGraph() {
-	const aps = projectState.aps.map((ap) => ({
+/** Compute cumulative z-position (in world units) for each floor level. */
+function getFloorZ(): Map<string, number> {
+	const wupm = getEffectiveWupm();
+	const sorted = [...floorState.floors].sort((a, b) => a.level - b.level);
+	const zMap = new Map<string, number>();
+	let z = 0;
+	for (const floor of sorted) {
+		zMap.set(floor.id, z * wupm);
+		z += floor.ceilingHeight;
+	}
+	return zMap;
+}
+
+function getApPositions() {
+	const floorZ = getFloorZ();
+	return projectState.aps.map((ap) => ({
 		id: ap.id,
 		x: ap.x,
 		y: ap.y,
+		z: floorZ.get(ap.floorId) ?? 0,
 		interferenceRadius: ap.interferenceRadius
 	}));
+}
+
+function buildSerializedGraph() {
+	const aps = getApPositions();
 
 	const { nodes, edges } = buildInterferenceGraph(aps);
 
@@ -82,12 +103,7 @@ function applyAssignments(assignment: Map<string, number>): void {
 }
 
 function computeThroughput(): void {
-	const positions = projectState.aps.map((ap) => ({
-		id: ap.id,
-		x: ap.x,
-		y: ap.y,
-		interferenceRadius: ap.interferenceRadius
-	}));
+	const positions = getApPositions();
 	const { edges } = buildInterferenceGraph(positions);
 
 	const inputs: ThroughputInput[] = projectState.aps.map((ap) => {

@@ -4,6 +4,7 @@ export interface ApPosition {
 	id: string;
 	x: number;
 	y: number;
+	z?: number; // vertical position in world units (for cross-floor interference)
 	interferenceRadius: number;
 }
 
@@ -24,7 +25,9 @@ export function buildInterferenceGraph(aps: ApPosition[]): {
 		for (let j = i + 1; j < aps.length; j++) {
 			const ai = aps[i]!;
 			const aj = aps[j]!;
-			const distSq = squaredEuclidean({ x: ai.x, y: ai.y }, { x: aj.x, y: aj.y });
+			let distSq = squaredEuclidean({ x: ai.x, y: ai.y }, { x: aj.x, y: aj.y });
+			const dz = (ai.z ?? 0) - (aj.z ?? 0);
+			distSq += dz * dz;
 			const radiusSum = ai.interferenceRadius + aj.interferenceRadius;
 			if (distSq < radiusSum * radiusSum) {
 				const dist = Math.sqrt(distSq);
