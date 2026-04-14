@@ -71,8 +71,9 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleKeyDown} />
 <div class="dropdown" bind:this={menuEl}>
-	<button class="dropdown-trigger" bind:this={triggerEl} onclick={toggle} onkeydown={handleKeyDown} class:open>
+	<button class="dropdown-trigger" bind:this={triggerEl} onclick={toggle} class:open>
 		{@render children()}
 		<svg
 			class="trigger-chevron"
