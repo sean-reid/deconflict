@@ -74,16 +74,14 @@
 			</div>
 
 			<p class="description">
-				Drop a floorplan, place APs, get optimal channels. Signal propagates through walls and floors with real physics.
+				Drop a floorplan, place APs, get optimal channels.<br />
+				Signal propagates through walls and floors with real physics.
 			</p>
 
-			<div class="steps-section">
-				<ol class="steps">
-					<li><span class="step-number">1</span><span>Import floorplan or draw walls</span></li>
-					<li><span class="step-number">2</span><span>Place access points</span></li>
-					<li><span class="step-number">3</span><span>Press <kbd>H</kbd> for heatmap</span></li>
-				</ol>
-			</div>
+			<p class="hint">
+				Import a floorplan or draw walls, place access points,<br />
+				then press <kbd>H</kbd> to see the heatmap.
+			</p>
 
 			<div class="actions">
 				<Button variant="primary" size="md" onclick={handleGetStarted}>
@@ -156,44 +154,23 @@
 		text-align: center;
 	}
 
-	.steps-section {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: var(--space-2, 8px);
-	}
-
-	.steps {
-		list-style: none;
+	.hint {
 		margin: 0;
-		padding: 0;
-		display: inline-flex;
-		flex-direction: column;
-		gap: var(--space-2, 8px);
-	}
-
-	.steps li {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2, 8px);
 		font-size: var(--text-sm);
-		color: var(--text-primary);
+		color: var(--text-tertiary);
+		line-height: 1.6;
+		text-align: center;
 	}
 
-	.step-number {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: var(--accent-primary-glow);
-		color: var(--accent-primary);
+	.hint kbd {
+		display: inline-block;
+		padding: 0 5px;
 		font-family: var(--font-mono);
 		font-size: var(--text-xs);
-		font-weight: 600;
-		flex-shrink: 0;
-		border: 1px solid rgba(0, 212, 255, 0.25);
+		color: var(--text-primary);
+		background: var(--bg-primary);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-sm);
 	}
 
 	.actions {
