@@ -80,9 +80,7 @@ async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 		const wm = wallState.wallMask;
 		const decoded = await decodeMask(wm.dataUrl, wm.width, wm.height);
 		const mm = wallState.materialMask;
-		const matMask = mm
-			? await decodeMaterialMask(mm.dataUrl, mm.width, mm.height)
-			: null;
+		const matMask = mm ? await decodeMaterialMask(mm.dataUrl, mm.width, mm.height) : null;
 		const entry: DecodedFloorMask = {
 			wallData: decoded.data,
 			materialMap: matMask,
@@ -98,9 +96,7 @@ async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 	const wm = floor.wallMask;
 	const decoded = await decodeMask(wm.dataUrl, wm.width, wm.height);
 	const mm = floor.materialMask;
-	const matMask = mm
-		? await decodeMaterialMask(mm.dataUrl, mm.width, mm.height)
-		: null;
+	const matMask = mm ? await decodeMaterialMask(mm.dataUrl, mm.width, mm.height) : null;
 	const entry: DecodedFloorMask = {
 		wallData: decoded.data,
 		materialMap: matMask,
@@ -153,16 +149,26 @@ function getFloorSlabLoss(floorIdA: string, floorIdB: string, band: Band): numbe
 /** Wall attenuation between two APs on the same floor (synchronous, uses cached mask). */
 function getWallLoss(
 	mask: DecodedFloorMask,
-	ax: number, ay: number,
-	bx: number, by: number,
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number,
 	defaultMaterial: number
 ): number {
 	const matDb = WALL_MATERIALS.map((m) => m.dbPerMeter * m.typicalThickness);
 	const defaultDb = WALL_MATERIALS[defaultMaterial]?.attenuation ?? 5;
 	return rayMarchWallAtten(
-		mask.wallData, mask.width, mask.height,
-		mask.materialMap, matDb, defaultDb,
-		ax, ay, bx, by, 3
+		mask.wallData,
+		mask.width,
+		mask.height,
+		mask.materialMap,
+		matDb,
+		defaultDb,
+		ax,
+		ay,
+		bx,
+		by,
+		3
 	);
 }
 
@@ -197,7 +203,14 @@ async function buildSerializedGraph() {
 			// Same floor: wall attenuation
 			const mask = masks.get(apA.floorId);
 			if (mask) {
-				totalDb = getWallLoss(mask, apA.x, apA.y, apB.x, apB.y, floorByIdCache.get(apA.floorId)?.wallMaterial ?? 0);
+				totalDb = getWallLoss(
+					mask,
+					apA.x,
+					apA.y,
+					apB.x,
+					apB.y,
+					floorByIdCache.get(apA.floorId)?.wallMaterial ?? 0
+				);
 			}
 		} else {
 			// Cross-floor: slab attenuation (use worst-case band for conservative estimate)
