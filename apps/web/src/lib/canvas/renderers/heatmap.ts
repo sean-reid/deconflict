@@ -20,7 +20,6 @@ import {
 } from '../../rf/propagation.js';
 
 const CELL_SIZE = 6;
-const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // Color LUT — 256 entries, built once
 const STOPS: [number, number, number, number, number][] = [
@@ -222,7 +221,7 @@ export class HeatmapLayer implements Layer {
 
 					// Wall attenuation (precomputed field, O(1) lookup)
 					const field = fields[i];
-					if (field && signal > WALL_SIGNAL_THRESHOLD) {
+					if (field) {
 						const loss = lookupAtten(field, wx, wy);
 						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
 					}
