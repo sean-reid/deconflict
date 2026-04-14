@@ -159,23 +159,15 @@
 	.steps-section {
 		display: flex;
 		flex-direction: column;
+		align-items: center;
 		gap: var(--space-2, 8px);
-	}
-
-	.steps-heading {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: var(--text-xs);
-		font-weight: 600;
-		color: var(--text-tertiary);
-		letter-spacing: 0.08em;
 	}
 
 	.steps {
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: flex;
+		display: inline-flex;
 		flex-direction: column;
 		gap: var(--space-2, 8px);
 	}
