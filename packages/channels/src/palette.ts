@@ -22,31 +22,31 @@ const CHANNELS_5_ORDERED = [
 ];
 
 const HUES_5GHZ = [
-	'#ff6b6b', // 36
-	'#ffa502', // 40
-	'#ffe66d', // 44
-	'#7bed9f', // 48
-	'#70a1ff', // 52
-	'#5352ed', // 56
-	'#a55eea', // 60
-	'#ff6348', // 64
-	'#2ed573', // 100
-	'#1e90ff', // 104
-	'#ffa07a', // 108
-	'#e056fd', // 112
-	'#00d2d3', // 116
-	'#ff9ff3', // 120
-	'#f368e0', // 124
-	'#48dbfb', // 128
-	'#ff9f43', // 132
-	'#badc58', // 136
-	'#7158e2', // 140
-	'#3ae374', // 144
-	'#ff4757', // 149
-	'#eccc68', // 153
-	'#18dcff', // 157
-	'#cd84f1', // 161
-	'#17c0eb'  // 165
+	'#5b9bff', // 36  — bright blue
+	'#7b8cff', // 40  — periwinkle
+	'#9b7dff', // 44  — lavender
+	'#b06eff', // 48  — violet
+	'#c75fff', // 52  — purple
+	'#a55bdb', // 56  — plum
+	'#8b6cd8', // 60  — iris
+	'#6b7dd5', // 64  — slate blue
+	'#4bc6e0', // 100 — sky
+	'#3dbde0', // 104 — cyan
+	'#5eaff0', // 108 — azure
+	'#7ea1f0', // 112 — cornflower
+	'#40d8e0', // 116 — aqua
+	'#60cce0', // 120 — teal-cyan
+	'#80c0f0', // 124 — light blue
+	'#56b4e8', // 128 — steel blue
+	'#7eb8f8', // 132 — soft blue
+	'#9fb0f8', // 136 — periwinkle light
+	'#bfa8f8', // 140 — lilac
+	'#dfa0f8', // 144 — orchid
+	'#8090ff', // 149 — royal
+	'#a080ff', // 153 — amethyst
+	'#c070ff', // 157 — magenta-purple
+	'#e060ff', // 161 — fuchsia
+	'#50c8ff'  // 165 — electric blue
 ];
 
 const COLORS_5: Map<number, string> = new Map(
@@ -68,15 +68,6 @@ const HUES_6GHZ = [
 	'#795548'
 ];
 
-export function channelColor(channelNumber: number, band: Band): string {
-	switch (band) {
-		case '2.4ghz':
-			return COLORS_2_4[channelNumber] ?? '#cccccc';
-		case '5ghz':
-			return COLORS_5.get(channelNumber) ?? '#cccccc';
-		case '6ghz': {
-			const index = Math.floor((channelNumber - 1) / 4);
-			return HUES_6GHZ[index % HUES_6GHZ.length]!;
-		}
-	}
+export function channelColor(_channelNumber: number, _band: Band): string {
+	return '#00d4ff';
 }
