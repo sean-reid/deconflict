@@ -35,8 +35,12 @@ export function signalStrengthOptimizer(distance: number, radius: number): numbe
 
 /**
  * DDA ray march with configurable stride.
- * Returns total dB attenuation along the ray (sum of per-material dB on wall transitions).
- * stride=1 checks every pixel; stride=3 checks every 3rd (3x faster, walls must be ≥3px thick).
+ *
+ * When `dbPerMeterArr` is provided, uses thickness-aware accumulation:
+ * every step through wall material adds `dbPerMeter * stepLengthMeters`.
+ * Otherwise falls back to transition-based counting (flat dB per crossing).
+ *
+ * stride=1 checks every pixel; stride=3 checks every 3rd.
  */
 export function rayMarchWallAtten(
 	wallData: Uint8Array,
@@ -49,7 +53,9 @@ export function rayMarchWallAtten(
 	y0: number,
 	x1: number,
 	y1: number,
-	stride = 3
+	stride = 3,
+	dbPerMeterArr?: number[],
+	metersPerPixel = 0
 ): number {
 	const ix0 = Math.round(x0),
 		iy0 = Math.round(y0);
@@ -61,6 +67,10 @@ export function rayMarchWallAtten(
 	const dx = lenX / n;
 	const dy = lenY / n;
 
+	// Step length in meters (for thickness-aware mode)
+	const stepLen = metersPerPixel > 0 ? metersPerPixel * stride : 0;
+	const thicknessAware = dbPerMeterArr && stepLen > 0;
+
 	let total = 0;
 	let wasWall = false;
 	for (let s = 0; s <= n; s++) {
@@ -69,12 +79,23 @@ export function rayMarchWallAtten(
 		if (px >= 0 && px < w && py >= 0 && py < h) {
 			const idx = py * w + px;
 			const isWall = wallData[idx] === 1;
-			if (isWall && !wasWall) {
-				if (materialMap) {
-					const matId = materialMap[idx] ?? 0;
-					total += materialDb[matId] ?? defaultDb;
-				} else {
-					total += defaultDb;
+
+			if (thicknessAware) {
+				// Thickness-aware: accumulate dB for every step through wall
+				if (isWall) {
+					const matId = materialMap ? (materialMap[idx] ?? 0) : 0;
+					const dbpm = dbPerMeterArr[matId] ?? defaultDb / 0.15; // fallback: assume 0.15m wall
+					total += dbpm * stepLen;
+				}
+			} else {
+				// Transition-based: flat dB per 0→1 crossing
+				if (isWall && !wasWall) {
+					if (materialMap) {
+						const matId = materialMap[idx] ?? 0;
+						total += materialDb[matId] ?? defaultDb;
+					} else {
+						total += defaultDb;
+					}
 				}
 			}
 			wasWall = isWall;

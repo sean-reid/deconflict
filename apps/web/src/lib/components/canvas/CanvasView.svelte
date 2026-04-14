@@ -13,7 +13,7 @@
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
-	import { apState, removeAps, getEffectiveWupm } from '$state/ap-state.svelte.js';
+	import { apState, removeAps, getEffectiveWupm, radiusFromPower } from '$state/ap-state.svelte.js';
 	import { floorplanState } from '$state/floorplan-state.svelte.js';
 	import { wallState } from '$state/wall-state.svelte.js';
 	import { projectMeta } from '$state/project-meta.svelte.js';
@@ -29,6 +29,7 @@
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
+	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
@@ -323,8 +324,10 @@
 
 	$effect(() => {
 		if (!gridLayer) return;
-		gridLayer.worldUnitsPerMeter = getEffectiveWupm();
+		const wupm = getEffectiveWupm();
+		gridLayer.worldUnitsPerMeter = wupm;
 		gridLayer.unitSystem = floorplanState.unitSystem;
+		if (heatmapLayer) heatmapLayer.worldUnitsPerMeter = wupm;
 		engine.markDirty();
 	});
 
@@ -334,12 +337,75 @@
 		engine.markDirty();
 	});
 
-	// Sync heatmap APs — filtered to current floor
+	// Sync heatmap APs — current floor + virtual APs from adjacent floors
+	// Tracks floor properties (ceilingHeight, floorThickness, floorMaterial) for reactivity
 	$effect(() => {
 		if (!heatmapLayer) return;
 		const floorId = floorState.currentFloorId;
-		const aps = apState.aps.filter((ap) => ap.floorId === floorId);
-		for (const ap of aps) {
+		const cur = currentFloor();
+		// Read floor properties to establish Svelte tracking
+		for (const f of floorState.floors) {
+			void f.ceilingHeight;
+			void f.floorThickness;
+			void f.floorMaterial;
+			void f.level;
+		}
+
+		// Current floor's APs (full power)
+		const localAps = apState.aps.filter((ap) => ap.floorId === floorId);
+
+		// Virtual APs from ALL other floors (attenuated through each slab between)
+		const otherFloors = floorState.floors.filter((f) => f.id !== floorId);
+		const sortedFloors = [...floorState.floors].sort((a, b) => a.level - b.level);
+		const virtualAps = [];
+		for (const adj of otherFloors) {
+			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
+			if (adjAps.length === 0) continue;
+
+			// Sum vertical gap and slab attenuation through every floor between
+			const loLevel = Math.min(cur.level, adj.level);
+			const hiLevel = Math.max(cur.level, adj.level);
+			let totalVertGap = 0;
+			let totalSlabThickness = 0;
+			// We need per-band dB/m, so accumulate weighted thickness
+			// Each slab: upper floor's material & thickness
+			const slabSegments: { dbPerMeter: Record<string, number>; thickness: number }[] = [];
+			for (const f of sortedFloors) {
+				if (f.level < loLevel || f.level >= hiLevel) continue;
+				// This floor's ceiling contributes to the vertical gap
+				totalVertGap += f.ceilingHeight;
+				// The slab between this floor and the one above = upper floor's material
+				const upperIdx = sortedFloors.findIndex((s) => s.level === f.level + 1);
+				if (upperIdx >= 0) {
+					const upper = sortedFloors[upperIdx]!;
+					const mat = FLOOR_MATERIALS[upper.floorMaterial];
+					if (mat) {
+						slabSegments.push({ dbPerMeter: mat.dbPerMeter, thickness: upper.floorThickness });
+						totalSlabThickness += upper.floorThickness;
+					}
+				}
+			}
+
+			for (const ap of adjAps) {
+				// Compute aggregate dB/m for this AP's band across all slabs
+				let totalDb = 0;
+				for (const seg of slabSegments) {
+					totalDb += (seg.dbPerMeter[ap.band] ?? 100) * seg.thickness;
+				}
+				virtualAps.push({
+					...ap,
+					id: `virtual-${ap.id}`,
+					verticalOffset: totalVertGap,
+					// Pass total dB as floorDbPerMeter * floorThickness = totalDb
+					// Set floorDbPerMeter = totalDb / totalSlabThickness (or totalDb if thickness=1)
+					floorDbPerMeter: totalSlabThickness > 0 ? totalDb / totalSlabThickness : 0,
+					floorThickness: totalSlabThickness
+				});
+			}
+		}
+
+		const allAps = [...localAps, ...virtualAps];
+		for (const ap of allAps) {
 			void ap.x;
 			void ap.y;
 			void ap.band;
@@ -348,7 +414,7 @@
 			void ap.assignedChannel;
 			void ap.power;
 		}
-		heatmapLayer.aps = aps;
+		heatmapLayer.aps = allAps;
 		engine.markDirty();
 	});
 
@@ -403,11 +469,10 @@
 		engine?.markDirty();
 	});
 
-	// Sync wall mask dimensions for heatmap clipping (synchronous, no decode needed)
+	// When wall mask changes, invalidate heatmap wall cache
 	$effect(() => {
 		if (!heatmapLayer) return;
-		const mask = wallState.wallMask;
-		heatmapLayer.wallMaskBounds = mask ? { width: mask.width, height: mask.height } : null;
+		wallState.wallMask; // track
 		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 	});
@@ -511,24 +576,16 @@
 		engine.markDirty();
 	});
 
-	// Sync floorplan image to layer + heatmap clip bounds
+	// Sync floorplan image to layer
 	$effect(() => {
-		if (!floorplanLayer || !heatmapLayer) return;
+		if (!floorplanLayer) return;
 		const url = floorplanState.floorplanUrl;
 		if (url) {
 			floorplanLayer.loadImage(url, () => {
-				// Set heatmap clip bounds to floorplan image size
-				if (floorplanLayer.imageWidth > 0) {
-					heatmapLayer.floorplanBounds = {
-						width: floorplanLayer.imageWidth,
-						height: floorplanLayer.imageHeight
-					};
-				}
 				engine.markDirty();
 			});
 		} else {
 			floorplanLayer.clearImage();
-			heatmapLayer.floorplanBounds = null;
 		}
 		engine.markDirty();
 	});

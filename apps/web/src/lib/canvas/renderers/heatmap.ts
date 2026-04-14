@@ -1,5 +1,12 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/ap-state.svelte.js';
+
+/** AP with optional cross-floor parameters for 3D propagation. */
+type HeatmapAp = AccessPoint & {
+	verticalOffset?: number; // meters — ceiling height × floor distance
+	floorDbPerMeter?: number; // dB/m through the slab material
+	floorThickness?: number; // slab thickness in meters
+};
 import type { DecodedWallMask } from '../wall-detect.js';
 import type { WallMaterialId } from '../materials.js';
 import { WALL_MATERIALS } from '../materials.js';
@@ -62,7 +69,7 @@ for (let i = 0; i < 256; i++) {
 export class HeatmapLayer implements Layer {
 	id = 'heatmap';
 	visible = false;
-	aps: AccessPoint[] = [];
+	aps: HeatmapAp[] = [];
 	ispSpeed = 0;
 	wallMask: DecodedWallMask | null = null;
 	wallAttenuation = 5;
@@ -70,8 +77,7 @@ export class HeatmapLayer implements Layer {
 	materialVersion = 0;
 	defaultMaterial: WallMaterialId = 0;
 	isDragging = false;
-	floorplanBounds: { width: number; height: number } | null = null;
-	wallMaskBounds: { width: number; height: number } | null = null;
+	worldUnitsPerMeter = 32.8; // updated from getEffectiveWupm()
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -106,11 +112,10 @@ export class HeatmapLayer implements Layer {
 			this.aps
 				.map(
 					(ap) =>
-						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}`
+						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}:${ap.verticalOffset ?? 0}:${ap.floorDbPerMeter ?? 0}:${ap.floorThickness ?? 0}`
 				)
 				.join('|') +
 			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
-			`|clip:${this.floorplanBounds?.width ?? this.wallMaskBounds?.width ?? this.wallMask?.width ?? 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -144,15 +149,24 @@ export class HeatmapLayer implements Layer {
 		const apRadSq = new Float64Array(n);
 		const apCutSq = new Float64Array(n);
 		const apBase = new Float64Array(n);
+		const wupm = this.worldUnitsPerMeter;
+		const wupmSq = wupm * wupm;
 		const defaultDb = WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
-		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
+		const matDb = WALL_MATERIALS.map((m) => m.dbPerMeter * m.typicalThickness);
 		const fast = this.isDragging;
+
+		// Per-AP cross-floor parameters
+		const vertOffSq = new Float64Array(n); // vertical offset² in world units²
+		const floorDbThickness = new Float64Array(n); // ITU aggregate floor isolation (dB)
 
 		const fields: (AttenField | null)[] = [];
 		for (let i = 0; i < n; i++) {
 			const ap = this.aps[i]!;
 			apX[i] = ap.x;
 			apY[i] = ap.y;
+			const vo = ap.verticalOffset ?? 0;
+			vertOffSq[i] = vo * vo * wupmSq;
+			floorDbThickness[i] = (ap.floorDbPerMeter ?? 0) * (ap.floorThickness ?? 0);
 			const rSq = ap.interferenceRadius * ap.interferenceRadius;
 			apRadSq[i] = rSq;
 			apCutSq[i] = rSq * MAX_RATIO_SQ;
@@ -175,13 +189,24 @@ export class HeatmapLayer implements Layer {
 			);
 		}
 
-		const clip = this.floorplanBounds
-			? this.floorplanBounds
-			: this.wallMaskBounds
-				? this.wallMaskBounds
-				: this.wallMask
-					? { width: this.wallMask.width, height: this.wallMask.height }
-					: null;
+		// Clip to the union of all AP signal reach areas so cross-floor APs
+		// with different floorplan sizes still propagate fully.
+		let clipMinX = Infinity,
+			clipMinY = Infinity,
+			clipMaxX = -Infinity,
+			clipMaxY = -Infinity;
+		for (let i = 0; i < n; i++) {
+			const reach = Math.sqrt(apCutSq[i]!);
+			const x0 = apX[i]! - reach;
+			const y0 = apY[i]! - reach;
+			const x1 = apX[i]! + reach;
+			const y1 = apY[i]! + reach;
+			if (x0 < clipMinX) clipMinX = x0;
+			if (y0 < clipMinY) clipMinY = y0;
+			if (x1 > clipMaxX) clipMaxX = x1;
+			if (y1 > clipMaxY) clipMaxY = y1;
+		}
+		const hasClip = clipMinX < clipMaxX && clipMinY < clipMaxY;
 
 		const inv = camera.getInverseTransform();
 		const ia = inv[0]!,
@@ -205,7 +230,7 @@ export class HeatmapLayer implements Layer {
 				const wx = ia * sx + ic * sy + ie;
 				const wy = ib * sx + idd * sy + ig;
 
-				if (clip && (wx < 0 || wx > clip.width || wy < 0 || wy > clip.height)) {
+				if (hasClip && (wx < clipMinX || wx > clipMaxX || wy < clipMinY || wy > clipMaxY)) {
 					continue;
 				}
 
@@ -213,16 +238,28 @@ export class HeatmapLayer implements Layer {
 				for (let i = 0; i < n; i++) {
 					const dx = wx - apX[i]!;
 					const dy = wy - apY[i]!;
-					const dSq = dx * dx + dy * dy;
+					const dSq = dx * dx + dy * dy + vertOffSq[i]!;
 					if (dSq > apCutSq[i]!) continue;
 
 					const signal = signalPower(dSq, apRadSq[i]!);
 					let tp = apBase[i]! * signal;
 
+					// Wall attenuation (precomputed field, O(1) lookup)
 					const field = fields[i];
 					if (field && signal > WALL_SIGNAL_THRESHOLD) {
 						const loss = lookupAtten(field, wx, wy);
 						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
+					}
+
+					// Floor slab attenuation (ITU-R P.1238 empirical model).
+					// Uses measured aggregate floor isolation that accounts for
+					// direct penetration + diffraction + multipath. Applied as
+					// flat dB loss. The 3D distance (via vertOffSq above) already
+					// captures the oblique geometry — closer floors = shorter 3D
+					// path = stronger signal, steeper angles = longer 3D path.
+					const fdt = floorDbThickness[i]!;
+					if (fdt > 0) {
+						tp *= Math.exp(fdt * -0.11512925464);
 					}
 
 					if (ispCap > 0 && tp > ispCap) tp = ispCap;

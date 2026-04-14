@@ -26,6 +26,11 @@ export class FloorplanLayer implements Layer {
 	}
 
 	loadImage(url: string, onReady?: () => void): void {
+		// Skip reload if already showing this URL (avoids revoking blob URLs)
+		if (this.image && this.imageReady && this.image.src === url) {
+			if (onReady) onReady();
+			return;
+		}
 		this.clearImage();
 		this.onReady = onReady ?? null;
 		this.image = new Image();
@@ -48,9 +53,10 @@ export class FloorplanLayer implements Layer {
 	}
 
 	clearImage(): void {
-		if (this.image?.src.startsWith('blob:')) {
-			URL.revokeObjectURL(this.image.src);
-		}
+		// Do NOT revoke blob URLs here — they belong to floor state and
+		// may be needed again when switching back to that floor.
+		// Revocation is handled by the call sites that replace/delete
+		// a floorplan (loadSample, handleFile, removeFloorplan).
 		this.image = null;
 		this.imageReady = false;
 		this.onReady = null;
