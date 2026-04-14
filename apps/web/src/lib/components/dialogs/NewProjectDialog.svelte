@@ -54,6 +54,9 @@
 		if (!open) return;
 		if (e.key === 'Escape') {
 			open = false;
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			handleConfirm();
 		}
 	}
 
