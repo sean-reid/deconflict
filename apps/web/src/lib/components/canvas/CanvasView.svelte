@@ -20,7 +20,7 @@
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
-	import { solverState, runSolver } from '$state/solver.svelte.js';
+	import { solverState, runSolver, invalidateSolverMaskCache } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
@@ -506,6 +506,7 @@
 		lastMatMaskUrl = matUrl;
 
 		wallMaskVersion++;
+		invalidateSolverMaskCache();
 		const thisVersion = wallMaskVersion;
 
 		if (!mask) {
@@ -598,7 +599,7 @@
 	});
 
 
-	// Auto-solve: debounce solver runs when AP layout or RF params change.
+	// Auto-solve: debounce solver runs when AP layout, RF params, or walls change.
 	// Excludes assignedChannel to avoid infinite loops (solver writes channels).
 	let autoSolveKey = $derived(
 		apState.aps
@@ -606,7 +607,8 @@
 				(ap) =>
 					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.floorId}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
 			)
-			.join('|')
+			.join('|') +
+		`|wm:${wallMaskVersion}:${wallState.wallMaterial}`
 	);
 
 	$effect(() => {

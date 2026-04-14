@@ -378,15 +378,9 @@
 		</div>
 		<div class="draw-scratch">
 			<Button variant="secondary" size="sm" onclick={() => {
-				// Size the drawing canvas to cover all AP signal areas
-				let maxX = 2000, maxY = 1500;
-				for (const ap of apState.aps) {
-					const reach = ap.interferenceRadius * 3;
-					maxX = Math.max(maxX, ap.x + reach);
-					maxY = Math.max(maxY, ap.y + reach);
-				}
-				const w = Math.ceil(maxX);
-				const h = Math.ceil(maxY);
+				// Start with a reasonable canvas; auto-grows when drawing beyond bounds
+				const w = 2000;
+				const h = 1500;
 				const emptyData = new Uint8Array(w * h);
 				const dataUrl = encodeMask(emptyData, w, h);
 				wallState.wallMask = { dataUrl, width: w, height: h };
