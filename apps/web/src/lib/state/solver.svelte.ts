@@ -66,9 +66,31 @@ interface DecodedFloorMask {
 
 const floorMaskCache = new Map<string, DecodedFloorMask>();
 
+/** Live mask override: set during wall editing so solver skips PNG decode. */
+let liveMask: DecodedFloorMask | null = null;
+
+/** Set the live decoded mask during wall editing (call with null when done). */
+export function setLiveSolverMask(
+	wallData: Uint8Array | null,
+	materialData: Uint8Array | null,
+	width: number,
+	height: number
+): void {
+	if (wallData) {
+		liveMask = { wallData, materialMap: materialData, width, height, sourceKey: 'live' };
+	} else {
+		liveMask = null;
+	}
+}
+
 /** Get decoded wall mask for a floor. Uses current wallState for active floor. */
 async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 	const floor = floorState.floors.find((f) => f.id === floorId);
+
+	// During wall editing, use the live decoded mask (no PNG round-trip)
+	if (liveMask && floorId === floorState.currentFloorId) {
+		return liveMask;
+	}
 
 	// For current floor, prefer wallState (always up-to-date) over floor entity (synced on switch)
 	if (floorId === floorState.currentFloorId && wallState.wallMask) {

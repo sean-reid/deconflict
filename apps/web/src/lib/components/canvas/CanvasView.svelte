@@ -20,7 +20,7 @@
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
-	import { solverState, runSolver, invalidateSolverMaskCache } from '$state/solver.svelte.js';
+	import { solverState, runSolver, invalidateSolverMaskCache, setLiveSolverMask } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
@@ -44,6 +44,7 @@
 	function handleWallEditDone() {
 		appState.wallEditMode = null;
 		brushCursorVisible = false;
+		setLiveSolverMask(null, null, 0, 0); // clear live mask override
 		// Sync any material data created during painting
 		if (wallEditHandler.materialData && !cachedMaterialData) {
 			cachedMaterialData = wallEditHandler.materialData;
@@ -265,6 +266,16 @@
 			wallLayer.invalidateCache();
 			heatmapLayer.markWallsDirty();
 			engine.markDirty();
+
+			// Push live mask to solver (skips PNG decode) and trigger re-solve
+			setLiveSolverMask(
+				wallEditHandler.wallData,
+				wallEditHandler.materialData,
+				wallEditHandler.maskWidth,
+				wallEditHandler.maskHeight
+			);
+			invalidateSolverMaskCache();
+			wallMaskVersion++;
 		};
 
 		// Set up resize observer
