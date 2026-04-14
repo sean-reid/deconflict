@@ -283,10 +283,7 @@ test.describe('Multi-floor', () => {
 		await page.waitForTimeout(1000);
 		await expect(page.locator('text=Floorplan loaded')).toBeVisible({ timeout: 3000 });
 
-		// Toggle floorplan visibility off and on
-		await page.click('text=Floorplan', { exact: false });
-		await page.waitForTimeout(200);
-		// Find the Floorplan layer toggle in the layers panel
+		// Toggle floorplan visibility off and on via layers panel
 		const layerToggle = page.locator('.layer-row').filter({ hasText: 'Floorplan' });
 		await layerToggle.click();
 		await page.waitForTimeout(200);
