@@ -79,7 +79,6 @@
 </script>
 
 <div class="ap-list">
-	<div class="ap-list-scroll">
 	<div class="header">
 		<span class="header-label">ACCESS POINTS</span>
 		<div class="header-actions">
@@ -151,7 +150,6 @@
 		</div>
 	{/if}
 
-	</div>
 	{#if projectState.aps.length >= 1 && projectState.wallMask}
 		<div class="coverage-section">
 			{#if optimizerState.coverage > 0}
@@ -200,16 +198,11 @@
 
 <style>
 	.ap-list {
-		position: relative;
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-	}
-
-	.ap-list-scroll {
-		flex: 1 1 0;
 		overflow-y: auto;
-		padding: var(--space-4) var(--space-4) 0;
+		overflow-x: hidden;
+		padding: var(--space-4);
+		flex: 1;
+		min-height: 0;
 	}
 
 	.floor-group-header {
@@ -416,9 +409,15 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		padding: var(--space-3) var(--space-4) var(--space-4);
+		padding: var(--space-3) 0 0;
 		border-top: 1px solid var(--border-subtle);
-		flex-shrink: 0;
+		position: sticky;
+		bottom: 0;
+		background: var(--bg-secondary);
+		margin: 0 calc(-1 * var(--space-4));
+		padding-left: var(--space-4);
+		padding-right: var(--space-4);
+		padding-bottom: var(--space-2);
 	}
 
 	.coverage-section :global(.btn) {
