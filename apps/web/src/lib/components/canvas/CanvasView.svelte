@@ -145,6 +145,10 @@
 		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 
+		// Trigger solver re-run
+		wallMaskVersion++;
+		invalidateSolverMaskCache();
+
 		// Encode and persist
 		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
 		wallState.materialMask = { dataUrl, width: mask.width, height: mask.height };
