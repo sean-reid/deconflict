@@ -78,8 +78,7 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 	isDragging = false;
 	worldUnitsPerMeter = 32.8; // updated from getEffectiveWupm()
-	/** When true, clip heatmap to wall mask bounds (draw-from-scratch mode). */
-	clipToWallMask = false;
+
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -117,7 +116,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}:${ap.verticalOffset ?? 0}:${ap.floorDbPerMeter ?? 0}:${ap.floorThickness ?? 0}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|cwm:${this.clipToWallMask ? 1 : 0}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -193,30 +192,21 @@ export class HeatmapLayer implements Layer {
 			);
 		}
 
-		// Clip region: AP signal reach, optionally constrained to wall mask bounds
+		// Clip to union of all AP signal reach areas
 		let clipMinX = Infinity,
 			clipMinY = Infinity,
 			clipMaxX = -Infinity,
 			clipMaxY = -Infinity;
-		if (this.clipToWallMask && this.wallMask) {
-			// Draw-from-scratch: clip to wall mask bounds (with origin offset)
-			clipMinX = this.wallMask.originX;
-			clipMinY = this.wallMask.originY;
-			clipMaxX = this.wallMask.originX + this.wallMask.width;
-			clipMaxY = this.wallMask.originY + this.wallMask.height;
-		} else {
-			// Imported floorplan: clip to union of all AP signal areas
-			for (let i = 0; i < n; i++) {
-				const reach = Math.sqrt(apCutSq[i]!);
-				const x0 = apX[i]! - reach;
-				const y0 = apY[i]! - reach;
-				const x1 = apX[i]! + reach;
-				const y1 = apY[i]! + reach;
-				if (x0 < clipMinX) clipMinX = x0;
-				if (y0 < clipMinY) clipMinY = y0;
-				if (x1 > clipMaxX) clipMaxX = x1;
-				if (y1 > clipMaxY) clipMaxY = y1;
-			}
+		for (let i = 0; i < n; i++) {
+			const reach = Math.sqrt(apCutSq[i]!);
+			const x0 = apX[i]! - reach;
+			const y0 = apY[i]! - reach;
+			const x1 = apX[i]! + reach;
+			const y1 = apY[i]! + reach;
+			if (x0 < clipMinX) clipMinX = x0;
+			if (y0 < clipMinY) clipMinY = y0;
+			if (x1 > clipMaxX) clipMaxX = x1;
+			if (y1 > clipMaxY) clipMaxY = y1;
 		}
 		const hasClip = clipMinX < clipMaxX && clipMinY < clipMaxY;
 

@@ -500,12 +500,10 @@
 		engine?.markDirty();
 	});
 
-	// When wall mask changes, invalidate heatmap wall cache + set clip mode
+	// When wall mask changes, invalidate heatmap wall cache
 	$effect(() => {
 		if (!heatmapLayer) return;
 		wallState.wallMask; // track
-		// Clip heatmap to wall mask bounds when no floorplan image (draw-from-scratch)
-		heatmapLayer.clipToWallMask = !floorplanState.floorplanUrl && !!wallState.wallMask;
 		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 	});
