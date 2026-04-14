@@ -1,5 +1,8 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/ap-state.svelte.js';
+
+/** AP with optional vertical offset for cross-floor 3D distance. */
+type HeatmapAp = AccessPoint & { verticalOffset?: number };
 import type { DecodedWallMask } from '../wall-detect.js';
 import type { WallMaterialId } from '../materials.js';
 import { WALL_MATERIALS } from '../materials.js';
@@ -62,7 +65,7 @@ for (let i = 0; i < 256; i++) {
 export class HeatmapLayer implements Layer {
 	id = 'heatmap';
 	visible = false;
-	aps: AccessPoint[] = [];
+	aps: HeatmapAp[] = [];
 	ispSpeed = 0;
 	wallMask: DecodedWallMask | null = null;
 	wallAttenuation = 5;
@@ -70,6 +73,7 @@ export class HeatmapLayer implements Layer {
 	materialVersion = 0;
 	defaultMaterial: WallMaterialId = 0;
 	isDragging = false;
+	worldUnitsPerMeter = 32.8; // updated from getEffectiveWupm()
 	floorplanBounds: { width: number; height: number } | null = null;
 	wallMaskBounds: { width: number; height: number } | null = null;
 
@@ -144,15 +148,22 @@ export class HeatmapLayer implements Layer {
 		const apRadSq = new Float64Array(n);
 		const apCutSq = new Float64Array(n);
 		const apBase = new Float64Array(n);
+		const wupm = this.worldUnitsPerMeter;
+		const wupmSq = wupm * wupm;
 		const defaultDb = WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
 		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
 		const fast = this.isDragging;
+
+		// Vertical offset squared for 3D distance (cross-floor virtual APs)
+		const vertOffSq = new Float64Array(n);
 
 		const fields: (AttenField | null)[] = [];
 		for (let i = 0; i < n; i++) {
 			const ap = this.aps[i]!;
 			apX[i] = ap.x;
 			apY[i] = ap.y;
+			const vo = ap.verticalOffset ?? 0;
+			vertOffSq[i] = vo * vo * wupmSq; // convert meters to world units squared
 			const rSq = ap.interferenceRadius * ap.interferenceRadius;
 			apRadSq[i] = rSq;
 			apCutSq[i] = rSq * MAX_RATIO_SQ;
@@ -213,7 +224,7 @@ export class HeatmapLayer implements Layer {
 				for (let i = 0; i < n; i++) {
 					const dx = wx - apX[i]!;
 					const dy = wy - apY[i]!;
-					const dSq = dx * dx + dy * dy;
+					const dSq = dx * dx + dy * dy + vertOffSq[i]!;
 					if (dSq > apCutSq[i]!) continue;
 
 					const signal = signalPower(dSq, apRadSq[i]!);

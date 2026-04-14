@@ -13,7 +13,7 @@
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
-	import { apState, removeAps, getEffectiveWupm } from '$state/ap-state.svelte.js';
+	import { apState, removeAps, getEffectiveWupm, radiusFromPower } from '$state/ap-state.svelte.js';
 	import { floorplanState } from '$state/floorplan-state.svelte.js';
 	import { wallState } from '$state/wall-state.svelte.js';
 	import { projectMeta } from '$state/project-meta.svelte.js';
@@ -29,6 +29,7 @@
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
+	import { getFloorAttenuation } from '$canvas/floor-materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
@@ -323,8 +324,10 @@
 
 	$effect(() => {
 		if (!gridLayer) return;
-		gridLayer.worldUnitsPerMeter = getEffectiveWupm();
+		const wupm = getEffectiveWupm();
+		gridLayer.worldUnitsPerMeter = wupm;
 		gridLayer.unitSystem = floorplanState.unitSystem;
+		if (heatmapLayer) heatmapLayer.worldUnitsPerMeter = wupm;
 		engine.markDirty();
 	});
 
@@ -334,12 +337,37 @@
 		engine.markDirty();
 	});
 
-	// Sync heatmap APs — filtered to current floor
+	// Sync heatmap APs — current floor + virtual APs from adjacent floors
 	$effect(() => {
 		if (!heatmapLayer) return;
 		const floorId = floorState.currentFloorId;
-		const aps = apState.aps.filter((ap) => ap.floorId === floorId);
-		for (const ap of aps) {
+		const cur = currentFloor();
+
+		// Current floor's APs (full power)
+		const localAps = apState.aps.filter((ap) => ap.floorId === floorId);
+
+		// Virtual APs from adjacent floors (reduced power by floor attenuation)
+		const adjFloors = floorState.floors.filter(
+			(f) => f.id !== floorId && Math.abs(f.level - cur.level) === 1
+		);
+		const virtualAps = [];
+		for (const adj of adjFloors) {
+			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
+			for (const ap of adjAps) {
+				const atten = getFloorAttenuation(adj.floorMaterial, ap.band);
+				const floorDist = Math.abs(adj.level - cur.level);
+				virtualAps.push({
+					...ap,
+					id: `virtual-${ap.id}`,
+					power: ap.power - atten,
+					interferenceRadius: radiusFromPower(Math.max(1, ap.power - atten), ap.band),
+					verticalOffset: adj.ceilingHeight * floorDist
+				});
+			}
+		}
+
+		const allAps = [...localAps, ...virtualAps];
+		for (const ap of allAps) {
 			void ap.x;
 			void ap.y;
 			void ap.band;
@@ -348,7 +376,7 @@
 			void ap.assignedChannel;
 			void ap.power;
 		}
-		heatmapLayer.aps = aps;
+		heatmapLayer.aps = allAps;
 		engine.markDirty();
 	});
 
