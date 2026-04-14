@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { projectState } from '$state/project.svelte.js';
 import { solverState } from '$state/solver.svelte.js';
-import { optimizerState, getBuildingCoverage, floorCoverage } from '$state/optimizer.svelte.js';
+import { getBuildingCoverage, floorCoverage } from '$state/optimizer.svelte.js';
 import { floorState } from '$state/floor-state.svelte.js';
 import type { CanvasEngine } from '$canvas/engine.js';
 

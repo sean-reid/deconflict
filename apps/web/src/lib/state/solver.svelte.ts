@@ -192,7 +192,8 @@ function getWallLoss(
 		by - oy,
 		3,
 		dbPerMeterArr,
-		metersPerPixel
+		metersPerPixel,
+		defaultMaterial
 	);
 }
 

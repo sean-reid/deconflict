@@ -57,7 +57,8 @@ export function rayMarchWallAtten(
 	y1: number,
 	stride = 3,
 	dbPerMeterArr?: number[],
-	metersPerPixel = 0
+	metersPerPixel = 0,
+	defaultMaterialId = 0
 ): number {
 	const ix0 = Math.round(x0),
 		iy0 = Math.round(y0);
@@ -85,7 +86,7 @@ export function rayMarchWallAtten(
 			if (thicknessAware) {
 				// Thickness-aware: accumulate dB for every step through wall
 				if (isWall) {
-					const matId = materialMap ? (materialMap[idx] ?? 0) : 0;
+					const matId = materialMap ? (materialMap[idx] ?? defaultMaterialId) : defaultMaterialId;
 					const dbpm = dbPerMeterArr[matId] ?? defaultDb / 0.15; // fallback: assume 0.15m wall
 					total += dbpm * stepLen;
 				}
