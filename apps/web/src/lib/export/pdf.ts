@@ -3,7 +3,6 @@ import { projectState } from '$state/project.svelte.js';
 import { solverState } from '$state/solver.svelte.js';
 import { optimizerState } from '$state/optimizer.svelte.js';
 import { floorState } from '$state/floor-state.svelte.js';
-import { getEffectiveWupm } from '$state/ap-state.svelte.js';
 import type { CanvasEngine } from '$canvas/engine.js';
 
 const bandLabels: Record<string, string> = {
@@ -23,11 +22,6 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	const pageHeight = doc.internal.pageSize.getHeight();
 	const margin = 15;
 	const contentWidth = pageWidth - margin * 2;
-	const wupm = getEffectiveWupm();
-	const isMetric = projectState.unitSystem === 'metric';
-	const unitLabel = isMetric ? 'm' : 'ft';
-	const unitFactor = isMetric ? 1 / wupm : 3.281 / wupm; // world units to m or ft
-
 	// --- Page 1: Layout View ---
 
 	doc.setFontSize(16);
@@ -100,6 +94,19 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 		imgWidth = imgHeight * aspectRatio;
 	}
 
+	// Label current floor if multi-floor
+	if (floorCount > 1) {
+		const curFloor = floorState.floors.find((f) => f.id === floorState.currentFloorId);
+		if (curFloor) {
+			doc.setFontSize(8);
+			doc.setFont('helvetica', 'italic');
+			doc.setTextColor(120);
+			doc.text(`Layout view: ${curFloor.name}`, margin, imgY - 2);
+			doc.setTextColor(0);
+			doc.setFont('helvetica', 'normal');
+		}
+	}
+
 	doc.addImage(imgData, 'JPEG', margin, imgY, imgWidth, imgHeight);
 
 	// --- Page 2: AP Schedule ---
@@ -118,29 +125,21 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 		width: number;
 		getValue: (ap: (typeof projectState.aps)[0]) => string;
 	}> = [];
-	cols.push({ header: 'Name', width: hasModel ? 28 : 35, getValue: (ap) => ap.name });
+	cols.push({ header: 'Name', width: 35, getValue: (ap) => ap.name });
 	if (hasFloors) {
 		cols.push({
 			header: 'Floor',
-			width: 22,
+			width: 25,
 			getValue: (ap) => floorState.floors.find((f) => f.id === ap.floorId)?.name ?? '-'
 		});
 	}
-	if (hasModel) {
-		cols.push({ header: 'Model', width: 40, getValue: (ap) => ap.modelLabel ?? 'Custom' });
-	}
-	cols.push({ header: 'Band', width: 18, getValue: (ap) => bandLabels[ap.band] ?? ap.band });
-	cols.push({ header: 'Width', width: 18, getValue: (ap) => `${ap.channelWidth} MHz` });
+	cols.push({ header: 'Model', width: 55, getValue: (ap) => ap.modelLabel ?? 'Custom' });
+	cols.push({ header: 'Band', width: 20, getValue: (ap) => bandLabels[ap.band] ?? ap.band });
+	cols.push({ header: 'Ch. Width', width: 22, getValue: (ap) => `${ap.channelWidth} MHz` });
 	cols.push({
 		header: 'Channel',
-		width: 20,
-		getValue: (ap) => (ap.assignedChannel !== null ? String(ap.assignedChannel) : '-')
-	});
-	cols.push({ header: 'Power', width: 18, getValue: (ap) => `${ap.power} dBm` });
-	cols.push({
-		header: `Range (${unitLabel})`,
 		width: 22,
-		getValue: (ap) => (ap.interferenceRadius * unitFactor).toFixed(1)
+		getValue: (ap) => (ap.assignedChannel !== null ? String(ap.assignedChannel) : '-')
 	});
 
 	let y = margin + 15;
@@ -162,14 +161,27 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	doc.setFontSize(7.5);
 
 	// Group by floor if multi-floor
-	const floors = hasFloors
-		? floorState.floors.sort((a, b) => a.level - b.level)
+	const sortedFloors = hasFloors
+		? [...floorState.floors].sort((a, b) => a.level - b.level)
 		: [{ id: '', name: '', level: 0 }];
 
-	for (const floor of floors) {
+	for (const floor of sortedFloors) {
 		const floorAps = hasFloors
 			? projectState.aps.filter((ap) => ap.floorId === floor.id)
 			: projectState.aps;
+
+		// Floor section header for multi-floor
+		if (hasFloors && floorAps.length > 0) {
+			y += 2;
+			doc.setFont('helvetica', 'bold');
+			doc.setFontSize(8);
+			doc.setFillColor(230, 235, 245);
+			doc.rect(margin, y - 4, contentWidth, 6, 'F');
+			doc.text(floor.name, margin + 1, y);
+			y += 6;
+			doc.setFont('helvetica', 'normal');
+			doc.setFontSize(7.5);
+		}
 
 		for (let idx = 0; idx < floorAps.length; idx++) {
 			const ap = floorAps[idx]!;
@@ -202,7 +214,9 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	if (optimizerState.coverage > 0) {
 		y += 5;
 		doc.setFont('helvetica', 'normal');
-		doc.text(`Coverage: ${optimizerState.coverage}%`, margin, y);
+		const curFloorName =
+			floorState.floors.find((f) => f.id === floorState.currentFloorId)?.name ?? '';
+		doc.text(`Coverage (${curFloorName}): ${optimizerState.coverage}%`, margin, y);
 	}
 
 	if (solverState.lastResult) {
