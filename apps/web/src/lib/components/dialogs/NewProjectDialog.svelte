@@ -78,7 +78,7 @@
 		aria-label="New Project"
 		onclick={handleOverlayClick}
 	>
-		<div class="dialog">
+		<form class="dialog" onsubmit={(e) => { e.preventDefault(); handleConfirm(); }}>
 			<h2 class="heading">New Project</h2>
 			<p class="warning">This will clear the current layout.</p>
 
@@ -94,9 +94,9 @@
 
 			<div class="actions">
 				<Button variant="ghost" onclick={handleCancel}>Cancel</Button>
-				<Button variant="primary" onclick={handleConfirm}>Create</Button>
+				<button class="submit-btn" type="submit">Create</button>
 			</div>
-		</div>
+		</form>
 	</div>
 {/if}
 
@@ -169,5 +169,34 @@
 		justify-content: flex-end;
 		gap: var(--space-2, 8px);
 		margin-top: var(--space-2, 8px);
+	}
+
+	.submit-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 32px;
+		padding: 0 14px;
+		background: var(--accent-primary);
+		color: var(--bg-primary);
+		border: 1px solid var(--accent-primary);
+		border-radius: var(--radius-md);
+		font-family: var(--font-sans);
+		font-size: var(--text-base);
+		font-weight: 500;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		white-space: nowrap;
+		line-height: 1;
+	}
+
+	.submit-btn:hover {
+		background: color-mix(in srgb, var(--accent-primary) 85%, white);
+		border-color: color-mix(in srgb, var(--accent-primary) 85%, white);
+	}
+
+	.submit-btn:focus-visible {
+		outline: 2px solid var(--accent-primary);
+		outline-offset: 1px;
 	}
 </style>
