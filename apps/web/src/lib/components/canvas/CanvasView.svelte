@@ -283,15 +283,11 @@
 				heatmapLayer.materialVersion++;
 			}
 			wallLayer.invalidateCache();
-			heatmapLayer.markWallsDirty();
+			// Don't rebuild attenuation fields per stroke — too expensive.
+			// Wall overlay updates live; heatmap uses stale field until Done.
 			engine.markDirty();
 
-			// Push live mask to solver (skips PNG decode) and trigger re-solve
-			if (mat) {
-				setLiveSolverMask(mat.data, mat.materialData, mat.width, mat.height);
-			}
-			invalidateSolverMaskCache();
-			wallMaskVersion++;
+			// Defer solver to Done — per-stroke solve is too expensive
 		};
 
 		// Set up resize observer
