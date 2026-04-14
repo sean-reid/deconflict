@@ -394,7 +394,7 @@
 		</div>
 		<div class="draw-scratch">
 			<Button variant="secondary" size="sm" onclick={() => {
-				// Start with a reasonable canvas; auto-grows when drawing beyond bounds
+				pushState();
 				const w = 2000;
 				const h = 1500;
 				const emptyData = new Uint8Array(w * h);
