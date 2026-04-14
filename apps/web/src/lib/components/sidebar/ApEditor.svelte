@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { projectState, updateAp, removeAp, removeAps, getEffectiveWupm, radiusFromPower } from '$state/project.svelte';
 	import { canvasState, clearSelection, selectAp } from '$state/canvas.svelte';
+	import { pushState } from '$state/history.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
 	import { floorState, getFloor, getFloorSlabAttenuation } from '$state/floor-state.svelte.js';
@@ -146,6 +147,7 @@
 	});
 
 	function handleBandChange(val: string) {
+		pushState();
 		const band = val as Band;
 		if (singleAp) {
 			const interferenceRadius = radiusFromPower(singleAp.power, band);
@@ -159,6 +161,7 @@
 	}
 
 	function handleWidthChange(val: string) {
+		pushState();
 		const channelWidth = Number(val) as ChannelWidth;
 		if (singleAp) {
 			updateAp(singleAp.id, { channelWidth });
@@ -170,12 +173,14 @@
 	}
 
 	function handleChannelChange(val: string) {
+		pushState();
 		if (!singleAp) return;
 		const fixedChannel = val === '' ? null : Number(val);
 		updateAp(singleAp.id, { fixedChannel, assignedChannel: fixedChannel });
 	}
 
 	function handleModelChange(model: ApModel | null) {
+		pushState();
 		if (!singleAp) return;
 		if (!model) {
 			updateAp(singleAp.id, { modelId: null, modelLabel: null });
@@ -196,6 +201,10 @@
 			fixedChannel: null,
 			assignedChannel: null
 		});
+	}
+
+	function handleNameFocus() {
+		pushState();
 	}
 
 	function handleNameInput(e: Event) {
@@ -242,6 +251,7 @@
 				type="text"
 				value={singleAp.name}
 				oninput={handleNameInput}
+				onfocus={handleNameFocus}
 				aria-label="AP name"
 			/>
 		</div>
