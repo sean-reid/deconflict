@@ -518,14 +518,13 @@
 		padding: 4px 10px;
 		border: 1px solid var(--border-default);
 		border-radius: 999px;
-		flex-shrink: 0;
 		background: var(--bg-surface);
 		color: var(--text-secondary);
 		font-family: var(--font-sans);
 		font-size: var(--text-xs);
 		cursor: pointer;
 		white-space: nowrap;
-		flex-shrink: 0;
+		flex: 0 0 auto;
 		transition: all var(--transition-fast);
 	}
 
