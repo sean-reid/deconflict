@@ -324,7 +324,7 @@
 				<span class="prop-unit">m</span>
 			</div>
 			<div class="prop-row">
-				<span class="prop-label">Slab thickness</span>
+				<span class="prop-label">Floor thickness</span>
 				<input
 					type="number"
 					class="prop-input"

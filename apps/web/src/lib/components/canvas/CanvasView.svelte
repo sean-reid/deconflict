@@ -353,17 +353,20 @@
 		const virtualAps = [];
 		for (const adj of adjFloors) {
 			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
-			const floorDist = Math.abs(adj.level - cur.level);
-			// The slab between floors belongs to the UPPER floor.
-			// Signal going up: use current floor's slab. Signal going down: use adj floor's slab.
+
+			// Vertical gap = lower floor's ceiling height
+			const lowerFloor = adj.level < cur.level ? adj : cur;
+			const vertGap = lowerFloor.ceilingHeight;
+
+			// Slab between floors = upper floor's material and thickness
 			const upperFloor = adj.level > cur.level ? adj : cur;
 			const floorMat = FLOOR_MATERIALS[upperFloor.floorMaterial];
+
 			for (const ap of adjAps) {
 				virtualAps.push({
 					...ap,
 					id: `virtual-${ap.id}`,
-					// Power unchanged — oblique floor loss computed per-cell
-					verticalOffset: adj.ceilingHeight * floorDist,
+					verticalOffset: vertGap,
 					floorDbPerMeter: floorMat?.dbPerMeter[ap.band] ?? 100,
 					floorThickness: upperFloor.floorThickness
 				});
