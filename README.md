@@ -38,14 +38,14 @@ pnpm dev
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| **H** | Toggle heatmap |
-| **G** | Toggle grid |
-| **W** | Toggle walls |
-| **Cmd/Ctrl + Z** | Undo |
-| **Cmd/Ctrl + Shift + Z** | Redo |
-| **Delete** | Remove selected APs |
+| Key                      | Action              |
+| ------------------------ | ------------------- |
+| **H**                    | Toggle heatmap      |
+| **G**                    | Toggle grid         |
+| **W**                    | Toggle walls        |
+| **Cmd/Ctrl + Z**         | Undo                |
+| **Cmd/Ctrl + Shift + Z** | Redo                |
+| **Delete**               | Remove selected APs |
 
 ## Architecture
 
@@ -62,14 +62,14 @@ packages/channels/ WiFi band/channel definitions, throughput model
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Dev server |
-| `pnpm build` | Production build |
-| `pnpm test` | Unit tests |
-| `pnpm lint` | Lint |
-| `pnpm typecheck` | Type check |
-| `pnpm --filter @deconflict/web test:e2e` | E2E tests |
+| Command                                  | Description      |
+| ---------------------------------------- | ---------------- |
+| `pnpm dev`                               | Dev server       |
+| `pnpm build`                             | Production build |
+| `pnpm test`                              | Unit tests       |
+| `pnpm lint`                              | Lint             |
+| `pnpm typecheck`                         | Type check       |
+| `pnpm --filter @deconflict/web test:e2e` | E2E tests        |
 
 ## License
 
