@@ -5,6 +5,17 @@
 	import { floorState, switchFloor, addFloor, removeFloor, currentFloor } from '$state/floor-state.svelte.js';
 	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
 	import Select from '$components/shared/Select.svelte';
+	import ConfirmDialog from '$components/dialogs/ConfirmDialog.svelte';
+
+	let confirmOpen = $state(false);
+	let confirmMessage = $state('');
+	let confirmAction = $state<(() => void) | null>(null);
+
+	function showConfirm(message: string, action: () => void) {
+		confirmMessage = message;
+		confirmAction = action;
+		confirmOpen = true;
+	}
 
 	let editingFloorId = $state<string | null>(null);
 	let editingFloorName = $state('');
@@ -50,10 +61,11 @@
 
 	function handleDeleteFloor(id: string) {
 		if (floorState.floors.length <= 1) return;
-		// Remove the floor's APs first
-		apState.aps = apState.aps.filter((ap) => ap.floorId !== id);
-		removeFloor(id);
-		scheduleSave();
+		showConfirm('Delete this floor and all its access points?', () => {
+			apState.aps = apState.aps.filter((ap) => ap.floorId !== id);
+			removeFloor(id);
+			scheduleSave();
+		});
 	}
 	import { appState } from '$state/app.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
@@ -251,6 +263,10 @@
 	}
 
 	function removeFloorplan() {
+		showConfirm('Remove floorplan and all APs on this floor?', doRemoveFloorplan);
+	}
+
+	function doRemoveFloorplan() {
 		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}
@@ -297,12 +313,12 @@
 						{floor.name}
 						{#if floor.id === floorState.currentFloorId && floorState.floors.length > 1}
 							{#if floorState.floors.indexOf(floor) > 0}
-								<span class="floor-action" role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); moveFloor(floor.id, -1); }}>&#9664;</span>
+								<span class="floor-action" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); moveFloor(floor.id, -1); }} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); moveFloor(floor.id, -1); } }}>&#9664;</span>
 							{/if}
 							{#if floorState.floors.indexOf(floor) < floorState.floors.length - 1}
-								<span class="floor-action" role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); moveFloor(floor.id, 1); }}>&#9654;</span>
+								<span class="floor-action" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); moveFloor(floor.id, 1); }} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); moveFloor(floor.id, 1); } }}>&#9654;</span>
 							{/if}
-							<span class="floor-action delete" role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); handleDeleteFloor(floor.id); }}>&times;</span>
+							<span class="floor-action delete" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); handleDeleteFloor(floor.id); }} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleDeleteFloor(floor.id); } }}>&times;</span>
 						{/if}
 					</button>
 				{/if}
@@ -468,6 +484,14 @@
 	{/if}
 
 </div>
+
+<ConfirmDialog
+	bind:open={confirmOpen}
+	title="Delete"
+	message={confirmMessage}
+	confirmLabel="Delete"
+	onconfirm={() => { confirmAction?.(); }}
+/>
 
 <style>
 	.floorplan-controls {

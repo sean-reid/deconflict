@@ -16,6 +16,7 @@
  * signal = 1 / (1 + (d²/r²)²).  No sqrt — pure multiply + divide.
  */
 export function signalPower(distSq: number, radiusSq: number): number {
+	if (radiusSq <= 0) return 0;
 	const ratioSq = distSq / radiusSq;
 	return 1 / (1 + ratioSq * ratioSq);
 }
@@ -26,6 +27,7 @@ export function signalPower(distSq: number, radiusSq: number): number {
  */
 export function signalStrengthOptimizer(distance: number, radius: number): number {
 	if (distance <= 0) return 1;
+	if (radius <= 0) return 0;
 	const ratio = distance / radius;
 	if (ratio >= 1.5) return 0;
 	return Math.pow(1 - ratio / 1.5, 2);

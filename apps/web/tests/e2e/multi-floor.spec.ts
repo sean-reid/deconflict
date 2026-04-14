@@ -137,6 +137,12 @@ test.describe('Multi-floor', () => {
 		const del = page.locator('.floor-action.delete');
 		if (await del.isVisible()) await del.click();
 		await page.waitForTimeout(300);
+		// Confirm the styled delete dialog
+		const confirmBtn = page.locator('button:has-text("Delete")').last();
+		if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+			await confirmBtn.click();
+		}
+		await page.waitForTimeout(300);
 		await expect(page.locator('.floor-pill:not(.add)')).toHaveCount(1);
 	});
 

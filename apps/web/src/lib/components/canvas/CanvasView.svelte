@@ -28,8 +28,9 @@
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
-	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
+	import { floorState, currentFloor, getFloorSlabAttenuation } from '$state/floor-state.svelte.js';
 	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
+	import type { Band } from '@deconflict/channels';
 	import { TiledMask } from '$canvas/tiled-mask.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
@@ -161,7 +162,7 @@
 
 		// Encode and persist
 		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
-		wallState.materialMask = { dataUrl, width: mask.width, height: mask.height, originX: 0, originY: 0 };
+		wallState.materialMask = { dataUrl, width: mask.width, height: mask.height, originX: cachedMaskOriginX, originY: cachedMaskOriginY };
 		scheduleSave();
 	}
 
@@ -394,42 +395,28 @@
 			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
 			if (adjAps.length === 0) continue;
 
-			// Sum vertical gap and slab attenuation through every floor between
+			// Sum vertical gap and total slab thickness between floors
 			const loLevel = Math.min(cur.level, adj.level);
 			const hiLevel = Math.max(cur.level, adj.level);
 			let totalVertGap = 0;
 			let totalSlabThickness = 0;
-			// We need per-band dB/m, so accumulate weighted thickness
-			// Each slab: upper floor's material & thickness
-			const slabSegments: { dbPerMeter: Record<string, number>; thickness: number }[] = [];
 			for (const f of sortedFloors) {
 				if (f.level < loLevel || f.level >= hiLevel) continue;
-				// This floor's ceiling contributes to the vertical gap
 				totalVertGap += f.ceilingHeight;
-				// The slab between this floor and the one above = upper floor's material
 				const upperIdx = sortedFloors.findIndex((s) => s.level === f.level + 1);
 				if (upperIdx >= 0) {
 					const upper = sortedFloors[upperIdx]!;
 					const mat = FLOOR_MATERIALS[upper.floorMaterial];
-					if (mat) {
-						slabSegments.push({ dbPerMeter: mat.dbPerMeter, thickness: upper.floorThickness });
-						totalSlabThickness += upper.floorThickness;
-					}
+					if (mat) totalSlabThickness += upper.floorThickness;
 				}
 			}
 
 			for (const ap of adjAps) {
-				// Compute aggregate dB/m for this AP's band across all slabs
-				let totalDb = 0;
-				for (const seg of slabSegments) {
-					totalDb += (seg.dbPerMeter[ap.band] ?? 100) * seg.thickness;
-				}
+				const totalDb = getFloorSlabAttenuation(floorId, adj.id, ap.band as Band);
 				virtualAps.push({
 					...ap,
 					id: `virtual-${ap.id}`,
 					verticalOffset: totalVertGap,
-					// Pass total dB as floorDbPerMeter * floorThickness = totalDb
-					// Set floorDbPerMeter = totalDb / totalSlabThickness (or totalDb if thickness=1)
 					floorDbPerMeter: totalSlabThickness > 0 ? totalDb / totalSlabThickness : 0,
 					floorThickness: totalSlabThickness
 				});
@@ -495,6 +482,11 @@
 		wallState.wallAttenuation = floor.wallAttenuation;
 		wallState.wallMaterial = floor.wallMaterial;
 		wallState.materialMask = floor.materialMask;
+
+		// Cancel wall edit mode on floor switch to prevent editing the wrong floor
+		if (appState.wallEditMode) {
+			appState.wallEditMode = null;
+		}
 
 		// Force wall mask re-decode on floor switch (prevent stale cache).
 		// Clear renderer references immediately so stale wall data from
@@ -683,16 +675,32 @@
 		`|wm:${wallMaskVersion}:${wallState.wallMaterial}`
 	);
 
+	let solverPending = false;
 	$effect(() => {
 		const auto = solverState.autoSolve;
 		const _key = autoSolveKey;
 		if (!auto || apState.aps.length === 0) return;
-		if (solverState.isRunning) return;
 
 		if (autoSolveTimeout) clearTimeout(autoSolveTimeout);
+		if (solverState.isRunning) {
+			// Queue a re-run after current solve completes
+			solverPending = true;
+			return;
+		}
 		autoSolveTimeout = setTimeout(() => {
 			runSolver();
 		}, 500);
+	});
+
+	// Re-run solver when a queued solve was pending
+	$effect(() => {
+		if (!solverState.isRunning && solverPending) {
+			solverPending = false;
+			if (autoSolveTimeout) clearTimeout(autoSolveTimeout);
+			autoSolveTimeout = setTimeout(() => {
+				runSolver();
+			}, 200);
+		}
 	});
 
 

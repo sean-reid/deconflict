@@ -1,5 +1,7 @@
 import type { FloorMaterialId } from '$canvas/floor-materials.js';
 import type { WallMaterialId } from '$canvas/materials.js';
+import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
+import type { Band } from '@deconflict/channels';
 
 export interface Floor {
 	id: string;
@@ -89,6 +91,27 @@ export function switchFloor(id: string): void {
 	if (floorState.floors.some((f) => f.id === id)) {
 		floorState.currentFloorId = id;
 	}
+}
+
+/** Compute total floor slab attenuation (dB) between two floors for a given band. */
+export function getFloorSlabAttenuation(floorIdA: string, floorIdB: string, band: Band): number {
+	const floorA = getFloor(floorIdA);
+	const floorB = getFloor(floorIdB);
+	if (!floorA || !floorB || floorA.level === floorB.level) return 0;
+	const sorted = [...floorState.floors].sort((a, b) => a.level - b.level);
+	const loLevel = Math.min(floorA.level, floorB.level);
+	const hiLevel = Math.max(floorA.level, floorB.level);
+	let totalDb = 0;
+	for (const f of sorted) {
+		if (f.level < loLevel || f.level >= hiLevel) continue;
+		const upperIdx = sorted.findIndex((s) => s.level === f.level + 1);
+		if (upperIdx >= 0) {
+			const upper = sorted[upperIdx]!;
+			const mat = FLOOR_MATERIALS[upper.floorMaterial];
+			if (mat) totalDb += (mat.dbPerMeter[band] ?? 100) * upper.floorThickness;
+		}
+	}
+	return totalDb;
 }
 
 /** Get floors adjacent to the given floor (level +/- 1). */

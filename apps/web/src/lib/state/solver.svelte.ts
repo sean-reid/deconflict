@@ -6,9 +6,8 @@ import type { SolverResult, ComparisonResult } from '@deconflict/solver';
 import { projectState, updateAp, clearAssignments } from './project.svelte.js';
 import { appState } from './app.svelte.js';
 import { SolverBridge } from '../workers/solver-bridge.js';
-import { floorState } from './floor-state.svelte.js';
+import { floorState, getFloorSlabAttenuation } from './floor-state.svelte.js';
 import { getEffectiveWupm } from './ap-state.svelte.js';
-import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
 import { WALL_MATERIALS } from '$canvas/materials.js';
 import { rayMarchWallAtten } from '../rf/propagation.js';
 import { wallState } from './wall-state.svelte.js';
@@ -155,35 +154,11 @@ export function invalidateSolverMaskCache(): void {
 
 // ─── Attenuation helpers ──────────────────────────────────────────
 
-/** Pre-sorted floors and lookup, built once per solve. */
-let sortedFloorsCache: typeof floorState.floors = [];
+/** Floor-by-ID lookup, built once per solve. */
 let floorByIdCache = new Map<string, (typeof floorState.floors)[0]>();
 
 function prepareSortedFloors(): void {
-	sortedFloorsCache = [...floorState.floors].sort((a, b) => a.level - b.level);
 	floorByIdCache = new Map(floorState.floors.map((f) => [f.id, f]));
-}
-
-/** dB loss through floor slabs between two floors (band-specific). */
-function getFloorSlabLoss(floorIdA: string, floorIdB: string, band: Band): number {
-	const floorA = floorByIdCache.get(floorIdA);
-	const floorB = floorByIdCache.get(floorIdB);
-	if (!floorA || !floorB || floorA.level === floorB.level) return 0;
-
-	const loLevel = Math.min(floorA.level, floorB.level);
-	const hiLevel = Math.max(floorA.level, floorB.level);
-
-	let totalDb = 0;
-	for (const f of sortedFloorsCache) {
-		if (f.level < loLevel || f.level >= hiLevel) continue;
-		const upperIdx = sortedFloorsCache.findIndex((s) => s.level === f.level + 1);
-		if (upperIdx >= 0) {
-			const upper = sortedFloorsCache[upperIdx]!;
-			const mat = FLOOR_MATERIALS[upper.floorMaterial];
-			if (mat) totalDb += (mat.dbPerMeter[band] ?? 100) * upper.floorThickness;
-		}
-	}
-	return totalDb;
 }
 
 /** Wall attenuation between two APs on the same floor. Uses thickness-aware
@@ -261,7 +236,7 @@ async function buildSerializedGraph() {
 			}
 		} else {
 			// Cross-floor: slab attenuation (use worst-case band for conservative estimate)
-			totalDb = getFloorSlabLoss(apA.floorId, apB.floorId, apA.band as Band);
+			totalDb = getFloorSlabAttenuation(apA.floorId, apB.floorId, apA.band as Band);
 		}
 
 		if (totalDb > 0) {

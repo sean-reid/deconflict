@@ -110,6 +110,7 @@
 					class="field-input"
 					bind:value={projectName}
 					placeholder="Untitled Project"
+					autofocus
 				/>
 			</label>
 
