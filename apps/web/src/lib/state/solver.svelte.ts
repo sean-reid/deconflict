@@ -150,17 +150,21 @@ function getFloorSlabLoss(floorIdA: string, floorIdB: string, band: Band): numbe
 	return totalDb;
 }
 
-/** Wall attenuation between two APs on the same floor (synchronous, uses cached mask). */
+/** Wall attenuation between two APs on the same floor. Uses thickness-aware
+ *  mode so drawn wall slabs accumulate dB proportional to their pixel width. */
 function getWallLoss(
 	mask: DecodedFloorMask,
 	ax: number,
 	ay: number,
 	bx: number,
 	by: number,
-	defaultMaterial: number
+	defaultMaterial: number,
+	wupm: number
 ): number {
 	const matDb = WALL_MATERIALS.map((m) => m.dbPerMeter * m.typicalThickness);
 	const defaultDb = WALL_MATERIALS[defaultMaterial]?.attenuation ?? 5;
+	const dbPerMeterArr = WALL_MATERIALS.map((m) => m.dbPerMeter);
+	const metersPerPixel = wupm > 0 ? 1 / wupm : 0;
 	return rayMarchWallAtten(
 		mask.wallData,
 		mask.width,
@@ -172,7 +176,9 @@ function getWallLoss(
 		ay,
 		bx,
 		by,
-		3
+		3,
+		dbPerMeterArr,
+		metersPerPixel
 	);
 }
 
@@ -212,10 +218,7 @@ async function buildSerializedGraph() {
 					apA.floorId === floorState.currentFloorId
 						? wallState.wallMaterial
 						: (floorByIdCache.get(apA.floorId)?.wallMaterial ?? 0);
-				totalDb = getWallLoss(mask, apA.x, apA.y, apB.x, apB.y, defMat);
-				console.log(`[solver] ${apA.id}→${apB.id}: wallLoss=${totalDb.toFixed(1)}dB, hasMaterialMap=${!!mask.materialMap}, defMat=${defMat}`);
-			} else {
-				console.log(`[solver] ${apA.id}→${apB.id}: no wall mask for floor ${apA.floorId}`);
+				totalDb = getWallLoss(mask, apA.x, apA.y, apB.x, apB.y, defMat, getEffectiveWupm());
 			}
 		} else {
 			// Cross-floor: slab attenuation (use worst-case band for conservative estimate)
@@ -223,18 +226,23 @@ async function buildSerializedGraph() {
 		}
 
 		if (totalDb > 0) {
-			// Convert dB to distance multiplier and check if signal still reaches
-			const distMultiplier = Math.pow(10, totalDb / 40);
+			// Compute signal at this distance with wall loss, compare to CCA threshold.
+			// Signal model: 1/(1+(d/r)⁴). Wall loss: 10^(-dB/10).
+			//
+			// CCA energy detect (802.11): ~20 dB below the signal at coverage edge.
+			// At d=r, signal=0.5 (~-75 dBm). CCA-ED ~-82 dBm → 0.5 * 10^(-20/10) ≈ 0.005.
+			// Below this, the interfering signal won't trigger carrier sense.
+			const CCI_THRESHOLD = 0.005;
 			const dx = apA.x - apB.x;
 			const dy = apA.y - apB.y;
 			const dz = (apZMap.get(apA.id) ?? 0) - (apZMap.get(apB.id) ?? 0);
 			const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			const effectiveDist = dist * distMultiplier;
-			const radiusSum = apA.interferenceRadius + apB.interferenceRadius;
-			console.log(`[solver] edge ${apA.id}→${apB.id}: dist=${dist.toFixed(0)}, effectiveDist=${effectiveDist.toFixed(0)}, radiusSum=${radiusSum.toFixed(0)}, ${effectiveDist >= radiusSum ? 'REMOVED' : 'KEPT'}`);
-			if (effectiveDist >= radiusSum) continue; // attenuated signal doesn't reach
-		} else {
-			console.log(`[solver] edge ${apA.id}→${apB.id}: no attenuation, KEPT`);
+			const r = Math.max(apA.interferenceRadius, apB.interferenceRadius);
+			const ratio = dist / r;
+			const r4 = ratio * ratio * ratio * ratio;
+			const signal = 1 / (1 + r4);
+			const attenFactor = Math.pow(10, -totalDb / 10);
+			if (signal * attenFactor < CCI_THRESHOLD) continue;
 		}
 
 		filteredEdges.push(edge);
