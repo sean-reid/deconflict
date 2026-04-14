@@ -215,17 +215,18 @@ export function buildAttenField(
 		let wasWall = false;
 		const base = a * distBuckets;
 
-		for (let d = 0; d < distBuckets; d++) {
-			const dist = (d + 0.5) * distStep;
-			// Position in mask-local pixel coords
-			const px = (apLX + cosT * dist + 0.5) | 0;
-			const py = (apLY + sinT * dist + 0.5) | 0;
+		// Step pixel-by-pixel to never miss thin walls.
+		// Store cumulative dB at bucket resolution for compact lookup.
+		let nextBucket = 0;
+		const totalPixels = Math.ceil(maxDist);
+		for (let p = 0; p < totalPixels; p++) {
+			const px = (apLX + cosT * p + 0.5) | 0;
+			const py = (apLY + sinT * p + 0.5) | 0;
 
 			if (px >= 0 && px < wallW && py >= 0 && py < wallH) {
 				const idx = py * wallW + px;
 				const isWall = wallData[idx] === 1;
 				if (isWall && !wasWall) {
-					// Wall crossing: add material dB
 					if (materialMap) {
 						const matId = materialMap[idx] ?? 0;
 						cumDb += materialDb[matId] ?? defaultDb;
@@ -238,7 +239,16 @@ export function buildAttenField(
 				wasWall = false;
 			}
 
-			data[base + d] = cumDb;
+			// Write to bucket when we cross the boundary
+			while (nextBucket < distBuckets && p >= (nextBucket + 0.5) * distStep) {
+				data[base + nextBucket] = cumDb;
+				nextBucket++;
+			}
+		}
+		// Fill remaining buckets
+		while (nextBucket < distBuckets) {
+			data[base + nextBucket] = cumDb;
+			nextBucket++;
 		}
 		edgeAtten[a] = cumDb;
 	}
