@@ -10,10 +10,19 @@ test.beforeEach(async ({ page }) => {
 /** Ensure sidebar is open on the Floorplan tab. */
 async function openFloorplanTab(page: any) {
 	// Already visible?
-	if (await page.locator('.floor-strip').isVisible({ timeout: 200 }).catch(() => false)) return;
+	if (
+		await page
+			.locator('.floor-strip')
+			.isVisible({ timeout: 200 })
+			.catch(() => false)
+	)
+		return;
 
 	// Check if sidebar is open (the aside element exists in DOM)
-	const sidebarVisible = await page.locator('aside[aria-label="Sidebar"]').isVisible({ timeout: 200 }).catch(() => false);
+	const sidebarVisible = await page
+		.locator('aside[aria-label="Sidebar"]')
+		.isVisible({ timeout: 200 })
+		.catch(() => false);
 
 	if (!sidebarVisible) {
 		// Sidebar is closed — open it
