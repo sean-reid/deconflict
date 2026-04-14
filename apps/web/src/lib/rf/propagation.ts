@@ -192,12 +192,19 @@ export function buildAttenField(
 	const apLX = apX - maskOriginX;
 	const apLY = apY - maskOriginY;
 
-	// No distance cutoff: wall attenuation applies at any distance.
-	// The field is bounded by the mask dimensions, not by AP radius.
+	// Ray-march cells within maxDist of the AP (performance bound).
+	// The field grid covers the full mask so lookupAtten works everywhere,
+	// but distant cells keep their default 0 (no visible contribution since
+	// signal is negligible there). The heatmap's lookupAtten ray-projects
+	// out-of-range cells back to the nearest computed edge cell.
+	const maxDistSq = maxDist * maxDist;
 	for (let r = 0; r < rows; r++) {
 		const wy = originY + r * gridStep + (gridStep >> 1);
 		for (let c = 0; c < cols; c++) {
 			const wx = originX + c * gridStep + (gridStep >> 1);
+			const dx = wx - apX;
+			const dy = wy - apY;
+			if (dx * dx + dy * dy > maxDistSq) continue;
 			// Ray march in mask-local pixel coordinates
 			grid[r * cols + c] = rayMarchWallAtten(
 				wallData,
@@ -304,7 +311,7 @@ export function getAttenField(
 		field = buildAttenField(
 			apX,
 			apY,
-			radius * 3,
+			radius * 5,
 			wallData,
 			wallW,
 			wallH,
