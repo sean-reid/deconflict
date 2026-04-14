@@ -90,7 +90,7 @@
 
 </script>
 
-<header class="toolbar">
+<header class="toolbar" class:disabled={!!appState.wallEditMode}>
 	<div class="toolbar-left">
 		<span class="logo">Deconflict</span>
 
@@ -361,4 +361,8 @@
 		}
 	}
 
+	.toolbar.disabled {
+		pointer-events: none;
+		opacity: 0.4;
+	}
 </style>

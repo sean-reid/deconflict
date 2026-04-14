@@ -20,7 +20,7 @@
 	import { canvasState, clearSelection } from '$state/canvas.svelte.js';
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
-	import { solverState, runSolver } from '$state/solver.svelte.js';
+	import { solverState, runSolver, invalidateSolverMaskCache, setLiveSolverMask } from '$state/solver.svelte.js';
 	import { updateCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
@@ -44,6 +44,7 @@
 	function handleWallEditDone() {
 		appState.wallEditMode = null;
 		brushCursorVisible = false;
+		setLiveSolverMask(null, null, 0, 0); // clear live mask override
 		// Sync any material data created during painting
 		if (wallEditHandler.materialData && !cachedMaterialData) {
 			cachedMaterialData = wallEditHandler.materialData;
@@ -65,6 +66,10 @@
 
 			// Recompute blob labels so click-to-override works on the edited walls
 			cachedWallLabels = labelWallBlobs(cachedWallData, width, height);
+
+			// Trigger re-solve (wallMaskVersion drives auto-solve key)
+			wallMaskVersion++;
+			invalidateSolverMaskCache();
 
 			wallLayer.invalidateCache();
 			heatmapLayer.markWallsDirty();
@@ -140,6 +145,10 @@
 		heatmapLayer.materialVersion++;
 		heatmapLayer.markWallsDirty();
 		engine.markDirty();
+
+		// Trigger solver re-run
+		wallMaskVersion++;
+		invalidateSolverMaskCache();
 
 		// Encode and persist
 		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
@@ -257,6 +266,16 @@
 			wallLayer.invalidateCache();
 			heatmapLayer.markWallsDirty();
 			engine.markDirty();
+
+			// Push live mask to solver (skips PNG decode) and trigger re-solve
+			setLiveSolverMask(
+				wallEditHandler.wallData,
+				wallEditHandler.materialData,
+				wallEditHandler.maskWidth,
+				wallEditHandler.maskHeight
+			);
+			invalidateSolverMaskCache();
+			wallMaskVersion++;
 		};
 
 		// Set up resize observer
@@ -469,10 +488,12 @@
 		engine?.markDirty();
 	});
 
-	// When wall mask changes, invalidate heatmap wall cache
+	// When wall mask changes, invalidate heatmap wall cache + set clip mode
 	$effect(() => {
 		if (!heatmapLayer) return;
 		wallState.wallMask; // track
+		// Clip heatmap to wall mask bounds when no floorplan image (draw-from-scratch)
+		heatmapLayer.clipToWallMask = !floorplanState.floorplanUrl && !!wallState.wallMask;
 		heatmapLayer.markWallsDirty();
 		engine.markDirty();
 	});
@@ -506,6 +527,7 @@
 		lastMatMaskUrl = matUrl;
 
 		wallMaskVersion++;
+		invalidateSolverMaskCache();
 		const thisVersion = wallMaskVersion;
 
 		if (!mask) {
@@ -598,15 +620,16 @@
 	});
 
 
-	// Auto-solve: debounce solver runs when AP layout or RF params change.
+	// Auto-solve: debounce solver runs when AP layout, RF params, or walls change.
 	// Excludes assignedChannel to avoid infinite loops (solver writes channels).
 	let autoSolveKey = $derived(
 		apState.aps
 			.map(
 				(ap) =>
-					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
+					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.floorId}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
 			)
-			.join('|')
+			.join('|') +
+		`|wm:${wallMaskVersion}:${wallState.wallMaterial}`
 	);
 
 	$effect(() => {
@@ -946,7 +969,9 @@
 		ontouchend={handleTouchEnd}
 		ontouchcancel={handleTouchEnd}
 	></canvas>
-	<LayerPanel />
+	{#if !appState.wallEditMode}
+		<LayerPanel />
+	{/if}
 	{#if appState.wallEditMode}
 		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
 		{#if brushCursorVisible}

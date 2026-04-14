@@ -72,8 +72,8 @@ export class WallEditHandler {
 		const w = this.maskWidth;
 		const h = this.maskHeight;
 
-		// Clamp to mask bounds
-		if (cx < 0 || cx >= w || cy < 0 || cy >= h) return;
+		// Skip if brush center is fully outside mask bounds
+		if (cx + r < 0 || cx - r >= w || cy + r < 0 || cy - r >= h) return;
 		const wallData = this.wallData;
 
 		const xlo = Math.max(0, cx - r);
