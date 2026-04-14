@@ -26,6 +26,11 @@ export class FloorplanLayer implements Layer {
 	}
 
 	loadImage(url: string, onReady?: () => void): void {
+		// Skip reload if already showing this URL (avoids revoking blob URLs)
+		if (this.image && this.imageReady && this.image.src === url) {
+			if (onReady) onReady();
+			return;
+		}
 		this.clearImage();
 		this.onReady = onReady ?? null;
 		this.image = new Image();
