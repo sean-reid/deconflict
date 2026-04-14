@@ -1,7 +1,16 @@
 import { jsPDF } from 'jspdf';
 import { projectState } from '$state/project.svelte.js';
 import { solverState } from '$state/solver.svelte.js';
+import { optimizerState } from '$state/optimizer.svelte.js';
+import { floorState } from '$state/floor-state.svelte.js';
+import { getEffectiveWupm } from '$state/ap-state.svelte.js';
 import type { CanvasEngine } from '$canvas/engine.js';
+
+const bandLabels: Record<string, string> = {
+	'2.4ghz': '2.4 GHz',
+	'5ghz': '5 GHz',
+	'6ghz': '6 GHz'
+};
 
 export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	const doc = new jsPDF({
@@ -14,29 +23,36 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	const pageHeight = doc.internal.pageSize.getHeight();
 	const margin = 15;
 	const contentWidth = pageWidth - margin * 2;
+	const wupm = getEffectiveWupm();
+	const isMetric = projectState.unitSystem === 'metric';
+	const unitLabel = isMetric ? 'm' : 'ft';
+	const unitFactor = isMetric ? 1 / wupm : 3.281 / wupm; // world units to m or ft
 
 	// --- Page 1: Layout View ---
 
-	// Title
 	doc.setFontSize(16);
 	doc.setFont('helvetica', 'bold');
 	doc.text(projectState.name, margin, margin + 5);
 
-	// Subtitle
 	doc.setFontSize(9);
 	doc.setFont('helvetica', 'normal');
-	doc.setTextColor(150);
+	doc.setTextColor(120);
 	const dateStr = new Date().toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'long',
 		day: 'numeric'
 	});
-	doc.text(`Generated ${dateStr}`, margin, margin + 11);
+	const floorCount = floorState.floors.length;
+	const apCount = projectState.aps.length;
+	doc.text(
+		`${dateStr}  |  ${apCount} access point${apCount !== 1 ? 's' : ''}  |  ${floorCount} floor${floorCount !== 1 ? 's' : ''}`,
+		margin,
+		margin + 11
+	);
 	doc.setTextColor(0);
 
 	// Canvas snapshot
 	const canvasEl = engine.canvas;
-	// Create a temporary canvas at 2x for quality
 	const tempCanvas = document.createElement('canvas');
 	const scale = 2;
 	const srcWidth = canvasEl.width / (window.devicePixelRatio || 1);
@@ -46,11 +62,9 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	const tempCtx = tempCanvas.getContext('2d')!;
 	tempCtx.scale(scale, scale);
 
-	// Fill background
 	tempCtx.fillStyle = '#0a0c12';
 	tempCtx.fillRect(0, 0, srcWidth, srcHeight);
 
-	// Render layers (skip grid and selection rect)
 	const dpr = scale;
 	const rc = {
 		ctx: tempCtx,
@@ -76,7 +90,6 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 
 	const imgData = tempCanvas.toDataURL('image/jpeg', 0.85);
 
-	// Calculate image dimensions to fit page
 	const imgY = margin + 15;
 	const maxImgHeight = pageHeight - imgY - margin;
 	const aspectRatio = srcWidth / srcHeight;
@@ -96,67 +109,87 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	doc.setFont('helvetica', 'bold');
 	doc.text('Access Point Schedule', margin, margin + 5);
 
-	doc.setFontSize(9);
-	doc.setFont('helvetica', 'normal');
+	// Table
+	const hasModel = projectState.aps.some((ap) => ap.modelLabel);
+	const hasFloors = floorState.floors.length > 1;
 
-	// Table header
-	const colWidths = [35, 20, 25, 25, 25, 20, 20, 20];
-	const headers = ['Name', 'Band', 'Width', 'Channel', 'Radius', 'Power', 'X', 'Y'];
+	const cols: Array<{
+		header: string;
+		width: number;
+		getValue: (ap: (typeof projectState.aps)[0]) => string;
+	}> = [];
+	cols.push({ header: 'Name', width: hasModel ? 28 : 35, getValue: (ap) => ap.name });
+	if (hasFloors) {
+		cols.push({
+			header: 'Floor',
+			width: 22,
+			getValue: (ap) => floorState.floors.find((f) => f.id === ap.floorId)?.name ?? '-'
+		});
+	}
+	if (hasModel) {
+		cols.push({ header: 'Model', width: 40, getValue: (ap) => ap.modelLabel ?? 'Custom' });
+	}
+	cols.push({ header: 'Band', width: 18, getValue: (ap) => bandLabels[ap.band] ?? ap.band });
+	cols.push({ header: 'Width', width: 18, getValue: (ap) => `${ap.channelWidth} MHz` });
+	cols.push({
+		header: 'Channel',
+		width: 20,
+		getValue: (ap) => (ap.assignedChannel !== null ? String(ap.assignedChannel) : '-')
+	});
+	cols.push({ header: 'Power', width: 18, getValue: (ap) => `${ap.power} dBm` });
+	cols.push({
+		header: `Range (${unitLabel})`,
+		width: 22,
+		getValue: (ap) => (ap.interferenceRadius * unitFactor).toFixed(1)
+	});
+
 	let y = margin + 15;
 
-	doc.setFillColor(240, 240, 240);
+	// Header row
+	doc.setFillColor(235, 235, 240);
 	doc.rect(margin, y - 4, contentWidth, 7, 'F');
 	doc.setFont('helvetica', 'bold');
-	doc.setFontSize(8);
+	doc.setFontSize(7.5);
 
 	let x = margin;
-	for (let i = 0; i < headers.length; i++) {
-		doc.text(headers[i]!, x + 1, y);
-		x += colWidths[i]!;
+	for (const col of cols) {
+		doc.text(col.header, x + 1, y);
+		x += col.width;
 	}
 
 	y += 7;
 	doc.setFont('helvetica', 'normal');
-	doc.setFontSize(8);
+	doc.setFontSize(7.5);
 
-	const bandLabels: Record<string, string> = {
-		'2.4ghz': '2.4 GHz',
-		'5ghz': '5 GHz',
-		'6ghz': '6 GHz'
-	};
+	// Group by floor if multi-floor
+	const floors = hasFloors
+		? floorState.floors.sort((a, b) => a.level - b.level)
+		: [{ id: '', name: '', level: 0 }];
 
-	for (let idx = 0; idx < projectState.aps.length; idx++) {
-		const ap = projectState.aps[idx]!;
+	for (const floor of floors) {
+		const floorAps = hasFloors
+			? projectState.aps.filter((ap) => ap.floorId === floor.id)
+			: projectState.aps;
 
-		// Alternating row background
-		if (idx % 2 === 0) {
-			doc.setFillColor(248, 248, 248);
-			doc.rect(margin, y - 4, contentWidth, 6, 'F');
-		}
+		for (let idx = 0; idx < floorAps.length; idx++) {
+			const ap = floorAps[idx]!;
 
-		x = margin;
-		const row = [
-			ap.name,
-			bandLabels[ap.band] ?? ap.band,
-			`${ap.channelWidth} MHz`,
-			ap.assignedChannel !== null ? String(ap.assignedChannel) : 'Auto',
-			String(ap.interferenceRadius),
-			`${ap.power} dBm`,
-			String(Math.round(ap.x)),
-			String(Math.round(ap.y))
-		];
+			if (idx % 2 === 0) {
+				doc.setFillColor(248, 248, 250);
+				doc.rect(margin, y - 4, contentWidth, 6, 'F');
+			}
 
-		for (let i = 0; i < row.length; i++) {
-			doc.text(row[i]!, x + 1, y);
-			x += colWidths[i]!;
-		}
+			x = margin;
+			for (const col of cols) {
+				doc.text(col.getValue(ap), x + 1, y);
+				x += col.width;
+			}
 
-		y += 6;
-
-		// Page break if needed
-		if (y > pageHeight - margin) {
-			doc.addPage();
-			y = margin + 5;
+			y += 6;
+			if (y > pageHeight - margin) {
+				doc.addPage();
+				y = margin + 5;
+			}
 		}
 	}
 
@@ -164,14 +197,19 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	y += 5;
 	doc.setFont('helvetica', 'bold');
 	doc.setFontSize(9);
-	doc.text(`Total: ${projectState.aps.length} access points`, margin, y);
+	doc.text(`Total: ${apCount} access point${apCount !== 1 ? 's' : ''}`, margin, y);
+
+	if (optimizerState.coverage > 0) {
+		y += 5;
+		doc.setFont('helvetica', 'normal');
+		doc.text(`Coverage: ${optimizerState.coverage}%`, margin, y);
+	}
 
 	if (solverState.lastResult) {
 		y += 5;
 		doc.setFont('helvetica', 'normal');
-		const algo = solverState.algorithm.charAt(0).toUpperCase() + solverState.algorithm.slice(1);
 		doc.text(
-			`Solver: ${algo} | Colors: ${solverState.lastResult.colorCount} | Conflicts: ${solverState.lastResult.conflicts.length} | Time: ${solverState.lastTiming.toFixed(1)}ms`,
+			`Channels used: ${solverState.lastResult.colorCount}  |  Conflicts: ${solverState.lastResult.conflicts.length}`,
 			margin,
 			y
 		);
