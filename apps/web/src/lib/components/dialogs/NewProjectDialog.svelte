@@ -3,6 +3,7 @@
 	import { projectState } from '$state/project.svelte';
 	import { clearHistory } from '$state/history.svelte';
 	import { clearSavedState } from '$state/persistence.svelte';
+	import { floorState } from '$state/floor-state.svelte';
 
 	let {
 		open = $bindable(false),
@@ -32,6 +33,26 @@
 		projectState.floorplanBoundary = null;
 		projectState.ispSpeed = 0;
 		projectState.targetThroughput = 25;
+
+		// Reset floor state to a single default floor
+		const newFloorId = crypto.randomUUID();
+		floorState.floors = [{
+			id: newFloorId,
+			name: 'Floor 1',
+			level: 0,
+			ceilingHeight: 3.0,
+			floorThickness: 0.2,
+			floorMaterial: 1,
+			floorplanUrl: null,
+			floorplanScale: 0.4,
+			calibration: null,
+			floorplanBoundary: null,
+			wallMask: null,
+			wallAttenuation: 5,
+			wallMaterial: 0,
+			materialMask: null
+		}];
+		floorState.currentFloorId = newFloorId;
 
 		clearHistory();
 		clearSavedState();
