@@ -66,6 +66,10 @@
 			// Recompute blob labels so click-to-override works on the edited walls
 			cachedWallLabels = labelWallBlobs(cachedWallData, width, height);
 
+			// Trigger re-solve (wallMaskVersion drives auto-solve key)
+			wallMaskVersion++;
+			invalidateSolverMaskCache();
+
 			wallLayer.invalidateCache();
 			heatmapLayer.markWallsDirty();
 			heatmapLayer.materialVersion++;
