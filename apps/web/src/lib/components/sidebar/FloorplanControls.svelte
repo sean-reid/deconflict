@@ -335,7 +335,7 @@
 				<span class="prop-unit">m</span>
 			</div>
 			<div class="prop-row">
-				<span class="prop-label">Slab material</span>
+				<span class="prop-label">Floor material</span>
 				<Select
 					value={String(currentFloor().floorMaterial)}
 					options={FLOOR_MATERIALS.map(m => ({ value: String(m.id), label: m.name }))}
