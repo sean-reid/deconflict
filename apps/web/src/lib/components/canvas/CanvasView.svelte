@@ -338,10 +338,18 @@
 	});
 
 	// Sync heatmap APs — current floor + virtual APs from adjacent floors
+	// Tracks floor properties (ceilingHeight, floorThickness, floorMaterial) for reactivity
 	$effect(() => {
 		if (!heatmapLayer) return;
 		const floorId = floorState.currentFloorId;
 		const cur = currentFloor();
+		// Read floor properties to establish Svelte tracking
+		for (const f of floorState.floors) {
+			void f.ceilingHeight;
+			void f.floorThickness;
+			void f.floorMaterial;
+			void f.level;
+		}
 
 		// Current floor's APs (full power)
 		const localAps = apState.aps.filter((ap) => ap.floorId === floorId);
