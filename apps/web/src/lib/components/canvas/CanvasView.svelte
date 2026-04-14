@@ -280,9 +280,7 @@
 				heatmapLayer.materialVersion++;
 			}
 			wallLayer.invalidateCache();
-			// Don't invalidate attenuation cache during drawing — too expensive to
-			// rebuild per stroke. The wall renderer updates live; the heatmap uses
-			// the stale attenuation field until pointerup/Done.
+			heatmapLayer.markWallsDirty();
 			engine.markDirty();
 
 			// Push live mask to solver (skips PNG decode) and trigger re-solve
