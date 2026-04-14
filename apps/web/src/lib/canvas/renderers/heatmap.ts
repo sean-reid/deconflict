@@ -20,7 +20,7 @@ import {
 } from '../../rf/propagation.js';
 
 const CELL_SIZE = 6;
-const MAX_RATIO_SQ = 9;
+const MAX_RATIO_SQ = 16;
 const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // Color LUT — 256 entries, built once
