@@ -158,6 +158,8 @@ export interface AttenField {
 	step: number;
 	originX: number; // world-space origin of the grid (may be negative)
 	originY: number;
+	apX: number; // AP position in world space (for edge projection)
+	apY: number;
 }
 
 /**
@@ -214,15 +216,53 @@ export function buildAttenField(
 		}
 	}
 
-	return { grid, cols, rows, step: gridStep, originX, originY };
+	return { grid, cols, rows, step: gridStep, originX, originY, apX, apY };
 }
 
-/** O(1) wall attenuation lookup from a precomputed field. */
+/** O(1) wall attenuation lookup from a precomputed field.
+ *  For out-of-bounds pixels, projects back along the AP→pixel ray to the
+ *  nearest field edge cell — the accumulated wall loss at the mask boundary. */
 export function lookupAtten(field: AttenField, wx: number, wy: number): number {
 	const s = field.step;
-	const gc = ((wx - field.originX) / s + 0.5) | 0;
-	const gr = ((wy - field.originY) / s + 0.5) | 0;
-	if (gc < 0 || gc >= field.cols || gr < 0 || gr >= field.rows) return 0;
+	let gc = ((wx - field.originX) / s + 0.5) | 0;
+	let gr = ((wy - field.originY) / s + 0.5) | 0;
+
+	if (gc >= 0 && gc < field.cols && gr >= 0 && gr < field.rows) {
+		return field.grid[gr * field.cols + gc]!;
+	}
+
+	// Out of bounds: find the field-edge cell along the AP→pixel ray.
+	// This gives the correct accumulated wall loss for pixels beyond the mask.
+	const dx = wx - field.apX;
+	const dy = wy - field.apY;
+	if (dx === 0 && dy === 0) return 0;
+
+	// Find t where the ray exits the field (0..cols-1, 0..rows-1 in grid coords)
+	const apGC = (field.apX - field.originX) / s;
+	const apGR = (field.apY - field.originY) / s;
+	const endGC = (wx - field.originX) / s;
+	const endGR = (wy - field.originY) / s;
+	const dgc = endGC - apGC;
+	const dgr = endGR - apGR;
+
+	let tMin = 1;
+	if (dgc !== 0) {
+		const t0 = -apGC / dgc;
+		const t1 = (field.cols - 1 - apGC) / dgc;
+		const tEnter = Math.min(t0, t1);
+		const tExit = Math.max(t0, t1);
+		if (tExit < tMin && tExit > 0) tMin = tExit;
+		void tEnter;
+	}
+	if (dgr !== 0) {
+		const t0 = -apGR / dgr;
+		const t1 = (field.rows - 1 - apGR) / dgr;
+		const tExit = Math.max(t0, t1);
+		if (tExit < tMin && tExit > 0) tMin = tExit;
+	}
+
+	gc = Math.max(0, Math.min(field.cols - 1, Math.round(apGC + dgc * tMin)));
+	gr = Math.max(0, Math.min(field.rows - 1, Math.round(apGR + dgr * tMin)));
 	return field.grid[gr * field.cols + gc]!;
 }
 

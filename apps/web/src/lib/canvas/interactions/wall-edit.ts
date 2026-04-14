@@ -72,7 +72,7 @@ export class WallEditHandler {
 		if (mode === 'erase') {
 			mask.paintCircle(cx, cy, r, 0);
 		} else if (mode === 'draw') {
-			mask.paintCircle(cx, cy, r, 1, this.defaultMaterial);
+			mask.paintCircle(cx, cy, r, 1, this.activeMaterial);
 		} else if (mode === 'material') {
 			// Only paint material on existing wall pixels
 			const x0 = cx - r;
