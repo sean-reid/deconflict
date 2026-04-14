@@ -187,19 +187,17 @@ export function buildAttenField(
 	const cols = Math.ceil(wallW / gridStep);
 	const rows = Math.ceil(wallH / gridStep);
 	const grid = new Float32Array(cols * rows);
-	const maxDistSq = maxDist * maxDist;
 
 	// AP position in mask-local coordinates for ray marching
 	const apLX = apX - maskOriginX;
 	const apLY = apY - maskOriginY;
 
+	// No distance cutoff: wall attenuation applies at any distance.
+	// The field is bounded by the mask dimensions, not by AP radius.
 	for (let r = 0; r < rows; r++) {
 		const wy = originY + r * gridStep + (gridStep >> 1);
 		for (let c = 0; c < cols; c++) {
 			const wx = originX + c * gridStep + (gridStep >> 1);
-			const dx = wx - apX;
-			const dy = wy - apY;
-			if (dx * dx + dy * dy > maxDistSq) continue;
 			// Ray march in mask-local pixel coordinates
 			grid[r * cols + c] = rayMarchWallAtten(
 				wallData,
@@ -257,20 +255,7 @@ export function lookupAtten(field: AttenField, wx: number, wy: number): number {
 
 	gc = Math.max(0, Math.min(field.cols - 1, Math.round(apGC + dgc * tExit)));
 	gr = Math.max(0, Math.min(field.rows - 1, Math.round(apGR + dgr * tExit)));
-	let val = field.grid[gr * field.cols + gc]!;
-	if (val > 0) return val;
-
-	// Edge cell was beyond maxDist (skipped during build, value=0).
-	// Walk back along the ray toward the AP to find the last computed cell.
-	const steps = 8;
-	for (let i = 1; i <= steps; i++) {
-		const t = tExit * (1 - i / steps);
-		const c2 = Math.max(0, Math.min(field.cols - 1, Math.round(apGC + dgc * t)));
-		const r2 = Math.max(0, Math.min(field.rows - 1, Math.round(apGR + dgr * t)));
-		val = field.grid[r2 * field.cols + c2]!;
-		if (val > 0) return val;
-	}
-	return 0;
+	return field.grid[gr * field.cols + gc]!;
 }
 
 // ─── Attenuation field cache ──────────────────────────────────────
