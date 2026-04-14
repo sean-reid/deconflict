@@ -150,7 +150,7 @@
 		</div>
 	{/if}
 
-	{#if projectState.aps.length >= 1 && projectState.wallMask}
+	{#if projectState.aps.length >= 1}
 		<div class="coverage-section">
 			{#if optimizerState.coverage > 0}
 				<div class="coverage-bar-container">
