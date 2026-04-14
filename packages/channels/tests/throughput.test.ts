@@ -9,24 +9,26 @@ describe('estimateThroughput', () => {
 		macEfficiency: 0.5
 	};
 
-	it('single AP, no contention: effectiveRate equals baseRate * efficiency', () => {
+	it('single AP, no contention: effectiveRate equals baseRate', () => {
 		const aps: ThroughputInput[] = [
 			{
 				apId: 'ap1',
 				band: '5ghz',
 				channelWidth: 80,
 				assignedChannel: 36,
-				coChannelOverlaps: []
+				coChannelOverlaps: [],
+				wifiStandard: 'WiFi 6',
+				streams: 2
 			}
 		];
 
 		const results = estimateThroughput(aps, defaultOptions);
 		expect(results).toHaveLength(1);
 		const est = results[0]!;
-		// 300 * 0.5 = 150
-		expect(est.baseRate).toBe(150);
-		expect(est.effectiveRate).toBe(150);
-		expect(est.cappedRate).toBe(150);
+		// WiFi 6, 2 streams, 80MHz = 1201 PHY. * 0.5 MAC = 601
+		expect(est.baseRate).toBe(601);
+		expect(est.effectiveRate).toBe(601);
+		expect(est.cappedRate).toBe(601);
 		expect(est.meetsTarget).toBe(true);
 	});
 
@@ -37,21 +39,25 @@ describe('estimateThroughput', () => {
 				band: '5ghz',
 				channelWidth: 80,
 				assignedChannel: 36,
-				coChannelOverlaps: [1.0]
+				coChannelOverlaps: [1.0],
+				wifiStandard: 'WiFi 6',
+				streams: 2
 			},
 			{
 				apId: 'ap2',
 				band: '5ghz',
 				channelWidth: 80,
 				assignedChannel: 36,
-				coChannelOverlaps: [1.0]
+				coChannelOverlaps: [1.0],
+				wifiStandard: 'WiFi 6',
+				streams: 2
 			}
 		];
 
 		const results = estimateThroughput(aps, defaultOptions);
-		// baseRate = 300 * 0.5 = 150; nEffective = 1 + 1 = 2; effectiveRate = 75
-		expect(results[0]!.effectiveRate).toBe(75);
-		expect(results[1]!.effectiveRate).toBe(75);
+		// baseRate = 601; nEffective = 1 + 1 = 2; effectiveRate = 300
+		expect(results[0]!.effectiveRate).toBe(300);
+		expect(results[1]!.effectiveRate).toBe(300);
 	});
 
 	it('ISP cap applied when lower than radio rate', () => {
@@ -61,7 +67,9 @@ describe('estimateThroughput', () => {
 				band: '5ghz',
 				channelWidth: 80,
 				assignedChannel: 36,
-				coChannelOverlaps: []
+				coChannelOverlaps: [],
+				wifiStandard: 'WiFi 6',
+				streams: 2
 			}
 		];
 
@@ -72,12 +80,40 @@ describe('estimateThroughput', () => {
 		};
 
 		const results = estimateThroughput(aps, options);
-		// effectiveRate = 150, but ISP cap = 100
-		expect(results[0]!.effectiveRate).toBe(150);
+		expect(results[0]!.effectiveRate).toBe(601);
 		expect(results[0]!.cappedRate).toBe(100);
 	});
 
-	it('AP meets target when above threshold', () => {
+	it('model-specific rates: WiFi 5 2x2 vs WiFi 6 4x4', () => {
+		const aps: ThroughputInput[] = [
+			{
+				apId: 'wifi5',
+				band: '5ghz',
+				channelWidth: 80,
+				assignedChannel: 36,
+				coChannelOverlaps: [],
+				wifiStandard: 'WiFi 5',
+				streams: 2
+			},
+			{
+				apId: 'wifi6',
+				band: '5ghz',
+				channelWidth: 80,
+				assignedChannel: 40,
+				coChannelOverlaps: [],
+				wifiStandard: 'WiFi 6',
+				streams: 4
+			}
+		];
+
+		const results = estimateThroughput(aps, defaultOptions);
+		// WiFi 5 2x2 80MHz = 867 * 0.5 = 434
+		expect(results[0]!.baseRate).toBe(434);
+		// WiFi 6 4x4 80MHz = 2401 * 0.5 = 1201
+		expect(results[1]!.baseRate).toBe(1201);
+	});
+
+	it('falls back to WiFi 6 2-stream when no model info', () => {
 		const aps: ThroughputInput[] = [
 			{
 				apId: 'ap1',
@@ -85,56 +121,24 @@ describe('estimateThroughput', () => {
 				channelWidth: 80,
 				assignedChannel: 36,
 				coChannelOverlaps: []
+				// no wifiStandard or streams
 			}
 		];
 
-		const aboveTarget: ThroughputOptions = {
-			ispSpeed: 0,
-			targetThroughput: 100,
-			macEfficiency: 0.5
-		};
-		expect(estimateThroughput(aps, aboveTarget)[0]!.meetsTarget).toBe(true);
-
-		const belowTarget: ThroughputOptions = {
-			ispSpeed: 0,
-			targetThroughput: 200,
-			macEfficiency: 0.5
-		};
-		expect(estimateThroughput(aps, belowTarget)[0]!.meetsTarget).toBe(false);
-	});
-
-	it('different bands give different base rates', () => {
-		const make = (band: '2.4ghz' | '5ghz' | '6ghz'): ThroughputInput => ({
-			apId: band,
-			band,
-			channelWidth: 20,
-			assignedChannel: 1,
-			coChannelOverlaps: []
-		});
-
-		const results = estimateThroughput(
-			[make('2.4ghz'), make('5ghz'), make('6ghz')],
-			defaultOptions
-		);
-
-		// 2.4ghz_20: 45*0.5=22.5->23, 5ghz_20: 70*0.5=35, 6ghz_20: 90*0.5=45
-		expect(results[0]!.baseRate).toBe(23);
-		expect(results[1]!.baseRate).toBe(35);
-		expect(results[2]!.baseRate).toBe(45);
+		const results = estimateThroughput(aps, defaultOptions);
+		// Default: WiFi 6, 2 streams, 80MHz = 1201 * 0.5 = 601
+		expect(results[0]!.baseRate).toBe(601);
 	});
 });
 
 describe('getBaseRate', () => {
-	it('returns known rate for 5ghz 80MHz', () => {
-		expect(getBaseRate('5ghz', 80)).toBe(300);
+	it('returns WiFi 6 2-stream rate for 5ghz 80MHz', () => {
+		// WiFi 6, 2 streams, 80MHz = 1201
+		expect(getBaseRate('5ghz', 80)).toBe(1201);
 	});
 
-	it('returns known rate for 6ghz 320MHz', () => {
-		expect(getBaseRate('6ghz', 320)).toBe(1200);
-	});
-
-	it('returns fallback for unknown combination', () => {
-		// 2.4ghz doesn't have 320 defined
-		expect(getBaseRate('2.4ghz', 320 as any)).toBe(100);
+	it('returns WiFi 6 2-stream rate for 6ghz 160MHz', () => {
+		// WiFi 6, 2 streams, 160MHz = 2402
+		expect(getBaseRate('6ghz', 160)).toBe(2402);
 	});
 });

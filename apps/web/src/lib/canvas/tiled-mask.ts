@@ -180,13 +180,18 @@ export class TiledMask {
 		const { originX, originY, width, height } = b;
 		// Reuse cached arrays if bounds unchanged (avoid 3MB alloc per stroke)
 		const sameSize =
-			this.cachedData && this.cachedWidth === width && this.cachedHeight === height &&
-			this.cachedOriginX === originX && this.cachedOriginY === originY;
+			this.cachedData &&
+			this.cachedWidth === width &&
+			this.cachedHeight === height &&
+			this.cachedOriginX === originX &&
+			this.cachedOriginY === originY;
 		const data = sameSize ? this.cachedData! : new Uint8Array(width * height);
 		if (sameSize) data.fill(0);
 		const needsMat = this.materialTiles && this.materialTiles.tiles.size > 0;
 		const matData = needsMat
-			? (sameSize && this.cachedMaterial ? this.cachedMaterial : new Uint8Array(width * height))
+			? sameSize && this.cachedMaterial
+				? this.cachedMaterial
+				: new Uint8Array(width * height)
 			: null;
 		if (matData && this.materialTiles) {
 			matData.fill(this.materialTiles.defaultValue);

@@ -377,7 +377,9 @@ export async function runSolver(): Promise<void> {
 			const bandNodes = graph.nodes.filter((id) => bandApIds.has(id));
 			const bandEdges = graph.edges
 				.filter(([id]) => bandApIds.has(id))
-				.map(([id, neighbors]) => [id, neighbors.filter((n) => bandApIds.has(n))] as [string, string[]]);
+				.map(
+					([id, neighbors]) => [id, neighbors.filter((n) => bandApIds.has(n))] as [string, string[]]
+				);
 
 			const channels = getAvailableChannels(band as any, projectState.regulatoryDomain);
 			const availableColors = channels.map((ch) => ch.number);

@@ -110,7 +110,6 @@
 					class="field-input"
 					bind:value={projectName}
 					placeholder="Untitled Project"
-					autofocus
 				/>
 			</label>
 
@@ -177,7 +176,7 @@
 		border-radius: var(--radius-md);
 		padding: var(--space-1) var(--space-2);
 		font-family: var(--font-sans);
-		font-size: var(--text-sm);
+		font-size: 16px; /* >= 16px prevents iOS auto-zoom on focus */
 		height: 32px;
 	}
 
