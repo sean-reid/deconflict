@@ -42,7 +42,12 @@
 			points.push({ x: wallState.wallMask.width, y: wallState.wallMask.height });
 		}
 
-		if (points.length === 0) return;
+		if (points.length === 0) {
+			// Empty canvas: reset to origin at 100% zoom
+			engine.camera.reset();
+			engine.markDirty();
+			return;
+		}
 
 		const rect = engine.canvas.getBoundingClientRect();
 		engine.camera.fitToBounds(points, rect.width, rect.height);
