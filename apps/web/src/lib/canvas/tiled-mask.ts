@@ -235,21 +235,23 @@ export class TiledMask {
 		};
 	}
 
-	/** Import from a flat Uint8Array (legacy format, origin at 0,0). */
+	/** Import from a flat Uint8Array with world-space origin offset. */
 	static fromFlat(
 		data: Uint8Array,
 		width: number,
 		height: number,
 		materialData?: Uint8Array | null,
-		defaultMaterial?: number
+		defaultMaterial?: number,
+		originX = 0,
+		originY = 0
 	): TiledMask {
 		const mask = new TiledMask();
-		mask.minBoundsWidth = width;
-		mask.minBoundsHeight = height;
+		mask.minBoundsWidth = originX + width;
+		mask.minBoundsHeight = originY + height;
 		for (let y = 0; y < height; y++) {
 			for (let x = 0; x < width; x++) {
 				if (data[y * width + x]) {
-					mask.setPixel(x, y, 1);
+					mask.setPixel(x + originX, y + originY, 1);
 				}
 			}
 		}
@@ -264,7 +266,7 @@ export class TiledMask {
 				for (let x = 0; x < width; x++) {
 					const val = materialData[y * width + x]!;
 					if (val !== (defaultMaterial ?? 0) || data[y * width + x]) {
-						mask.setMaterial(x, y, val);
+						mask.setMaterial(x + originX, y + originY, val);
 					}
 				}
 			}

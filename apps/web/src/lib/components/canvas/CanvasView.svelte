@@ -579,6 +579,10 @@
 			const matData = matPromise ? await matPromise : null;
 			if (wallMaskVersion !== thisVersion) return;
 
+			// Propagate the stored origin to the decoded mask
+			decoded.originX = mask.originX ?? 0;
+			decoded.originY = mask.originY ?? 0;
+
 			const defaultMat = wallState.wallMaterial;
 			wallLayer.mask = decoded;
 			wallLayer.materialMap = matData ?? null;
@@ -597,7 +601,8 @@
 			// Build TiledMask from decoded flat data for the wall edit handler
 			cachedTiledMask = TiledMask.fromFlat(
 				decoded.data, decoded.width, decoded.height,
-				matData, defaultMat
+				matData, defaultMat,
+				decoded.originX, decoded.originY
 			);
 			if (wallEditHandler) {
 				wallEditHandler.tiledMask = cachedTiledMask;
