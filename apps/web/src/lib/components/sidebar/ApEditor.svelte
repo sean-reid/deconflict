@@ -312,7 +312,7 @@
 		</div>
 
 		{#if neighbors.length > 0}
-			<div class="section-header">NEARBY ({neighbors.length})</div>
+			<div class="section-header">INTERFERENCE ({neighbors.length})</div>
 			<div class="neighbors">
 				{#each neighbors.slice(0, 5) as n}
 					<div class="neighbor-row">
