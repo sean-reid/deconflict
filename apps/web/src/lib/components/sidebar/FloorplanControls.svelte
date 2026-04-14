@@ -3,6 +3,8 @@
 	import { floorplanState } from '$state/floorplan-state.svelte.js';
 	import { apState } from '$state/ap-state.svelte.js';
 	import { floorState, switchFloor, addFloor, removeFloor, currentFloor } from '$state/floor-state.svelte.js';
+	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
+	import Select from '$components/shared/Select.svelte';
 
 	let editingFloorId = $state<string | null>(null);
 	let editingFloorName = $state('');
@@ -308,6 +310,41 @@
 			<button class="floor-pill add" onclick={handleAddFloor} aria-label="Add floor">+</button>
 		</div>
 	</div>
+	{#if floorState.floors.length > 1}
+		<div class="floor-props">
+			<div class="prop-row">
+				<span class="prop-label">Ceiling height</span>
+				<input
+					type="number"
+					class="prop-input"
+					value={currentFloor().ceilingHeight}
+					min="2" max="10" step="0.5"
+					onchange={(e) => { currentFloor().ceilingHeight = Number((e.target as HTMLInputElement).value); scheduleSave(); }}
+				/>
+				<span class="prop-unit">m</span>
+			</div>
+			<div class="prop-row">
+				<span class="prop-label">Slab thickness</span>
+				<input
+					type="number"
+					class="prop-input"
+					value={currentFloor().floorThickness}
+					min="0.05" max="1" step="0.05"
+					onchange={(e) => { currentFloor().floorThickness = Number((e.target as HTMLInputElement).value); scheduleSave(); }}
+				/>
+				<span class="prop-unit">m</span>
+			</div>
+			<div class="prop-row">
+				<span class="prop-label">Floor material</span>
+				<Select
+					value={String(currentFloor().floorMaterial)}
+					options={FLOOR_MATERIALS.map(m => ({ value: String(m.id), label: m.name }))}
+					onchange={(v) => { currentFloor().floorMaterial = Number(v) as any; scheduleSave(); }}
+				/>
+			</div>
+		</div>
+	{/if}
+
 	{#if !hasFloorplan}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -486,6 +523,50 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-1);
+	}
+
+	.floor-props {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding-bottom: var(--space-2);
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.prop-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.prop-label {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
+		min-width: 80px;
+		flex-shrink: 0;
+	}
+
+	.prop-input {
+		width: 60px;
+		height: 24px;
+		background: var(--bg-surface);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-sm);
+		color: var(--text-primary);
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		text-align: center;
+		padding: 0 4px;
+	}
+
+	.prop-input:focus {
+		outline: none;
+		border-color: var(--accent-primary);
+	}
+
+	.prop-unit {
+		font-size: var(--text-xs);
+		color: var(--text-tertiary);
 	}
 
 	.floor-action {
