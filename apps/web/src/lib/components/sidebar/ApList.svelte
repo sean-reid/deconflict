@@ -202,9 +202,9 @@
 	.ap-list {
 		display: flex;
 		flex-direction: column;
-		flex: 1;
-		min-height: 0;
-		overflow: hidden;
+		/* 100vh minus toolbar(40) + tabs(40) + statusbar(24) + coverage(~80) + padding */
+		height: calc(100vh - 64px);
+		height: calc(100dvh - 64px);
 	}
 
 	.ap-list-scroll {
