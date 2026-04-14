@@ -45,6 +45,7 @@
 	function handleWallEditDone() {
 		appState.wallEditMode = null;
 		brushCursorVisible = false;
+		heatmapLayer.isDragging = false; // restore full-resolution grid
 		setLiveSolverMask(null, null, 0, 0); // clear live mask override
 
 		// Materialize tiled mask and persist
@@ -279,7 +280,9 @@
 				heatmapLayer.materialVersion++;
 			}
 			wallLayer.invalidateCache();
-			heatmapLayer.markWallsDirty();
+			// Don't invalidate attenuation cache during drawing — too expensive to
+			// rebuild per stroke. The wall renderer updates live; the heatmap uses
+			// the stale attenuation field until pointerup/Done.
 			engine.markDirty();
 
 			// Push live mask to solver (skips PNG decode) and trigger re-solve
