@@ -2,6 +2,7 @@ import { apState } from '$state/ap-state.svelte.js';
 import { floorplanState } from '$state/floorplan-state.svelte.js';
 import { wallState } from '$state/wall-state.svelte.js';
 import { projectMeta } from '$state/project-meta.svelte.js';
+import { floorState } from '$state/floor-state.svelte.js';
 import { appState } from '$state/app.svelte.js';
 import { clearSelection } from '$state/canvas.svelte.js';
 import type { Band, ChannelWidth, RegulatoryDomain } from '@deconflict/channels';
@@ -93,7 +94,8 @@ export async function serialize(): Promise<string> {
 			interferenceRadius: ap.interferenceRadius,
 			power: ap.power,
 			modelId: ap.modelId ?? null,
-			modelLabel: ap.modelLabel ?? null
+			modelLabel: ap.modelLabel ?? null,
+			floorId: ap.floorId
 		}))
 	};
 	return JSON.stringify(data, null, '\t');
@@ -150,7 +152,8 @@ export function deserialize(json: string): void {
 		interferenceRadius: ap.interferenceRadius ?? 150,
 		power: ap.power ?? 20,
 		modelId: ap.modelId ?? null,
-		modelLabel: ap.modelLabel ?? null
+		modelLabel: ap.modelLabel ?? null,
+		floorId: (ap as any).floorId ?? floorState.currentFloorId
 	}));
 
 	clearSelection();

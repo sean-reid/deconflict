@@ -3,6 +3,7 @@ import { pushState } from './history.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
 import { rangeFromPower } from '../rf/propagation.js';
 import { floorplanState } from './floorplan-state.svelte.js';
+import { floorState } from './floor-state.svelte.js';
 
 export interface AccessPoint {
 	id: string;
@@ -17,6 +18,7 @@ export interface AccessPoint {
 	power: number;
 	modelId: string | null;
 	modelLabel: string | null;
+	floorId: string;
 }
 
 let nextApNumber = 1;
@@ -63,7 +65,8 @@ export function addAp(x: number, y: number): AccessPoint {
 			prev?.interferenceRadius ?? radiusFromPower(prev?.power ?? 20, prev?.band ?? apState.band),
 		power: prev?.power ?? 20,
 		modelId: prev?.modelId ?? null,
-		modelLabel: prev?.modelLabel ?? null
+		modelLabel: prev?.modelLabel ?? null,
+		floorId: floorState.currentFloorId
 	};
 	apState.aps.push(ap);
 	scheduleSave();
