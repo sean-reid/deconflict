@@ -53,9 +53,10 @@ export class FloorplanLayer implements Layer {
 	}
 
 	clearImage(): void {
-		if (this.image?.src.startsWith('blob:')) {
-			URL.revokeObjectURL(this.image.src);
-		}
+		// Do NOT revoke blob URLs here — they belong to floor state and
+		// may be needed again when switching back to that floor.
+		// Revocation is handled by the call sites that replace/delete
+		// a floorplan (loadSample, handleFile, removeFloorplan).
 		this.image = null;
 		this.imageReady = false;
 		this.onReady = null;

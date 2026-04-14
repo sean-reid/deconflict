@@ -261,4 +261,47 @@ test.describe('Multi-floor', () => {
 		await expect(pills).toHaveCount(2);
 		await expect(pills.nth(1)).toHaveText(/Attic/);
 	});
+
+	test('floorplan survives multiple floor switches and visibility toggles', async ({ page }) => {
+		// Load apartment on floor 1
+		await openFloorplanTab(page);
+		await page.click('text=Apartment');
+		await page.waitForTimeout(4000);
+		const skip = page.locator('text=Skip');
+		if (await skip.isVisible({ timeout: 2000 }).catch(() => false)) await skip.click();
+		await page.waitForTimeout(500);
+
+		// Verify floorplan loaded — check for "Floorplan loaded" checkbox
+		await expect(page.locator('text=Floorplan loaded')).toBeVisible({ timeout: 3000 });
+
+		// Add floor 2 (empty)
+		await page.locator('.floor-pill.add').click();
+		await page.waitForTimeout(500);
+
+		// Switch back to floor 1 — floorplan should survive
+		await page.locator('.floor-pill:not(.add)').first().click();
+		await page.waitForTimeout(1000);
+		await expect(page.locator('text=Floorplan loaded')).toBeVisible({ timeout: 3000 });
+
+		// Toggle floorplan visibility off and on
+		await page.click('text=Floorplan', { exact: false });
+		await page.waitForTimeout(200);
+		// Find the Floorplan layer toggle in the layers panel
+		const layerToggle = page.locator('.layer-row').filter({ hasText: 'Floorplan' });
+		await layerToggle.click();
+		await page.waitForTimeout(200);
+		await layerToggle.click();
+		await page.waitForTimeout(200);
+
+		// Switch to floor 2 and back again (second round-trip)
+		await openFloorplanTab(page);
+		await page.locator('.floor-pill:not(.add)').nth(1).click();
+		await page.waitForTimeout(500);
+		await page.locator('.floor-pill:not(.add)').first().click();
+		await page.waitForTimeout(1000);
+
+		// Floorplan should still be present
+		await expect(page.locator('text=Floorplan loaded')).toBeVisible({ timeout: 3000 });
+		await page.screenshot({ path: 'test-results/multi-floor/floorplan-survives-switches.png' });
+	});
 });
