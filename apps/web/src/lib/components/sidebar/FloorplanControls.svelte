@@ -507,8 +507,11 @@
 		display: flex;
 		gap: 4px;
 		overflow-x: auto;
+		overflow-y: hidden;
 		padding-bottom: var(--space-2);
 		border-bottom: 1px solid var(--border-subtle);
+		flex-wrap: nowrap;
+		min-width: 0;
 	}
 
 	.floor-pill {
