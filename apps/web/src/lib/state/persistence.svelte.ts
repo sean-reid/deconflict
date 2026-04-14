@@ -67,9 +67,22 @@ type SavedState = SavedStateV2 | SavedStateV3;
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 export const persistenceState = $state({ lastSaved: null as Date | null });
 
+function syncCurrentFloorFromLegacy(): void {
+	const cur = floorState.floors.find((f) => f.id === floorState.currentFloorId);
+	if (!cur) return;
+	cur.floorplanUrl = floorplanState.floorplanUrl;
+	cur.floorplanScale = floorplanState.floorplanScale;
+	cur.calibration = floorplanState.calibration;
+	cur.floorplanBoundary = floorplanState.floorplanBoundary;
+	cur.wallMask = wallState.wallMask;
+	cur.wallAttenuation = wallState.wallAttenuation;
+	cur.wallMaterial = wallState.wallMaterial;
+	cur.materialMask = wallState.materialMask;
+}
+
 function saveToStorage(): void {
+	syncCurrentFloorFromLegacy();
 	try {
-		const floor = floorState.floors[0]!;
 		const data: SavedStateV3 = {
 			version: 3,
 			name: projectMeta.name,

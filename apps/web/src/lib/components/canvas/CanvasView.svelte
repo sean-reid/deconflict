@@ -28,6 +28,7 @@
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
+	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
@@ -360,6 +361,43 @@
 		if (!heatmapLayer) return;
 		heatmapLayer.isDragging = canvasState.isDragging || !!appState.wallEditMode;
 		engine.markDirty();
+	});
+
+	// Floor → legacy atoms: load current floor's data into legacy atoms on switch
+	let lastSyncedFloorId = '';
+	$effect(() => {
+		const id = floorState.currentFloorId;
+		if (id === lastSyncedFloorId) return;
+
+		// Before switching: save current legacy state back to the outgoing floor
+		if (lastSyncedFloorId) {
+			const outgoing = floorState.floors.find((f) => f.id === lastSyncedFloorId);
+			if (outgoing) {
+				outgoing.floorplanUrl = floorplanState.floorplanUrl;
+				outgoing.floorplanScale = floorplanState.floorplanScale;
+				outgoing.calibration = floorplanState.calibration;
+				outgoing.floorplanBoundary = floorplanState.floorplanBoundary;
+				outgoing.wallMask = wallState.wallMask;
+				outgoing.wallAttenuation = wallState.wallAttenuation;
+				outgoing.wallMaterial = wallState.wallMaterial;
+				outgoing.materialMask = wallState.materialMask;
+			}
+		}
+
+		// Load incoming floor's data into legacy atoms
+		const floor = currentFloor();
+		floorplanState.floorplanUrl = floor.floorplanUrl;
+		floorplanState.floorplanScale = floor.floorplanScale;
+		floorplanState.calibration = floor.calibration;
+		floorplanState.floorplanBoundary = floor.floorplanBoundary;
+		wallState.wallMask = floor.wallMask;
+		wallState.wallAttenuation = floor.wallAttenuation;
+		wallState.wallMaterial = floor.wallMaterial;
+		wallState.materialMask = floor.materialMask;
+
+		lastSyncedFloorId = id;
+		clearSelection();
+		engine?.markDirty();
 	});
 
 	// Sync wall mask dimensions for heatmap clipping (synchronous, no decode needed)

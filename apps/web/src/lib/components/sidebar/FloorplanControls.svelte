@@ -2,6 +2,38 @@
 	import { wallState } from '$state/wall-state.svelte.js';
 	import { floorplanState } from '$state/floorplan-state.svelte.js';
 	import { apState } from '$state/ap-state.svelte.js';
+	import { floorState, switchFloor, addFloor, removeFloor, currentFloor } from '$state/floor-state.svelte.js';
+
+	let editingFloorId = $state<string | null>(null);
+	let editingFloorName = $state('');
+
+	function handleAddFloor() {
+		const floor = addFloor();
+		switchFloor(floor.id);
+		scheduleSave();
+	}
+
+	function startRenameFloor(id: string, name: string) {
+		editingFloorId = id;
+		editingFloorName = name;
+	}
+
+	function commitRenameFloor() {
+		if (editingFloorId) {
+			const floor = floorState.floors.find((f) => f.id === editingFloorId);
+			if (floor) {
+				floor.name = editingFloorName.trim() || floor.name;
+				scheduleSave();
+			}
+		}
+		editingFloorId = null;
+	}
+
+	function handleDeleteFloor(id: string) {
+		if (floorState.floors.length <= 1) return;
+		removeFloor(id);
+		scheduleSave();
+	}
 	import { appState } from '$state/app.svelte.js';
 	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
 	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
@@ -221,6 +253,42 @@
 </script>
 
 <div class="floorplan-controls">
+	<div class="floor-manager">
+		<div class="floor-strip">
+			{#each floorState.floors as floor}
+				{#if editingFloorId === floor.id}
+					<input
+						class="floor-name-input"
+						type="text"
+						bind:value={editingFloorName}
+						onblur={commitRenameFloor}
+						onkeydown={(e) => { if (e.key === 'Enter') commitRenameFloor(); if (e.key === 'Escape') { editingFloorId = null; } }}
+						autofocus
+					/>
+				{:else}
+					<button
+						class="floor-pill"
+						class:active={floor.id === floorState.currentFloorId}
+						onclick={() => switchFloor(floor.id)}
+						ondblclick={() => startRenameFloor(floor.id, floor.name)}
+						title="Click to switch, double-click to rename"
+					>
+						{floor.name}
+						{#if floorState.floors.length > 1 && floor.id === floorState.currentFloorId}
+							<span
+								class="floor-delete"
+								role="button"
+								tabindex="-1"
+								onclick={(e) => { e.stopPropagation(); handleDeleteFloor(floor.id); }}
+								title="Delete floor"
+							>&times;</span>
+						{/if}
+					</button>
+				{/if}
+			{/each}
+			<button class="floor-pill add" onclick={handleAddFloor} aria-label="Add floor">+</button>
+		</div>
+	</div>
 	{#if !hasFloorplan}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -349,6 +417,81 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
+	}
+
+	.floor-strip {
+		display: flex;
+		gap: 4px;
+		overflow-x: auto;
+		padding-bottom: var(--space-2);
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.floor-pill {
+		padding: 4px 10px;
+		border: 1px solid var(--border-default);
+		border-radius: 999px;
+		background: var(--bg-surface);
+		color: var(--text-secondary);
+		font-family: var(--font-sans);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all var(--transition-fast);
+	}
+
+	.floor-pill:hover {
+		background: var(--bg-hover);
+		color: var(--text-primary);
+	}
+
+	.floor-pill.active {
+		border-color: var(--accent-primary);
+		color: var(--accent-primary);
+		background: var(--accent-primary-glow);
+	}
+
+	.floor-pill.add {
+		border-style: dashed;
+		color: var(--text-tertiary);
+		min-width: 28px;
+		text-align: center;
+	}
+
+	.floor-pill.add:hover {
+		border-color: var(--accent-primary-dim);
+		color: var(--accent-primary);
+	}
+
+	.floor-manager {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+
+	.floor-delete {
+		margin-left: 4px;
+		font-size: 12px;
+		line-height: 1;
+		opacity: 0.5;
+		cursor: pointer;
+	}
+
+	.floor-delete:hover {
+		opacity: 1;
+		color: var(--danger, #ef4444);
+	}
+
+	.floor-name-input {
+		padding: 3px 8px;
+		border: 1px solid var(--accent-primary);
+		border-radius: 999px;
+		background: var(--bg-surface);
+		color: var(--text-primary);
+		font-family: var(--font-sans);
+		font-size: var(--text-xs);
+		width: 80px;
+		outline: none;
 	}
 
 	.drop-zone {
