@@ -21,6 +21,7 @@
 	let editingFloorName = $state('');
 
 	function handleAddFloor() {
+		pushState();
 		const floor = addFloor();
 		switchFloor(floor.id);
 		scheduleSave();
@@ -62,6 +63,7 @@
 	function handleDeleteFloor(id: string) {
 		if (floorState.floors.length <= 1) return;
 		showConfirm('Delete this floor and all its access points?', () => {
+			pushState();
 			apState.aps = apState.aps.filter((ap) => ap.floorId !== id);
 			removeFloor(id);
 			scheduleSave();
@@ -267,6 +269,7 @@
 	}
 
 	function doRemoveFloorplan() {
+		pushState();
 		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}
@@ -335,7 +338,7 @@
 					class="prop-input"
 					value={currentFloor().ceilingHeight}
 					min="2" max="10" step="0.5"
-					onchange={(e) => { currentFloor().ceilingHeight = Number((e.target as HTMLInputElement).value); scheduleSave(); }}
+					onchange={(e) => { pushState(); currentFloor().ceilingHeight = Number((e.target as HTMLInputElement).value); scheduleSave(); }}
 				/>
 				<span class="prop-unit">m</span>
 			</div>
@@ -346,7 +349,7 @@
 					class="prop-input"
 					value={currentFloor().floorThickness}
 					min="0.05" max="1" step="0.05"
-					onchange={(e) => { currentFloor().floorThickness = Number((e.target as HTMLInputElement).value); scheduleSave(); }}
+					onchange={(e) => { pushState(); currentFloor().floorThickness = Number((e.target as HTMLInputElement).value); scheduleSave(); }}
 				/>
 				<span class="prop-unit">m</span>
 			</div>
@@ -355,7 +358,7 @@
 				<Select
 					value={String(currentFloor().floorMaterial)}
 					options={FLOOR_MATERIALS.map(m => ({ value: String(m.id), label: m.name }))}
-					onchange={(v) => { currentFloor().floorMaterial = Number(v) as any; scheduleSave(); }}
+					onchange={(v) => { pushState(); currentFloor().floorMaterial = Number(v) as any; scheduleSave(); }}
 				/>
 			</div>
 		</div>
