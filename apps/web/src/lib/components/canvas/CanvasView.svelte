@@ -496,6 +496,11 @@
 		wallState.wallMaterial = floor.wallMaterial;
 		wallState.materialMask = floor.materialMask;
 
+		// Force wall mask re-decode on floor switch (prevent stale cache)
+		lastWallMaskUrl = null;
+		lastMatMaskUrl = null;
+		cachedWallData = null;
+
 		lastSyncedFloorId = id;
 		clearSelection();
 		engine?.markDirty();
