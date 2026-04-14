@@ -177,15 +177,10 @@ export function buildAttenField(
 	defaultDb: number,
 	gridStep = ATTEN_GRID_STEP
 ): AttenField {
-	// Extend field to cover AP's full reach, not just wall mask bounds.
-	// This way pixels outside the wall mask still get attenuation from
-	// walls the ray passes through inside the mask.
-	const originX = Math.min(0, Math.floor(apX - maxDist));
-	const originY = Math.min(0, Math.floor(apY - maxDist));
-	const endX = Math.max(wallW, Math.ceil(apX + maxDist));
-	const endY = Math.max(wallH, Math.ceil(apY + maxDist));
-	const cols = Math.ceil((endX - originX) / gridStep);
-	const rows = Math.ceil((endY - originY) / gridStep);
+	const originX = 0;
+	const originY = 0;
+	const cols = Math.ceil(wallW / gridStep);
+	const rows = Math.ceil(wallH / gridStep);
 	const grid = new Float32Array(cols * rows);
 	const maxDistSq = maxDist * maxDist;
 
@@ -217,9 +212,11 @@ export function buildAttenField(
 /** O(1) wall attenuation lookup from a precomputed field. */
 export function lookupAtten(field: AttenField, wx: number, wy: number): number {
 	const s = field.step;
-	const gc = ((wx - field.originX) / s + 0.5) | 0;
-	const gr = ((wy - field.originY) / s + 0.5) | 0;
-	if (gc < 0 || gc >= field.cols || gr < 0 || gr >= field.rows) return 0;
+	// Clamp to field bounds: pixels outside the wall mask get the
+	// attenuation of the nearest edge cell (walls between AP and mask
+	// edge are already accumulated there — no new walls beyond the edge).
+	const gc = Math.max(0, Math.min(field.cols - 1, ((wx - field.originX) / s + 0.5) | 0));
+	const gr = Math.max(0, Math.min(field.rows - 1, ((wy - field.originY) / s + 0.5) | 0));
 	return field.grid[gr * field.cols + gc]!;
 }
 
