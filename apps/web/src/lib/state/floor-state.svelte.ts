@@ -12,10 +12,22 @@ export interface Floor {
 	floorplanScale: number;
 	calibration: { worldUnitsPerMeter: number } | null;
 	floorplanBoundary: Array<{ x: number; y: number }> | null;
-	wallMask: { dataUrl: string; width: number; height: number } | null;
+	wallMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX: number;
+		originY: number;
+	} | null;
 	wallAttenuation: number;
 	wallMaterial: WallMaterialId;
-	materialMask: { dataUrl: string; width: number; height: number } | null;
+	materialMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX: number;
+		originY: number;
+	} | null;
 }
 
 function createDefaultFloor(id?: string, name?: string): Floor {

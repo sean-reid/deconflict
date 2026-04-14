@@ -25,10 +25,22 @@ interface SavedStateV2 {
 	unitSystem?: 'imperial' | 'metric';
 	ispSpeed: number;
 	targetThroughput: number;
-	wallMask?: { dataUrl: string; width: number; height: number } | null;
+	wallMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 	wallAttenuation?: number;
 	wallMaterial?: number;
-	materialMask?: { dataUrl: string; width: number; height: number } | null;
+	materialMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 	floorplanBoundary?: Array<{ x: number; y: number }> | null;
 	calibration: { worldUnitsPerMeter: number } | null;
 }
@@ -44,10 +56,22 @@ interface SavedFloor {
 	floorplanScale: number;
 	calibration: { worldUnitsPerMeter: number } | null;
 	floorplanBoundary: Array<{ x: number; y: number }> | null;
-	wallMask: { dataUrl: string; width: number; height: number } | null;
+	wallMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 	wallAttenuation: number;
 	wallMaterial: number;
-	materialMask: { dataUrl: string; width: number; height: number } | null;
+	materialMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
 }
 
 interface SavedStateV3 {
@@ -167,10 +191,22 @@ function migrateV2(data: SavedStateV2): SavedStateV3 {
 				floorThickness: 0.2,
 				calibration: data.calibration ?? null,
 				floorplanBoundary: data.floorplanBoundary ?? null,
-				wallMask: data.wallMask ?? null,
+				wallMask: data.wallMask
+					? {
+							...data.wallMask,
+							originX: data.wallMask.originX ?? 0,
+							originY: data.wallMask.originY ?? 0
+						}
+					: null,
 				wallAttenuation: data.wallAttenuation ?? 5,
 				wallMaterial: data.wallMaterial ?? 0,
-				materialMask: data.materialMask ?? null
+				materialMask: data.materialMask
+					? {
+							...data.materialMask,
+							originX: data.materialMask.originX ?? 0,
+							originY: data.materialMask.originY ?? 0
+						}
+					: null
 			}
 		],
 		aps: (data.aps || []).map((ap) => ({
@@ -225,10 +261,18 @@ export function restoreFromStorage(): boolean {
 			floorplanScale: f.floorplanScale ?? 0.4,
 			calibration: f.calibration ?? null,
 			floorplanBoundary: f.floorplanBoundary ?? null,
-			wallMask: f.wallMask ?? null,
+			wallMask: f.wallMask
+				? { ...f.wallMask, originX: f.wallMask.originX ?? 0, originY: f.wallMask.originY ?? 0 }
+				: null,
 			wallAttenuation: f.wallAttenuation ?? 5,
 			wallMaterial: (f.wallMaterial ?? 0) as WallMaterialId,
-			materialMask: f.materialMask ?? null
+			materialMask: f.materialMask
+				? {
+						...f.materialMask,
+						originX: f.materialMask.originX ?? 0,
+						originY: f.materialMask.originY ?? 0
+					}
+				: null
 		}));
 		floorState.currentFloorId = floorState.floors[0]!.id;
 

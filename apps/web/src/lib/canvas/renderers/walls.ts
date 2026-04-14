@@ -42,7 +42,7 @@ export class WallLayer implements Layer {
 		ctx.save();
 		ctx.setTransform(a * dpr, b * dpr, c * dpr, d * dpr, e * dpr, f * dpr);
 		ctx.globalAlpha = 0.4;
-		ctx.drawImage(this.cachedImage!, 0, 0);
+		ctx.drawImage(this.cachedImage!, this.mask!.originX, this.mask!.originY);
 		ctx.restore();
 	}
 }

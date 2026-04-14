@@ -30,6 +30,7 @@
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
 	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
+	import { TiledMask } from '$canvas/tiled-mask.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
@@ -45,27 +46,30 @@
 		appState.wallEditMode = null;
 		brushCursorVisible = false;
 		setLiveSolverMask(null, null, 0, 0); // clear live mask override
-		// Sync any material data created during painting
-		if (wallEditHandler.materialData && !cachedMaterialData) {
-			cachedMaterialData = wallEditHandler.materialData;
-		}
-		// Re-encode edited masks and persist (use handler dimensions which may have expanded)
-		if (cachedWallData) {
-			const width = wallEditHandler.maskWidth || wallState.wallMask?.width || 800;
-			const height = wallEditHandler.maskHeight || wallState.wallMask?.height || 600;
-			const newWallUrl = encodeMask(cachedWallData, width, height);
-			const newMatUrl = cachedMaterialData ? encodeMaterialMask(cachedMaterialData, width, height) : null;
+
+		// Materialize tiled mask and persist
+		const tm = wallEditHandler.tiledMask;
+		const mat = tm?.materialize();
+		if (mat) {
+			const { data, materialData, width, height, originX, originY } = mat;
+			cachedWallData = data;
+			cachedMaterialData = materialData;
+			cachedMaskOriginX = originX;
+			cachedMaskOriginY = originY;
+
+			const newWallUrl = encodeMask(data, width, height);
+			const newMatUrl = materialData ? encodeMaterialMask(materialData, width, height) : null;
 
 			// Update URLs and pre-set lastUrls so the async decode effect skips re-decode
-			wallState.wallMask = { dataUrl: newWallUrl, width, height };
+			wallState.wallMask = { dataUrl: newWallUrl, width, height, originX, originY };
 			lastWallMaskUrl = newWallUrl;
 			if (newMatUrl) {
-				wallState.materialMask = { dataUrl: newMatUrl, width, height };
+				wallState.materialMask = { dataUrl: newMatUrl, width, height, originX, originY };
 				lastMatMaskUrl = newMatUrl;
 			}
 
 			// Recompute blob labels so click-to-override works on the edited walls
-			cachedWallLabels = labelWallBlobs(cachedWallData, width, height);
+			cachedWallLabels = labelWallBlobs(data, width, height);
 
 			// Trigger re-solve (wallMaskVersion drives auto-solve key)
 			wallMaskVersion++;
@@ -106,12 +110,16 @@
 	let cachedWallLabels: ReturnType<typeof labelWallBlobs> | null = null;
 	let cachedMaterialData: Uint8Array | null = null;
 	let cachedWallData: Uint8Array | null = null;
+	let cachedTiledMask: TiledMask | null = null;
+	let cachedMaskOriginX = 0;
+	let cachedMaskOriginY = 0;
 
 	function handleWallClick(screenX: number, screenY: number): boolean {
 		if (!engine || !cachedWallData || !cachedWallLabels) return false;
 		const world = engine.camera.screenToWorld({ x: screenX, y: screenY });
-		const px = Math.round(world.x);
-		const py = Math.round(world.y);
+		// Convert world coords to mask-local coords
+		const px = Math.round(world.x) - cachedMaskOriginX;
+		const py = Math.round(world.y) - cachedMaskOriginY;
 		const mask = wallState.wallMask;
 		if (!mask || px < 0 || px >= mask.width || py < 0 || py >= mask.height) return false;
 		const idx = py * mask.width + px;
@@ -152,7 +160,7 @@
 
 		// Encode and persist
 		const dataUrl = encodeMaterialMask(cachedMaterialData, mask.width, mask.height);
-		wallState.materialMask = { dataUrl, width: mask.width, height: mask.height };
+		wallState.materialMask = { dataUrl, width: mask.width, height: mask.height, originX: 0, originY: 0 };
 		scheduleSave();
 	}
 
@@ -247,20 +255,27 @@
 		placeHandler = new PlaceHandler(engine);
 		wallEditHandler = new WallEditHandler(engine);
 		wallEditHandler.onEdit = () => {
-			// Sync handler's data to BOTH wall + heatmap renderers for live preview
-			const maskRef = wallEditHandler.wallData ? {
-				data: wallEditHandler.wallData,
-				width: wallEditHandler.maskWidth,
-				height: wallEditHandler.maskHeight
-			} : null;
-			if (maskRef) {
+			// Materialize tiled mask to flat arrays for renderers
+			const tm = wallEditHandler.tiledMask;
+			const mat = tm?.materialize();
+			if (mat) {
+				const maskRef = {
+					data: mat.data,
+					width: mat.width,
+					height: mat.height,
+					originX: mat.originX,
+					originY: mat.originY
+				};
 				wallLayer.mask = maskRef;
 				heatmapLayer.wallMask = maskRef;
-				cachedWallData = wallEditHandler.wallData;
-			}
-			if (wallEditHandler.materialData) {
-				wallLayer.materialMap = wallEditHandler.materialData;
-				heatmapLayer.materialMap = wallEditHandler.materialData;
+				cachedWallData = mat.data;
+				cachedMaskOriginX = mat.originX;
+				cachedMaskOriginY = mat.originY;
+				if (mat.materialData) {
+					wallLayer.materialMap = mat.materialData;
+					heatmapLayer.materialMap = mat.materialData;
+					cachedMaterialData = mat.materialData;
+				}
 				heatmapLayer.materialVersion++;
 			}
 			wallLayer.invalidateCache();
@@ -268,12 +283,9 @@
 			engine.markDirty();
 
 			// Push live mask to solver (skips PNG decode) and trigger re-solve
-			setLiveSolverMask(
-				wallEditHandler.wallData,
-				wallEditHandler.materialData,
-				wallEditHandler.maskWidth,
-				wallEditHandler.maskHeight
-			);
+			if (mat) {
+				setLiveSolverMask(mat.data, mat.materialData, mat.width, mat.height);
+			}
 			invalidateSolverMaskCache();
 			wallMaskVersion++;
 		};
@@ -558,15 +570,18 @@
 			heatmapLayer.wallAttenuation = wallState.wallAttenuation;
 
 			cachedWallData = decoded.data;
+			cachedMaskOriginX = decoded.originX;
+			cachedMaskOriginY = decoded.originY;
 			cachedWallLabels = labelWallBlobs(decoded.data, decoded.width, decoded.height);
 			cachedMaterialData = matData ?? null;
 
-			// Wire wall edit handler with live mask data
+			// Build TiledMask from decoded flat data for the wall edit handler
+			cachedTiledMask = TiledMask.fromFlat(
+				decoded.data, decoded.width, decoded.height,
+				matData, defaultMat
+			);
 			if (wallEditHandler) {
-				wallEditHandler.wallData = decoded.data;
-				wallEditHandler.materialData = cachedMaterialData;
-				wallEditHandler.maskWidth = decoded.width;
-				wallEditHandler.maskHeight = decoded.height;
+				wallEditHandler.tiledMask = cachedTiledMask;
 			}
 
 			engine.markDirty();

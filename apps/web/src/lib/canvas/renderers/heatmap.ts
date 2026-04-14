@@ -185,7 +185,9 @@ export class HeatmapLayer implements Layer {
 							this.materialMap,
 							matDb,
 							defaultDb,
-							fast
+							fast,
+							this.wallMask.originX,
+							this.wallMask.originY
 						)
 					: null
 			);
@@ -197,11 +199,11 @@ export class HeatmapLayer implements Layer {
 			clipMaxX = -Infinity,
 			clipMaxY = -Infinity;
 		if (this.clipToWallMask && this.wallMask) {
-			// Draw-from-scratch: clip to wall mask bounds
-			clipMinX = 0;
-			clipMinY = 0;
-			clipMaxX = this.wallMask.width;
-			clipMaxY = this.wallMask.height;
+			// Draw-from-scratch: clip to wall mask bounds (with origin offset)
+			clipMinX = this.wallMask.originX;
+			clipMinY = this.wallMask.originY;
+			clipMaxX = this.wallMask.originX + this.wallMask.width;
+			clipMaxY = this.wallMask.originY + this.wallMask.height;
 		} else {
 			// Imported floorplan: clip to union of all AP signal areas
 			for (let i = 0; i < n; i++) {

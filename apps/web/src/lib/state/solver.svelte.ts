@@ -61,6 +61,8 @@ interface DecodedFloorMask {
 	materialMap: Uint8Array | null;
 	width: number;
 	height: number;
+	originX: number;
+	originY: number;
 	sourceKey: string; // for cache invalidation
 }
 
@@ -77,7 +79,15 @@ export function setLiveSolverMask(
 	height: number
 ): void {
 	if (wallData) {
-		liveMask = { wallData, materialMap: materialData, width, height, sourceKey: 'live' };
+		liveMask = {
+			wallData,
+			materialMap: materialData,
+			width,
+			height,
+			originX: 0,
+			originY: 0,
+			sourceKey: 'live'
+		};
 	} else {
 		liveMask = null;
 	}
@@ -107,6 +117,8 @@ async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 			materialMap: matMask,
 			width: decoded.width,
 			height: decoded.height,
+			originX: wm.originX ?? 0,
+			originY: wm.originY ?? 0,
 			sourceKey: key
 		};
 		floorMaskCache.set(floorId, entry);
@@ -128,6 +140,8 @@ async function getFloorMask(floorId: string): Promise<DecodedFloorMask | null> {
 		materialMap: matMask,
 		width: decoded.width,
 		height: decoded.height,
+		originX: wm.originX ?? 0,
+		originY: wm.originY ?? 0,
 		sourceKey: key
 	};
 	floorMaskCache.set(floorId, entry);
@@ -187,6 +201,9 @@ function getWallLoss(
 	const defaultDb = WALL_MATERIALS[defaultMaterial]?.attenuation ?? 5;
 	const dbPerMeterArr = WALL_MATERIALS.map((m) => m.dbPerMeter);
 	const metersPerPixel = wupm > 0 ? 1 / wupm : 0;
+	// Convert world coords to mask-local for ray march
+	const ox = mask.originX ?? 0;
+	const oy = mask.originY ?? 0;
 	return rayMarchWallAtten(
 		mask.wallData,
 		mask.width,
@@ -194,10 +211,10 @@ function getWallLoss(
 		mask.materialMap,
 		matDb,
 		defaultDb,
-		ax,
-		ay,
-		bx,
-		by,
+		ax - ox,
+		ay - oy,
+		bx - ox,
+		by - oy,
 		3,
 		dbPerMeterArr,
 		metersPerPixel

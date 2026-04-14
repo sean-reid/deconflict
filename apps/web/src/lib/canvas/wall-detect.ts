@@ -5,12 +5,17 @@ export interface WallMask {
 	dataUrl: string;
 	width: number;
 	height: number;
+	originX: number;
+	originY: number;
 }
 
 export interface DecodedWallMask {
 	data: Uint8Array;
 	width: number;
 	height: number;
+	/** World-space origin of the mask (default 0). */
+	originX: number;
+	originY: number;
 }
 
 let ocrWorker: Worker | null = null;
@@ -146,7 +151,13 @@ export async function detectWalls(
 	}
 	maskCtx.putImageData(maskImg, 0, 0);
 
-	return { dataUrl: maskCanvas.toDataURL('image/png'), width: w, height: h };
+	return {
+		dataUrl: maskCanvas.toDataURL('image/png'),
+		width: w,
+		height: h,
+		originX: 0,
+		originY: 0
+	};
 }
 
 /** Decode a wall mask PNG data URL to a Uint8Array for fast pixel lookups */
@@ -168,9 +179,10 @@ export function decodeMask(
 			for (let i = 0; i < mask.length; i++) {
 				mask[i] = data[i * 4]! > 128 ? 1 : 0;
 			}
-			resolve({ data: mask, width, height });
+			resolve({ data: mask, width, height, originX: 0, originY: 0 });
 		};
-		img.onerror = () => resolve({ data: new Uint8Array(width * height), width, height });
+		img.onerror = () =>
+			resolve({ data: new Uint8Array(width * height), width, height, originX: 0, originY: 0 });
 		img.src = dataUrl;
 	});
 }

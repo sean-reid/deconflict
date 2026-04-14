@@ -175,14 +175,21 @@ export function buildAttenField(
 	materialMap: Uint8Array | null,
 	materialDb: number[],
 	defaultDb: number,
-	gridStep = ATTEN_GRID_STEP
+	gridStep = ATTEN_GRID_STEP,
+	maskOriginX = 0,
+	maskOriginY = 0
 ): AttenField {
-	const originX = 0;
-	const originY = 0;
+	// Field grid covers the wall mask area in world coordinates
+	const originX = maskOriginX;
+	const originY = maskOriginY;
 	const cols = Math.ceil(wallW / gridStep);
 	const rows = Math.ceil(wallH / gridStep);
 	const grid = new Float32Array(cols * rows);
 	const maxDistSq = maxDist * maxDist;
+
+	// AP position in mask-local coordinates for ray marching
+	const apLX = apX - maskOriginX;
+	const apLY = apY - maskOriginY;
 
 	for (let r = 0; r < rows; r++) {
 		const wy = originY + r * gridStep + (gridStep >> 1);
@@ -191,6 +198,7 @@ export function buildAttenField(
 			const dx = wx - apX;
 			const dy = wy - apY;
 			if (dx * dx + dy * dy > maxDistSq) continue;
+			// Ray march in mask-local pixel coordinates
 			grid[r * cols + c] = rayMarchWallAtten(
 				wallData,
 				wallW,
@@ -198,10 +206,10 @@ export function buildAttenField(
 				materialMap,
 				materialDb,
 				defaultDb,
-				apX,
-				apY,
-				wx,
-				wy
+				apLX,
+				apLY,
+				wx - maskOriginX,
+				wy - maskOriginY
 			);
 		}
 	}
@@ -244,7 +252,9 @@ export function getAttenField(
 	materialMap: Uint8Array | null,
 	materialDb: number[],
 	defaultDb: number,
-	fast = false
+	fast = false,
+	maskOriginX = 0,
+	maskOriginY = 0
 ): AttenField {
 	if (cachedGeneration !== wallGeneration) {
 		attenCache.clear();
@@ -269,7 +279,9 @@ export function getAttenField(
 			materialMap,
 			materialDb,
 			defaultDb,
-			gridStep
+			gridStep,
+			maskOriginX,
+			maskOriginY
 		);
 		attenCache.set(key, field);
 		if (attenCache.size > 10) {

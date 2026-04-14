@@ -7,8 +7,20 @@ const MAX_HISTORY = 50;
 
 interface Snapshot {
 	aps: AccessPoint[];
-	wallMask: { dataUrl: string; width: number; height: number } | null;
-	materialMask: { dataUrl: string; width: number; height: number } | null;
+	wallMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX: number;
+		originY: number;
+	} | null;
+	materialMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX: number;
+		originY: number;
+	} | null;
 	wallMaterial: WallMaterialId;
 }
 

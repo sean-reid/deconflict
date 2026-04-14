@@ -1,5 +1,6 @@
 import type { CanvasEngine } from '../engine.js';
 import type { WallMaterialId } from '../materials.js';
+import { TiledMask } from '../tiled-mask.js';
 import { appState } from '$state/app.svelte.js';
 
 export class WallEditHandler {
@@ -8,11 +9,8 @@ export class WallEditHandler {
 	private lastX = 0;
 	private lastY = 0;
 
-	// Set externally by CanvasView with the live decoded mask data
-	wallData: Uint8Array | null = null;
-	materialData: Uint8Array | null = null;
-	maskWidth = 0;
-	maskHeight = 0;
+	/** Tiled mask for infinite-canvas wall drawing. */
+	tiledMask: TiledMask | null = null;
 	activeMaterial: WallMaterialId = 0;
 	defaultMaterial: WallMaterialId = 0;
 
@@ -24,7 +22,7 @@ export class WallEditHandler {
 	}
 
 	handlePointerDown(e: PointerEvent): void {
-		if (!appState.wallEditMode || !this.wallData) return;
+		if (!appState.wallEditMode || !this.tiledMask) return;
 		this.painting = true;
 		const rect = this.engine.canvas.getBoundingClientRect();
 		const sx = e.clientX - rect.left;
@@ -36,7 +34,7 @@ export class WallEditHandler {
 	}
 
 	handlePointerMove(e: PointerEvent): void {
-		if (!this.painting || !this.wallData) return;
+		if (!this.painting || !this.tiledMask) return;
 		const rect = this.engine.canvas.getBoundingClientRect();
 		const sx = e.clientX - rect.left;
 		const sy = e.clientY - rect.top;
@@ -63,52 +61,34 @@ export class WallEditHandler {
 	}
 
 	private paintAt(wx: number, wy: number): void {
-		if (!this.wallData) return;
+		if (!this.tiledMask) return;
 
 		const r = appState.wallBrushSize;
 		const cx = Math.round(wx);
 		const cy = Math.round(wy);
 		const mode = appState.wallEditMode;
-		const w = this.maskWidth;
-		const h = this.maskHeight;
+		const mask = this.tiledMask;
 
-		// Skip if brush center is fully outside mask bounds
-		if (cx + r < 0 || cx - r >= w || cy + r < 0 || cy - r >= h) return;
-		const wallData = this.wallData;
-
-		const xlo = Math.max(0, cx - r);
-		const xhi = Math.min(w - 1, cx + r);
-		const ylo = Math.max(0, cy - r);
-		const yhi = Math.min(h - 1, cy + r);
-		const r2 = r * r;
-
-		for (let y = ylo; y <= yhi; y++) {
-			for (let x = xlo; x <= xhi; x++) {
-				if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r2) continue;
-				const idx = y * w + x;
-
-				if (mode === 'erase') {
-					wallData[idx] = 0;
-				} else if (mode === 'draw') {
-					wallData[idx] = 1;
-					// New wall pixels get the active material from the toolbar
-					if (!this.materialData) {
-						this.materialData = new Uint8Array(w * h);
-						this.materialData.fill(this.defaultMaterial);
-					}
-					this.materialData[idx] = this.activeMaterial;
-				} else if (mode === 'material') {
-					// Only paint material on existing wall pixels
-					if (wallData[idx]) {
-						if (!this.materialData) {
-							this.materialData = new Uint8Array(w * h);
-							// Fill with current default material, not zeros (which = Drywall)
-							this.materialData.fill(this.defaultMaterial);
-						}
-						this.materialData[idx] = this.activeMaterial;
+		if (mode === 'erase') {
+			mask.paintCircle(cx, cy, r, 0);
+		} else if (mode === 'draw') {
+			mask.paintCircle(cx, cy, r, 1, this.defaultMaterial);
+		} else if (mode === 'material') {
+			// Only paint material on existing wall pixels
+			const x0 = cx - r;
+			const y0 = cy - r;
+			const x1 = cx + r;
+			const y1 = cy + r;
+			const r2 = r * r;
+			for (let y = y0; y <= y1; y++) {
+				for (let x = x0; x <= x1; x++) {
+					if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r2) continue;
+					if (mask.getPixel(x, y)) {
+						mask.setMaterial(x, y, this.activeMaterial);
 					}
 				}
 			}
+			mask.markDirty();
 		}
 
 		this.onEdit?.();
