@@ -4,7 +4,7 @@
 	import { pushState } from '$state/history.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
-	import { floorState, getFloor, getFloorSlabAttenuation } from '$state/floor-state.svelte.js';
+	import { solverState } from '$state/solver.svelte.js';
 	import { findModel, getBandSpec, type ApModel } from '$lib/data/ap-models.js';
 	import Select from '$components/shared/Select.svelte';
 	import Button from '$components/shared/Button.svelte';
@@ -102,33 +102,20 @@
 		}
 	});
 
-	/** APs on the same channel whose signal reaches this AP — actual co-channel interference. */
+	/** APs the solver identified as actual co-channel conflicts (same channel + interfering). */
 	let interferers = $derived.by(() => {
-		if (!singleAp || singleAp.assignedChannel === null) return [];
-		const aps = projectState.aps;
-		const results: Array<{ id: string; name: string; signalPct: number }> = [];
-		for (const other of aps) {
-			if (other.id === singleAp.id) continue;
-			if (other.assignedChannel !== singleAp.assignedChannel) continue;
-			// Signal from other AP at this AP's position (inverse quartic)
-			const dx = singleAp.x - other.x;
-			const dy = singleAp.y - other.y;
-			const dSq = dx * dx + dy * dy;
-			const rSq = other.interferenceRadius * other.interferenceRadius;
-			let signal = rSq > 0 ? 1 / (1 + (dSq * dSq) / (rSq * rSq)) : 0;
-			// Cross-floor slab attenuation
-			if (singleAp.floorId !== other.floorId) {
-				const slabDb = getFloorSlabAttenuation(singleAp.floorId, other.floorId, other.band as Band);
-				if (slabDb > 0) signal *= Math.pow(10, -slabDb / 10);
+		if (!singleAp || !solverState.lastResult) return [];
+		const conflicts = solverState.lastResult.conflicts;
+		const results: Array<{ id: string; name: string }> = [];
+		for (const [a, b] of conflicts) {
+			const otherId = a === singleAp.id ? b : b === singleAp.id ? a : null;
+			if (!otherId) continue;
+			const other = projectState.aps.find((ap) => ap.id === otherId);
+			if (other) {
+				results.push({ id: other.id, name: other.name });
 			}
-			if (signal < 0.005) continue; // below CCA threshold
-			results.push({
-				id: other.id,
-				name: other.name,
-				signalPct: Math.round(signal * 100)
-			});
 		}
-		return results.sort((a, b) => b.signalPct - a.signalPct);
+		return results;
 	});
 
 	let channelOptions = $derived.by(() => {
@@ -321,14 +308,12 @@
 		</div>
 
 		{#if interferers.length > 0}
-			<div class="section-header">CO-CHANNEL INTERFERENCE ({interferers.length})</div>
+			<div class="section-header">CO-CHANNEL CONFLICTS ({interferers.length})</div>
 			<div class="neighbors">
 				{#each interferers.slice(0, 5) as n}
 					<button class="neighbor-row clickable" onclick={() => selectAp(n.id)}>
 						<span class="neighbor-name">{n.name}</span>
-						<span class="neighbor-overlap high">
-							{n.signalPct}%
-						</span>
+						<span class="neighbor-overlap high">same ch.</span>
 					</button>
 				{/each}
 			</div>
