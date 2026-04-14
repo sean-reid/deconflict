@@ -78,6 +78,8 @@ export class HeatmapLayer implements Layer {
 	defaultMaterial: WallMaterialId = 0;
 	isDragging = false;
 	worldUnitsPerMeter = 32.8; // updated from getEffectiveWupm()
+	/** When true, clip heatmap to wall mask bounds (draw-from-scratch mode). */
+	clipToWallMask = false;
 
 	private cache: HTMLCanvasElement | null = null;
 	private cacheKey = '';
@@ -115,7 +117,7 @@ export class HeatmapLayer implements Layer {
 						`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}:${ap.assignedChannel}:${ap.power}:${ap.verticalOffset ?? 0}:${ap.floorDbPerMeter ?? 0}:${ap.floorThickness ?? 0}`
 				)
 				.join('|') +
-			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}` +
+			`|isp:${this.ispSpeed}|wm:${this.wallMask?.width ?? 0}|mat:${this.defaultMaterial}|mv:${this.materialVersion}|cwm:${this.clipToWallMask ? 1 : 0}` +
 			`|z:${camera.state.zoom.toFixed(3)}:x:${Math.round(camera.state.x * 10)}:y:${Math.round(camera.state.y * 10)}` +
 			`|${width}x${height}`
 		);
@@ -189,22 +191,30 @@ export class HeatmapLayer implements Layer {
 			);
 		}
 
-		// Clip to the union of all AP signal reach areas so cross-floor APs
-		// with different floorplan sizes still propagate fully.
+		// Clip region: AP signal reach, optionally constrained to wall mask bounds
 		let clipMinX = Infinity,
 			clipMinY = Infinity,
 			clipMaxX = -Infinity,
 			clipMaxY = -Infinity;
-		for (let i = 0; i < n; i++) {
-			const reach = Math.sqrt(apCutSq[i]!);
-			const x0 = apX[i]! - reach;
-			const y0 = apY[i]! - reach;
-			const x1 = apX[i]! + reach;
-			const y1 = apY[i]! + reach;
-			if (x0 < clipMinX) clipMinX = x0;
-			if (y0 < clipMinY) clipMinY = y0;
-			if (x1 > clipMaxX) clipMaxX = x1;
-			if (y1 > clipMaxY) clipMaxY = y1;
+		if (this.clipToWallMask && this.wallMask) {
+			// Draw-from-scratch: clip to wall mask bounds
+			clipMinX = 0;
+			clipMinY = 0;
+			clipMaxX = this.wallMask.width;
+			clipMaxY = this.wallMask.height;
+		} else {
+			// Imported floorplan: clip to union of all AP signal areas
+			for (let i = 0; i < n; i++) {
+				const reach = Math.sqrt(apCutSq[i]!);
+				const x0 = apX[i]! - reach;
+				const y0 = apY[i]! - reach;
+				const x1 = apX[i]! + reach;
+				const y1 = apY[i]! + reach;
+				if (x0 < clipMinX) clipMinX = x0;
+				if (y0 < clipMinY) clipMinY = y0;
+				if (x1 > clipMaxX) clipMaxX = x1;
+				if (y1 > clipMaxY) clipMaxY = y1;
+			}
 		}
 		const hasClip = clipMinX < clipMaxX && clipMinY < clipMaxY;
 

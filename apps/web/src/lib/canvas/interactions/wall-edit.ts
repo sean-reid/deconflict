@@ -91,12 +91,12 @@ export class WallEditHandler {
 					wallData[idx] = 0;
 				} else if (mode === 'draw') {
 					wallData[idx] = 1;
-					// New wall pixels use the global default material
+					// New wall pixels get the active material from the toolbar
 					if (!this.materialData) {
 						this.materialData = new Uint8Array(w * h);
 						this.materialData.fill(this.defaultMaterial);
 					}
-					this.materialData[idx] = this.defaultMaterial;
+					this.materialData[idx] = this.activeMaterial;
 				} else if (mode === 'material') {
 					// Only paint material on existing wall pixels
 					if (wallData[idx]) {
