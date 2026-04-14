@@ -31,10 +31,10 @@
 		</div>
 		<div class="panel-content">
 			{#if appState.sidebarPanel === 'floorplan'}
-				<FloorplanControls />
+				<div class="scroll-panel"><FloorplanControls /></div>
 			{:else if appState.sidebarPanel === 'aps'}
 				{#if hasSelection}
-					<ApEditor />
+					<div class="scroll-panel"><ApEditor /></div>
 				{:else}
 					<ApList />
 				{/if}
@@ -95,8 +95,17 @@
 
 	.panel-content {
 		flex: 1;
-		overflow-y: auto;
+		overflow: hidden;
 		padding: var(--space-4);
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.scroll-panel {
+		flex: 1;
+		overflow-y: auto;
+		min-height: 0;
 	}
 
 	.sidebar.disabled {

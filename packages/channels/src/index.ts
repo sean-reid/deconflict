@@ -6,4 +6,4 @@ export { channelsInterfere, getFrequencyRange } from './overlap.js';
 export { getAvailableChannels } from './regulatory.js';
 export { channelColor } from './palette.js';
 export type { ThroughputEstimate, ThroughputInput, ThroughputOptions } from './throughput.js';
-export { estimateThroughput, getBaseRate } from './throughput.js';
+export { estimateThroughput, getBaseRate, getPhyRate } from './throughput.js';

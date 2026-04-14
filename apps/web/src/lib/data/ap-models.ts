@@ -12,6 +12,7 @@ export interface ApBandSpec {
 	maxChannelWidth: ChannelWidth;
 	maxTxPower: number; // dBm (conducted)
 	typicalIndoorRange: number; // meters
+	streams: number; // spatial streams (MIMO), e.g. 2 for 2x2, 4 for 4x4
 }
 
 export interface ApModel {

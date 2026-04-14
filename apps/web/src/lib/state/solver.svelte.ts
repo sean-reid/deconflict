@@ -13,6 +13,7 @@ import { rayMarchWallAtten } from '../rf/propagation.js';
 import { wallState } from './wall-state.svelte.js';
 import { decodeMask } from '$canvas/wall-detect.js';
 import { decodeMaterialMask } from '$canvas/wall-labels.js';
+import { findModel } from '$lib/data/ap-models.js';
 
 type Algorithm = 'greedy' | 'dsatur' | 'welsh-powell' | 'backtracking';
 
@@ -330,12 +331,17 @@ function computeThroughput(): void {
 				coChannelOverlaps.push(signal);
 			}
 		}
+		// Look up model specs for accurate PHY rate
+		const model = ap.modelId ? findModel(ap.modelId) : null;
+		const bandSpec = model?.bands.find((b) => b.band === ap.band);
 		return {
 			apId: ap.id,
 			band: ap.band,
 			channelWidth: ap.channelWidth,
 			assignedChannel: ap.assignedChannel,
-			coChannelOverlaps
+			coChannelOverlaps,
+			wifiStandard: model?.wifiStandard,
+			streams: bandSpec?.streams
 		};
 	});
 

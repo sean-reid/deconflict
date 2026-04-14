@@ -21,8 +21,8 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'R320',
 		wifiStandard: 'WiFi 5',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 20, typicalIndoorRange: 28 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 20, typicalIndoorRange: 22 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 20, typicalIndoorRange: 28, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 20, typicalIndoorRange: 22, streams: 2 }
 		]
 	},
 
@@ -34,8 +34,8 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'R350',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 22, typicalIndoorRange: 30 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 22, typicalIndoorRange: 25 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 22, typicalIndoorRange: 30, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 22, typicalIndoorRange: 25, streams: 2 }
 		]
 	},
 	// FCC ID: S2M-R550 | https://webresources.ruckuswireless.com/datasheets/r550/ds-commscope-r550.html
@@ -45,8 +45,8 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'R550',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 35 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 25, typicalIndoorRange: 28 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 35, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 25, typicalIndoorRange: 28, streams: 2 }
 		]
 	},
 	// FCC ID: S2M-R650 | https://webresources.ruckuswireless.com/datasheets/r650/ds-commscope-r650.html
@@ -56,8 +56,8 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'R650',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 35 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 27, typicalIndoorRange: 30 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 35, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 27, typicalIndoorRange: 30, streams: 4 }
 		]
 	},
 	// FCC ID: S2M-R750 | https://webresources.ruckuswireless.com/datasheets/r750/ds-commscope-r750.html
@@ -67,8 +67,8 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'R750',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 40 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 28, typicalIndoorRange: 35 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 40, streams: 4 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 28, typicalIndoorRange: 35, streams: 4 }
 		]
 	},
 	// FCC ID: S2M-T350 | https://webresources.ruckuswireless.com/datasheets/t350/ds-commscope-t350.html
@@ -78,8 +78,8 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'T350 (Outdoor)',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 40 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 25, typicalIndoorRange: 35 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 25, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 25, typicalIndoorRange: 35, streams: 2 }
 		]
 	},
 
@@ -91,35 +91,37 @@ export const RUCKUS_MODELS: readonly ApModel[] = [
 		model: 'R560',
 		wifiStandard: 'WiFi 6E',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 30 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 22, typicalIndoorRange: 25 },
-			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 22, typicalIndoorRange: 18 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 30, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 22, typicalIndoorRange: 25, streams: 2 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 22, typicalIndoorRange: 18, streams: 2 }
 		]
 	},
 	// FCC ID: S2M-R760 | https://webresources.ruckuswireless.com/datasheets/r760/ds-commscope-r760.html
+	// MIMO: 4x4:4 on all three radios per datasheet (12 spatial streams total)
 	{
 		id: 'ruckus-r760',
 		vendor: 'Ruckus',
 		model: 'R760',
 		wifiStandard: 'WiFi 6E',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 38 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 27, typicalIndoorRange: 32 },
-			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 22 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 38, streams: 4 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 27, typicalIndoorRange: 32, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 22, streams: 4 }
 		]
 	},
 
 	// ─── WiFi 7 ─────────────────────────────────────────────────────
 	// FCC ID: S2M-R770 | https://www.ruckusnetworks.com/products/wireless-access-points/r770
+	// MIMO: 2x2:2 on 2.4GHz, 4x4:4 on 5GHz, 2x2:2 on 6GHz per datasheet (8 streams total)
 	{
 		id: 'ruckus-r770',
 		vendor: 'Ruckus',
 		model: 'R770',
 		wifiStandard: 'WiFi 7',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 35 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 30 },
-			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 24, typicalIndoorRange: 20 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 35, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 30, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 24, typicalIndoorRange: 20, streams: 2 }
 		]
 	}
 ];

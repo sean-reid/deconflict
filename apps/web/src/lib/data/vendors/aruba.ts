@@ -21,8 +21,8 @@ export const ARUBA_MODELS: readonly ApModel[] = [
 		model: 'AP-503',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 20, maxTxPower: 21, typicalIndoorRange: 25 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 21, typicalIndoorRange: 20 }
+			{ band: '2.4ghz', maxChannelWidth: 20, maxTxPower: 21, typicalIndoorRange: 25, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 21, typicalIndoorRange: 20, streams: 2 }
 		]
 	},
 	// FCC ID: Q9HAP505 | https://www.also.com/ec/cms5/media/img/2800_hpe_portal/documents_1/access_points/ds_ap510series.pdf
@@ -32,8 +32,8 @@ export const ARUBA_MODELS: readonly ApModel[] = [
 		model: 'AP-505',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 28 },
-			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 21, typicalIndoorRange: 22 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 28, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 80, maxTxPower: 21, typicalIndoorRange: 22, streams: 2 }
 		]
 	},
 	// FCC ID: Q9HAP515 | https://www.also.com/ec/cms5/media/img/2800_hpe_portal/documents_1/access_points/ds_ap510series.pdf
@@ -43,8 +43,8 @@ export const ARUBA_MODELS: readonly ApModel[] = [
 		model: 'AP-515',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 30 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 28 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 30, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 28, streams: 4 }
 		]
 	},
 	// FCC ID: Q9HAP535 | https://www.also.com/ec/cms5/media/img/2800_hpe_portal/documents_1/access_points/ds_ap530series.pdf
@@ -54,19 +54,20 @@ export const ARUBA_MODELS: readonly ApModel[] = [
 		model: 'AP-535',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 24, typicalIndoorRange: 35 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 28 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 24, typicalIndoorRange: 35, streams: 4 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 28, streams: 4 }
 		]
 	},
 	// FCC ID: Q9HAP575 | https://www.also.com/ec/cms5/media/img/2800_hpe_portal/documents_1/access_points/ds_ap570series.pdf
+	// MIMO: 2x2:2 on 2.4GHz, 4x4:4 on 5GHz per datasheet (802.11ax 2x2/4x4 dual radio)
 	{
 		id: 'aruba-ap575',
 		vendor: 'Aruba',
 		model: 'AP-575',
 		wifiStandard: 'WiFi 6',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 24, typicalIndoorRange: 40 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 35 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 24, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 25, typicalIndoorRange: 35, streams: 4 }
 		]
 	},
 
@@ -78,21 +79,22 @@ export const ARUBA_MODELS: readonly ApModel[] = [
 		model: 'AP-615',
 		wifiStandard: 'WiFi 6E',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 28 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 22 },
-			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 16 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 28, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 22, streams: 2 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 16, streams: 2 }
 		]
 	},
 	// FCC ID: Q9HAP635 | HPE QuickSpecs doc a50002582enw
+	// MIMO: 2x2:2 on all three radios per datasheet (tri radio 2x2 Wi-Fi 6E)
 	{
 		id: 'aruba-ap635',
 		vendor: 'Aruba',
 		model: 'AP-635',
 		wifiStandard: 'WiFi 6E',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 28 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 22 },
-			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 16 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 21, typicalIndoorRange: 28, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 22, streams: 2 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 21, typicalIndoorRange: 16, streams: 2 }
 		]
 	},
 	// FCC ID: Q9HAP655 | https://www.securewirelessworks.com/aruba-ap-655.asp
@@ -102,9 +104,9 @@ export const ARUBA_MODELS: readonly ApModel[] = [
 		model: 'AP-655',
 		wifiStandard: 'WiFi 6E',
 		bands: [
-			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 24, typicalIndoorRange: 35 },
-			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 28 },
-			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 20 }
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 24, typicalIndoorRange: 35, streams: 4 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 28, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 20, streams: 4 }
 		]
 	}
 ];
