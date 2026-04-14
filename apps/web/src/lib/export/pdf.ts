@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { projectState } from '$state/project.svelte.js';
 import { solverState } from '$state/solver.svelte.js';
-import { optimizerState } from '$state/optimizer.svelte.js';
+import { optimizerState, getBuildingCoverage, floorCoverage } from '$state/optimizer.svelte.js';
 import { floorState } from '$state/floor-state.svelte.js';
 import type { CanvasEngine } from '$canvas/engine.js';
 
@@ -211,12 +211,25 @@ export async function exportPdf(engine: CanvasEngine): Promise<void> {
 	doc.setFontSize(9);
 	doc.text(`Total: ${apCount} access point${apCount !== 1 ? 's' : ''}`, margin, y);
 
-	if (optimizerState.coverage > 0) {
+	if (floorCoverage.size > 0) {
 		y += 5;
 		doc.setFont('helvetica', 'normal');
-		const curFloorName =
-			floorState.floors.find((f) => f.id === floorState.currentFloorId)?.name ?? '';
-		doc.text(`Coverage (${curFloorName}): ${optimizerState.coverage}%`, margin, y);
+		// Per-floor coverage
+		for (const floor of sortedFloors) {
+			if (!floor.id) continue;
+			const fc = floorCoverage.get(floor.id);
+			if (fc) {
+				doc.text(`Coverage (${floor.name}): ${fc.coverage}%`, margin, y);
+				y += 4;
+			}
+		}
+		// Building average if multi-floor
+		if (floorCount > 1 && floorCoverage.size > 1) {
+			doc.setFont('helvetica', 'bold');
+			doc.text(`Building average: ${getBuildingCoverage()}%`, margin, y);
+			y += 4;
+			doc.setFont('helvetica', 'normal');
+		}
 	}
 
 	if (solverState.lastResult) {

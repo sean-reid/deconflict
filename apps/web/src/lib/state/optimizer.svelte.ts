@@ -17,6 +17,21 @@ export const optimizerState = $state({
 	error: null as string | null
 });
 
+/** Per-floor coverage cache: floorId → { coverage %, sampleCount (proxy for area) }. */
+export const floorCoverage = new Map<string, { coverage: number; samples: number }>();
+
+/** Weighted average coverage across all floors with data. */
+export function getBuildingCoverage(): number {
+	if (floorCoverage.size === 0) return 0;
+	let totalWeighted = 0;
+	let totalSamples = 0;
+	for (const { coverage, samples } of floorCoverage.values()) {
+		totalWeighted += coverage * samples;
+		totalSamples += samples;
+	}
+	return totalSamples > 0 ? Math.round(totalWeighted / totalSamples) : 0;
+}
+
 // Cached interior sample points and decoded mask for real-time coverage
 let cachedMaskUrl: string | null = null;
 let cachedMask: DecodedWallMask | null = null;
@@ -121,6 +136,12 @@ export async function updateCoverage(): Promise<void> {
 	}
 
 	optimizerState.coverage = Math.round((totalSignal / cachedSamples.length) * 100);
+
+	// Cache per-floor coverage (weighted by sample count as area proxy)
+	floorCoverage.set(curFloorId, {
+		coverage: optimizerState.coverage,
+		samples: cachedSamples.length
+	});
 }
 
 export async function runOptimizer(): Promise<void> {
