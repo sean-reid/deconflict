@@ -618,6 +618,18 @@
 		const url = floorplanState.floorplanUrl;
 		if (url) {
 			floorplanLayer.loadImage(url, () => {
+				// Auto-fit to floorplan bounds on load
+				if (floorplanLayer.imageWidth > 0) {
+					const rect = engine.canvas.getBoundingClientRect();
+					engine.camera.fitToBounds(
+						[
+							{ x: 0, y: 0 },
+							{ x: floorplanLayer.imageWidth, y: floorplanLayer.imageHeight }
+						],
+						rect.width,
+						rect.height
+					);
+				}
 				engine.markDirty();
 			});
 		} else {
