@@ -19,7 +19,7 @@ export interface FloorMaterial {
 export type FloorMaterialId = 0 | 1 | 2 | 3;
 
 /**
- * Floor material definitions with per-meter attenuation.
+ * Slab material definitions with per-meter attenuation.
  * Total loss = dbPerMeter * thickness.
  *
  * Sources: ITU-R P.1238, iBwave material database, NIST measurements.
