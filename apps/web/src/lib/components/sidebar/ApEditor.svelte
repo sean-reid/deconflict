@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { projectState, updateAp, removeAp, removeAps, getEffectiveWupm, radiusFromPower } from '$state/project.svelte';
-	import { canvasState, clearSelection } from '$state/canvas.svelte';
+	import { canvasState, clearSelection, selectAp } from '$state/canvas.svelte';
 	import { getAvailableChannels } from '@deconflict/channels';
 	import type { Band, ChannelWidth } from '@deconflict/channels';
 	import { floorState, getFloor, getFloorSlabAttenuation } from '$state/floor-state.svelte.js';
@@ -105,7 +105,7 @@
 	let interferers = $derived.by(() => {
 		if (!singleAp || singleAp.assignedChannel === null) return [];
 		const aps = projectState.aps;
-		const results: Array<{ name: string; signalPct: number }> = [];
+		const results: Array<{ id: string; name: string; signalPct: number }> = [];
 		for (const other of aps) {
 			if (other.id === singleAp.id) continue;
 			if (other.assignedChannel !== singleAp.assignedChannel) continue;
@@ -122,6 +122,7 @@
 			}
 			if (signal < 0.005) continue; // below CCA threshold
 			results.push({
+				id: other.id,
 				name: other.name,
 				signalPct: Math.round(signal * 100)
 			});
@@ -313,12 +314,12 @@
 			<div class="section-header">CO-CHANNEL INTERFERENCE ({interferers.length})</div>
 			<div class="neighbors">
 				{#each interferers.slice(0, 5) as n}
-					<div class="neighbor-row">
+					<button class="neighbor-row clickable" onclick={() => selectAp(n.id)}>
 						<span class="neighbor-name">{n.name}</span>
 						<span class="neighbor-overlap high">
 							{n.signalPct}%
 						</span>
-					</div>
+					</button>
 				{/each}
 			</div>
 		{/if}
@@ -476,8 +477,20 @@
 		gap: var(--space-2);
 		padding: var(--space-1) var(--space-2);
 		background: var(--bg-surface);
+		border: none;
 		border-radius: var(--radius-md);
 		font-size: var(--text-sm);
+		font-family: var(--font-sans);
+		width: 100%;
+		text-align: left;
+	}
+
+	.neighbor-row.clickable {
+		cursor: pointer;
+	}
+
+	.neighbor-row.clickable:hover {
+		background: var(--bg-hover);
 	}
 
 	.neighbor-name {
