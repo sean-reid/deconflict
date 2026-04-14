@@ -257,7 +257,20 @@ export function lookupAtten(field: AttenField, wx: number, wy: number): number {
 
 	gc = Math.max(0, Math.min(field.cols - 1, Math.round(apGC + dgc * tExit)));
 	gr = Math.max(0, Math.min(field.rows - 1, Math.round(apGR + dgr * tExit)));
-	return field.grid[gr * field.cols + gc]!;
+	let val = field.grid[gr * field.cols + gc]!;
+	if (val > 0) return val;
+
+	// Edge cell was beyond maxDist (skipped during build, value=0).
+	// Walk back along the ray toward the AP to find the last computed cell.
+	const steps = 8;
+	for (let i = 1; i <= steps; i++) {
+		const t = tExit * (1 - i / steps);
+		const c2 = Math.max(0, Math.min(field.cols - 1, Math.round(apGC + dgc * t)));
+		const r2 = Math.max(0, Math.min(field.rows - 1, Math.round(apGR + dgr * t)));
+		val = field.grid[r2 * field.cols + c2]!;
+		if (val > 0) return val;
+	}
+	return 0;
 }
 
 // ─── Attenuation field cache ──────────────────────────────────────
