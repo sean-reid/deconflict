@@ -604,7 +604,7 @@
 		apState.aps
 			.map(
 				(ap) =>
-					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
+					`${ap.id}:${Math.round(ap.x)}:${Math.round(ap.y)}:${ap.floorId}:${ap.interferenceRadius}:${ap.band}:${ap.channelWidth}`
 			)
 			.join('|')
 	);
