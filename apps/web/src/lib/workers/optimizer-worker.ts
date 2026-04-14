@@ -10,9 +10,17 @@ interface ApInput {
 	interferenceRadius: number;
 }
 
+interface FixedApInput {
+	x: number;
+	y: number;
+	interferenceRadius: number;
+	signalScale: number; // floor slab attenuation factor (0-1)
+}
+
 interface OptimizeMessage {
 	type: 'optimize';
 	aps: ApInput[];
+	fixedAps: FixedApInput[];
 	wallMask: Uint8Array;
 	maskWidth: number;
 	maskHeight: number;
@@ -183,7 +191,8 @@ interface Position {
 function evaluateCoverage(
 	positions: Position[],
 	samples: Array<{ x: number; y: number }>,
-	cache: WallCache
+	cache: WallCache,
+	fixedAps: FixedApInput[] = []
 ): number {
 	let total = 0;
 	for (let s = 0; s < samples.length; s++) {
@@ -202,6 +211,21 @@ function evaluateCoverage(
 			}
 			if (signal > best) best = signal;
 		}
+		// Include fixed APs from other floors (attenuated by floor slab)
+		for (const fap of fixedAps) {
+			const dx = samples[s]!.x - fap.x;
+			const dy = samples[s]!.y - fap.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			let signal = signalStrengthOptimizer(dist, fap.interferenceRadius) * fap.signalScale;
+			if (signal > 0.001) {
+				const srcIdx = nearestSourceIdx(cache, fap.x, fap.y);
+				if (srcIdx >= 0) {
+					const dbLoss = cache.table[srcIdx * cache.numSamples + s]!;
+					if (dbLoss > 0) signal *= Math.pow(10, -dbLoss / 20);
+				}
+			}
+			if (signal > best) best = signal;
+		}
 		total += best;
 	}
 	return total / samples.length;
@@ -213,7 +237,8 @@ function evaluateExact(
 	mask: Uint8Array,
 	w: number,
 	h: number,
-	wallAttenuation: number
+	wallAttenuation: number,
+	fixedAps: FixedApInput[] = []
 ): number {
 	let total = 0;
 	for (const sample of samples) {
@@ -225,6 +250,17 @@ function evaluateExact(
 			let signal = signalStrengthOptimizer(dist, ap.radius);
 			if (signal > 0.001) {
 				const crossings = countWallCrossings(mask, w, h, ap.x, ap.y, sample.x, sample.y);
+				if (crossings > 0) signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
+			}
+			if (signal > best) best = signal;
+		}
+		for (const fap of fixedAps) {
+			const dx = sample.x - fap.x;
+			const dy = sample.y - fap.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			let signal = signalStrengthOptimizer(dist, fap.interferenceRadius) * fap.signalScale;
+			if (signal > 0.001) {
+				const crossings = countWallCrossings(mask, w, h, fap.x, fap.y, sample.x, sample.y);
 				if (crossings > 0) signal *= Math.pow(10, (-crossings * wallAttenuation) / 20);
 			}
 			if (signal > best) best = signal;
@@ -261,7 +297,7 @@ function yieldToEventLoop(): Promise<void> {
 // ─── Main optimization pipeline ─────────────────────────────────────
 
 async function runOptimization(msg: OptimizeMessage): Promise<void> {
-	const { aps, wallMask: mask, maskWidth: w, maskHeight: h, wallAttenuation } = msg;
+	const { aps, fixedAps, wallMask: mask, maskWidth: w, maskHeight: h, wallAttenuation } = msg;
 
 	const { interior } = computeBuildingInterior(mask, w, h, {
 		maxDim: 200,
@@ -388,6 +424,21 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 					bestAp = a;
 				}
 			}
+			// Fixed APs contribute signal but don't claim samples
+			for (const fap of fixedAps) {
+				const dx = samples[s]!.x - fap.x;
+				const dy = samples[s]!.y - fap.y;
+				const dist = Math.sqrt(dx * dx + dy * dy);
+				let signal = signalStrengthOptimizer(dist, fap.interferenceRadius) * fap.signalScale;
+				if (signal > 0.001) {
+					const srcIdx = nearestSourceIdx(cache, fap.x, fap.y);
+					if (srcIdx >= 0) {
+						const dbLoss = cache.table[srcIdx * cache.numSamples + s]!;
+						if (dbLoss > 0) signal *= Math.pow(10, -dbLoss / 20);
+					}
+				}
+				if (signal > bestSignal) bestSignal = signal;
+			}
 			const deficit = 1.0 - bestSignal;
 			const weight = 1 + deficit * 3;
 			buckets[bestAp]!.sumX += samples[s]!.x * weight;
@@ -409,7 +460,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		if (maxMove < 1.0) break;
 	}
 
-	const lloydsScore = evaluateCoverage(positions, samples, cache);
+	const lloydsScore = evaluateCoverage(positions, samples, cache, fixedAps);
 	self.postMessage({
 		type: 'progress',
 		positions: positions.map((p) => ({ id: p.id, x: p.x, y: p.y })),
@@ -466,7 +517,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				radius: aps[a]!.interferenceRadius
 			});
 		}
-		return evaluateCoverage(tempPositions, samples, cache);
+		return evaluateCoverage(tempPositions, samples, cache, fixedAps);
 	}
 
 	for (let p = 0; p < SWARM; p++) {
@@ -579,7 +630,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 			return;
 		}
 		let improved = false;
-		let bestScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
+		let bestScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation, fixedAps);
 
 		for (let a = 0; a < numAps; a++) {
 			for (const [ddx, ddy] of DIRS) {
@@ -590,7 +641,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				if (nx < 0 || nx >= w || ny < 0 || ny >= h || !interior[ny * w + nx]) continue;
 				finalPositions[a]!.x = nx;
 				finalPositions[a]!.y = ny;
-				const score = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
+				const score = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation, fixedAps);
 				if (score > bestScore) {
 					bestScore = score;
 					improved = true;
@@ -603,11 +654,12 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		if (!improved) polishStep *= 0.5;
 	}
 
-	const finalScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation);
+	const finalScore = evaluateExact(finalPositions, samples, mask, w, h, wallAttenuation, fixedAps);
 	const initialScore = evaluateCoverage(
 		aps.map((a) => ({ ...a, radius: a.interferenceRadius })),
 		samples,
-		cache
+		cache,
+		fixedAps
 	);
 	const improvement = initialScore > 0 ? ((finalScore - initialScore) / initialScore) * 100 : 0;
 

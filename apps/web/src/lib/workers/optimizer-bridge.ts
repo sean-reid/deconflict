@@ -59,6 +59,7 @@ export class OptimizerBridge {
 		maskHeight: number,
 		wallAttenuation: number,
 		options?: {
+			fixedAps?: Array<{ x: number; y: number; interferenceRadius: number; signalScale: number }>;
 			iterations?: number;
 			onProgress?: (progress: OptimizeProgress) => void;
 		}
@@ -76,6 +77,7 @@ export class OptimizerBridge {
 			const msg = {
 				type: 'optimize' as const,
 				aps,
+				fixedAps: options?.fixedAps ?? [],
 				wallMask: maskCopy,
 				maskWidth,
 				maskHeight,
