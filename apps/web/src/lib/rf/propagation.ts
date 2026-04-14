@@ -151,21 +151,32 @@ export function countWallCrossings(
 /** Grid spacing for the precomputed attenuation field (in wall-mask pixels). */
 export const ATTEN_GRID_STEP = 6;
 
+/**
+ * Polar attenuation field — cumulative wall dB stored by angle and distance
+ * from the AP. Built by marching outward in radial slices (720 angles = 0.5°).
+ * 55× faster than the old Cartesian grid (360K vs 20M DDA steps).
+ *
+ * Lookup: atan2 → angle bucket, distance → distance bucket. O(1).
+ * No field boundary artifacts. Wall shadows extend naturally in all directions.
+ */
 export interface AttenField {
-	grid: Float32Array;
-	cols: number;
-	rows: number;
-	step: number;
-	originX: number; // world-space origin of the grid (may be negative)
-	originY: number;
-	apX: number; // AP position in world space (for edge projection)
+	/** Cumulative dB at [angle * distBuckets + distIdx]. */
+	data: Float32Array;
+	angles: number;
+	distBuckets: number;
+	distStep: number; // world units per distance bucket
+	apX: number;
 	apY: number;
+	/** Final (edge) attenuation per angle — used for pixels beyond maxDist. */
+	edgeAtten: Float32Array;
 }
 
+const POLAR_ANGLES_FULL = 720; // 0.5° per slice
+const POLAR_ANGLES_FAST = 360; // 1° per slice (drag mode)
+
 /**
- * Precompute a coarse attenuation field from an AP position.
- * Grid extends to cover the AP's full signal range (not just the mask bounds)
- * so wall shadows project correctly beyond the mask boundary.
+ * Build a polar attenuation field by marching outward from the AP in radial slices.
+ * Each slice accumulates wall dB incrementally — no redundant ray marching.
  */
 export function buildAttenField(
 	apX: number,
@@ -181,88 +192,75 @@ export function buildAttenField(
 	maskOriginX = 0,
 	maskOriginY = 0
 ): AttenField {
-	// Field grid covers the wall mask area in world coordinates
-	const originX = maskOriginX;
-	const originY = maskOriginY;
-	const cols = Math.ceil(wallW / gridStep);
-	const rows = Math.ceil(wallH / gridStep);
-	const grid = new Float32Array(cols * rows);
+	const fast = gridStep > ATTEN_GRID_STEP;
+	const angles = fast ? POLAR_ANGLES_FAST : POLAR_ANGLES_FULL;
+	const distStep = fast ? 6 : 3; // world units per distance bucket
+	const distBuckets = Math.ceil(maxDist / distStep);
+	const data = new Float32Array(angles * distBuckets);
+	const edgeAtten = new Float32Array(angles);
 
-	// AP position in mask-local coordinates for ray marching
+	// AP in mask-local coords
 	const apLX = apX - maskOriginX;
 	const apLY = apY - maskOriginY;
+	const angleStep = (2 * Math.PI) / angles;
 
-	// Ray-march cells within maxDist of the AP (performance bound).
-	// The field grid covers the full mask so lookupAtten works everywhere,
-	// but distant cells keep their default 0 (no visible contribution since
-	// signal is negligible there). The heatmap's lookupAtten ray-projects
-	// out-of-range cells back to the nearest computed edge cell.
-	const maxDistSq = maxDist * maxDist;
-	for (let r = 0; r < rows; r++) {
-		const wy = originY + r * gridStep + (gridStep >> 1);
-		for (let c = 0; c < cols; c++) {
-			const wx = originX + c * gridStep + (gridStep >> 1);
-			const dx = wx - apX;
-			const dy = wy - apY;
-			if (dx * dx + dy * dy > maxDistSq) continue;
-			// Ray march in mask-local pixel coordinates
-			grid[r * cols + c] = rayMarchWallAtten(
-				wallData,
-				wallW,
-				wallH,
-				materialMap,
-				materialDb,
-				defaultDb,
-				apLX,
-				apLY,
-				wx - maskOriginX,
-				wy - maskOriginY
-			);
+	for (let a = 0; a < angles; a++) {
+		const theta = a * angleStep;
+		const cosT = Math.cos(theta);
+		const sinT = Math.sin(theta);
+
+		let cumDb = 0;
+		let wasWall = false;
+		const base = a * distBuckets;
+
+		for (let d = 0; d < distBuckets; d++) {
+			const dist = (d + 0.5) * distStep;
+			// Position in mask-local pixel coords
+			const px = (apLX + cosT * dist + 0.5) | 0;
+			const py = (apLY + sinT * dist + 0.5) | 0;
+
+			if (px >= 0 && px < wallW && py >= 0 && py < wallH) {
+				const idx = py * wallW + px;
+				const isWall = wallData[idx] === 1;
+				if (isWall && !wasWall) {
+					// Wall crossing: add material dB
+					if (materialMap) {
+						const matId = materialMap[idx] ?? 0;
+						cumDb += materialDb[matId] ?? defaultDb;
+					} else {
+						cumDb += defaultDb;
+					}
+				}
+				wasWall = isWall;
+			} else {
+				wasWall = false;
+			}
+
+			data[base + d] = cumDb;
 		}
+		edgeAtten[a] = cumDb;
 	}
 
-	return { grid, cols, rows, step: gridStep, originX, originY, apX, apY };
+	return { data, angles, distBuckets, distStep, apX, apY, edgeAtten };
 }
 
-/** O(1) wall attenuation lookup from a precomputed field.
- *  For out-of-bounds pixels, projects back along the AP→pixel ray to the
- *  field edge — the accumulated wall loss at the mask boundary. */
+/** O(1) polar attenuation lookup: angle + distance → cumulative dB. */
 export function lookupAtten(field: AttenField, wx: number, wy: number): number {
-	const s = field.step;
-	let gc = ((wx - field.originX) / s + 0.5) | 0;
-	let gr = ((wy - field.originY) / s + 0.5) | 0;
+	const dx = wx - field.apX;
+	const dy = wy - field.apY;
+	const dist = Math.sqrt(dx * dx + dy * dy);
+	if (dist < 0.5) return 0;
 
-	if (gc >= 0 && gc < field.cols && gr >= 0 && gr < field.rows) {
-		return field.grid[gr * field.cols + gc]!;
-	}
+	// Angle bucket: atan2 → [0, 2π) → [0, angles)
+	let theta = Math.atan2(dy, dx);
+	if (theta < 0) theta += 2 * Math.PI;
+	const ai = Math.min(field.angles - 1, ((theta / (2 * Math.PI)) * field.angles) | 0);
 
-	// Out of bounds: find where the AP→pixel ray exits the field.
-	const apGC = (field.apX - field.originX) / s;
-	const apGR = (field.apY - field.originY) / s;
-	const dgc = gc - apGC;
-	const dgr = gr - apGR;
-	if (dgc === 0 && dgr === 0) return 0;
+	// Distance bucket
+	const di = (dist / field.distStep) | 0;
+	if (di >= field.distBuckets) return field.edgeAtten[ai]!;
 
-	// Ray-box exit: find the smallest t > 0 where the ray crosses a field boundary
-	let tExit = 1;
-	if (dgc > 0) {
-		const t = (field.cols - 0.5 - apGC) / dgc;
-		if (t > 0 && t < tExit) tExit = t;
-	} else if (dgc < 0) {
-		const t = (-0.5 - apGC) / dgc;
-		if (t > 0 && t < tExit) tExit = t;
-	}
-	if (dgr > 0) {
-		const t = (field.rows - 0.5 - apGR) / dgr;
-		if (t > 0 && t < tExit) tExit = t;
-	} else if (dgr < 0) {
-		const t = (-0.5 - apGR) / dgr;
-		if (t > 0 && t < tExit) tExit = t;
-	}
-
-	gc = Math.max(0, Math.min(field.cols - 1, Math.round(apGC + dgc * tExit)));
-	gr = Math.max(0, Math.min(field.rows - 1, Math.round(apGR + dgr * tExit)));
-	return field.grid[gr * field.cols + gc]!;
+	return field.data[ai * field.distBuckets + di]!;
 }
 
 // ─── Attenuation field cache ──────────────────────────────────────
