@@ -63,7 +63,7 @@ export function addFloor(name?: string): Floor {
 	return floor;
 }
 
-/** Remove a floor by ID. Cannot remove the last floor. */
+/** Remove a floor by ID. Cannot remove the last floor. Caller should clean up APs. */
 export function removeFloor(id: string): void {
 	if (floorState.floors.length <= 1) return;
 	floorState.floors = floorState.floors.filter((f) => f.id !== id);

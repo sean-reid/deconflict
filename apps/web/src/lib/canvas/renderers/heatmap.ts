@@ -1,8 +1,12 @@
 import type { Layer, RenderContext } from '../types.js';
 import type { AccessPoint } from '$state/ap-state.svelte.js';
 
-/** AP with optional vertical offset for cross-floor 3D distance. */
-type HeatmapAp = AccessPoint & { verticalOffset?: number };
+/** AP with optional cross-floor parameters for 3D propagation. */
+type HeatmapAp = AccessPoint & {
+	verticalOffset?: number; // meters — ceiling height × floor distance
+	floorDbPerMeter?: number; // dB/m through the slab material
+	floorThickness?: number; // slab thickness in meters
+};
 import type { DecodedWallMask } from '../wall-detect.js';
 import type { WallMaterialId } from '../materials.js';
 import { WALL_MATERIALS } from '../materials.js';
@@ -154,8 +158,10 @@ export class HeatmapLayer implements Layer {
 		const matDb = WALL_MATERIALS.map((m) => m.dbPerMeter * m.typicalThickness);
 		const fast = this.isDragging;
 
-		// Vertical offset squared for 3D distance (cross-floor virtual APs)
-		const vertOffSq = new Float64Array(n);
+		// Per-AP cross-floor parameters
+		const vertOffSq = new Float64Array(n); // vertical offset² in world units²
+		const floorDbThickness = new Float64Array(n); // dbPerMeter * thickness (vertical path)
+		const vertOffWorld = new Float64Array(n); // vertical offset in world units (for cosTheta)
 
 		const fields: (AttenField | null)[] = [];
 		for (let i = 0; i < n; i++) {
@@ -163,7 +169,9 @@ export class HeatmapLayer implements Layer {
 			apX[i] = ap.x;
 			apY[i] = ap.y;
 			const vo = ap.verticalOffset ?? 0;
-			vertOffSq[i] = vo * vo * wupmSq; // convert meters to world units squared
+			vertOffSq[i] = vo * vo * wupmSq;
+			vertOffWorld[i] = vo * wupm;
+			floorDbThickness[i] = (ap.floorDbPerMeter ?? 0) * (ap.floorThickness ?? 0);
 			const rSq = ap.interferenceRadius * ap.interferenceRadius;
 			apRadSq[i] = rSq;
 			apCutSq[i] = rSq * MAX_RATIO_SQ;
@@ -230,10 +238,25 @@ export class HeatmapLayer implements Layer {
 					const signal = signalPower(dSq, apRadSq[i]!);
 					let tp = apBase[i]! * signal;
 
+					// Wall attenuation (precomputed field, O(1) lookup)
 					const field = fields[i];
 					if (field && signal > WALL_SIGNAL_THRESHOLD) {
 						const loss = lookupAtten(field, wx, wy);
 						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
+					}
+
+					// Oblique floor attenuation: signal at angle through slab loses more dB.
+					// effectiveLoss = dbPerMeter * thickness / cosTheta
+					// cosTheta = verticalOffset / sqrt(horizDist² + verticalOffset²)
+					const fdt = floorDbThickness[i]!;
+					if (fdt > 0) {
+						const horizDistSq = dx * dx + dy * dy;
+						const vow = vertOffWorld[i]!;
+						// cosTheta = vow / sqrt(horizDistSq + vow²)
+						// effectiveLoss = fdt / cosTheta = fdt * sqrt(horizDistSq + vow²) / vow
+						// Cap at 3× vertical loss to avoid infinity at extreme angles
+						const pathRatio = Math.min(3, Math.sqrt(horizDistSq + vow * vow) / vow);
+						tp *= Math.exp(fdt * pathRatio * -0.11512925464);
 					}
 
 					if (ispCap > 0 && tp > ispCap) tp = ispCap;

@@ -29,7 +29,7 @@
 	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/wall-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { floorState, currentFloor } from '$state/floor-state.svelte.js';
-	import { getFloorAttenuation } from '$canvas/floor-materials.js';
+	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
@@ -353,15 +353,16 @@
 		const virtualAps = [];
 		for (const adj of adjFloors) {
 			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
+			const floorDist = Math.abs(adj.level - cur.level);
+			const floorMat = FLOOR_MATERIALS[adj.floorMaterial];
 			for (const ap of adjAps) {
-				const atten = getFloorAttenuation(adj.floorMaterial, ap.band, adj.floorThickness);
-				const floorDist = Math.abs(adj.level - cur.level);
 				virtualAps.push({
 					...ap,
 					id: `virtual-${ap.id}`,
-					power: ap.power - atten,
-					interferenceRadius: radiusFromPower(Math.max(1, ap.power - atten), ap.band),
-					verticalOffset: adj.ceilingHeight * floorDist
+					// Power unchanged — oblique floor loss computed per-cell
+					verticalOffset: adj.ceilingHeight * floorDist,
+					floorDbPerMeter: floorMat?.dbPerMeter[ap.band] ?? 100,
+					floorThickness: adj.floorThickness
 				});
 			}
 		}

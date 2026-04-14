@@ -48,6 +48,8 @@
 
 	function handleDeleteFloor(id: string) {
 		if (floorState.floors.length <= 1) return;
+		// Remove the floor's APs first
+		apState.aps = apState.aps.filter((ap) => ap.floorId !== id);
 		removeFloor(id);
 		scheduleSave();
 	}
