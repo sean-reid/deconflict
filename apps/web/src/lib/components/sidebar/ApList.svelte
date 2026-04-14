@@ -202,16 +202,15 @@
 	.ap-list {
 		display: flex;
 		flex-direction: column;
-		height: 100%;
+		flex: 1;
 		min-height: 0;
+		overflow: hidden;
 	}
 
 	.ap-list-scroll {
 		flex: 1;
 		overflow-y: auto;
 		min-height: 0;
-		display: flex;
-		flex-direction: column;
 	}
 
 	.floor-group-header {
