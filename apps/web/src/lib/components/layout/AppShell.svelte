@@ -61,6 +61,8 @@
 		grid-row: 2;
 		width: 320px;
 		border-left: 1px solid var(--border-subtle);
+		overflow: hidden;
+		min-height: 0;
 	}
 
 	.statusbar-row {

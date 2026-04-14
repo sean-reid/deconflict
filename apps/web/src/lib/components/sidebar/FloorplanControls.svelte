@@ -521,6 +521,7 @@
 		font-size: var(--text-xs);
 		cursor: pointer;
 		white-space: nowrap;
+		flex-shrink: 0;
 		transition: all var(--transition-fast);
 	}
 
