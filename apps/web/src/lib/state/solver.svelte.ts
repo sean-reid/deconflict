@@ -317,18 +317,17 @@ function applyAssignments(assignment: Map<string, number>): void {
 }
 
 function computeThroughput(): void {
-	const positions = getApPositions();
-	const { edges } = buildInterferenceGraph(positions);
-
 	const inputs: ThroughputInput[] = projectState.aps.map((ap) => {
-		// Find co-channel APs and their overlap fractions
+		// Use real attenuated signal from edgeSignals (computed during graph build
+		// with wall + floor attenuation), not geometric overlap
 		const coChannelOverlaps: number[] = [];
-		for (const edge of edges) {
-			const otherId = edge.a === ap.id ? edge.b : edge.b === ap.id ? edge.a : null;
-			if (!otherId) continue;
-			const other = projectState.aps.find((a) => a.id === otherId);
-			if (other && other.assignedChannel === ap.assignedChannel && ap.assignedChannel !== null) {
-				coChannelOverlaps.push(edge.overlapFraction);
+		for (const other of projectState.aps) {
+			if (other.id === ap.id) continue;
+			if (other.assignedChannel !== ap.assignedChannel || ap.assignedChannel === null) continue;
+			const pairKey = [ap.id, other.id].sort().join(':');
+			const signal = edgeSignals.get(pairKey);
+			if (signal !== undefined && signal > 0) {
+				coChannelOverlaps.push(signal);
 			}
 		}
 		return {
