@@ -211,6 +211,7 @@
 		flex: 1;
 		overflow-y: auto;
 		min-height: 0;
+		padding: var(--space-4) var(--space-4) 0;
 	}
 
 	.floor-group-header {
@@ -417,7 +418,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		padding: var(--space-3) var(--space-2) var(--space-2);
+		padding: var(--space-3) var(--space-4) var(--space-4);
 		border-top: 1px solid var(--border-subtle);
 		flex-shrink: 0;
 	}

@@ -96,7 +96,6 @@
 	.panel-content {
 		flex: 1;
 		overflow: hidden;
-		padding: var(--space-4);
 		min-height: 0;
 		display: flex;
 		flex-direction: column;
@@ -107,6 +106,7 @@
 		overflow-y: auto;
 		overflow-x: hidden;
 		min-height: 0;
+		padding: var(--space-4);
 	}
 
 	.sidebar.disabled {
