@@ -134,7 +134,7 @@ test.describe('Multi-floor', () => {
 		await page.waitForTimeout(300);
 		await expect(page.locator('.floor-pill:not(.add)')).toHaveCount(2);
 
-		const del = page.locator('.floor-delete');
+		const del = page.locator('.floor-action.delete');
 		if (await del.isVisible()) await del.click();
 		await page.waitForTimeout(300);
 		await expect(page.locator('.floor-pill:not(.add)')).toHaveCount(1);
@@ -142,7 +142,7 @@ test.describe('Multi-floor', () => {
 
 	test('cannot delete last floor', async ({ page }) => {
 		await openFloorplanTab(page);
-		await expect(page.locator('.floor-delete')).not.toBeVisible();
+		await expect(page.locator('.floor-action.delete')).not.toBeVisible();
 	});
 
 	// ─── Multi-floor AP placement ────────────────────────────────
@@ -209,7 +209,7 @@ test.describe('Multi-floor', () => {
 		await page.screenshot({ path: 'test-results/multi-floor/back-to-floor1.png' });
 	});
 
-	test.skip('heatmap works per floor', async ({ page }) => {
+	test('heatmap shows only current floor APs', async ({ page }) => {
 		const canvas = page.locator('canvas');
 
 		// Place 2 APs on floor 1

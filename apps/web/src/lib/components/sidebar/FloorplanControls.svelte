@@ -29,6 +29,23 @@
 		editingFloorId = null;
 	}
 
+	function moveFloor(id: string, direction: -1 | 1) {
+		const idx = floorState.floors.findIndex((f) => f.id === id);
+		const newIdx = idx + direction;
+		if (newIdx < 0 || newIdx >= floorState.floors.length) return;
+		// Swap levels
+		const a = floorState.floors[idx]!;
+		const b = floorState.floors[newIdx]!;
+		const tmpLevel = a.level;
+		a.level = b.level;
+		b.level = tmpLevel;
+		// Swap positions in array
+		floorState.floors[idx] = b;
+		floorState.floors[newIdx] = a;
+		floorState.floors = [...floorState.floors]; // trigger reactivity
+		scheduleSave();
+	}
+
 	function handleDeleteFloor(id: string) {
 		if (floorState.floors.length <= 1) return;
 		removeFloor(id);
@@ -274,14 +291,14 @@
 						title="Click to switch, double-click to rename"
 					>
 						{floor.name}
-						{#if floorState.floors.length > 1 && floor.id === floorState.currentFloorId}
-							<span
-								class="floor-delete"
-								role="button"
-								tabindex="-1"
-								onclick={(e) => { e.stopPropagation(); handleDeleteFloor(floor.id); }}
-								title="Delete floor"
-							>&times;</span>
+						{#if floor.id === floorState.currentFloorId && floorState.floors.length > 1}
+							{#if floorState.floors.indexOf(floor) > 0}
+								<span class="floor-action" role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); moveFloor(floor.id, -1); }}>&#9664;</span>
+							{/if}
+							{#if floorState.floors.indexOf(floor) < floorState.floors.length - 1}
+								<span class="floor-action" role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); moveFloor(floor.id, 1); }}>&#9654;</span>
+							{/if}
+							<span class="floor-action delete" role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); handleDeleteFloor(floor.id); }}>&times;</span>
 						{/if}
 					</button>
 				{/if}
@@ -469,16 +486,20 @@
 		gap: var(--space-1);
 	}
 
-	.floor-delete {
-		margin-left: 4px;
-		font-size: 12px;
+	.floor-action {
+		margin-left: 2px;
+		font-size: 10px;
 		line-height: 1;
-		opacity: 0.5;
+		opacity: 0.4;
 		cursor: pointer;
+		padding: 2px;
 	}
 
-	.floor-delete:hover {
+	.floor-action:hover {
 		opacity: 1;
+	}
+
+	.floor-action.delete:hover {
 		color: var(--danger, #ef4444);
 	}
 
