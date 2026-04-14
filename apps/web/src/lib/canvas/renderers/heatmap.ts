@@ -20,7 +20,6 @@ import {
 } from '../../rf/propagation.js';
 
 const CELL_SIZE = 6;
-const MAX_RATIO_SQ = 25;
 const WALL_SIGNAL_THRESHOLD = 0.05;
 
 // Color LUT — 256 entries, built once
@@ -58,6 +57,8 @@ for (let i = 0; i < 256; i++) {
 	}
 	LUT[i] = packColor(r, g, b, a);
 }
+// LUT[0] must be exactly 0 so the `!color` skip works for transparent pixels
+LUT[0] = 0;
 
 /**
  * Heatmap layer — synchronous main-thread rendering.
@@ -147,7 +148,6 @@ export class HeatmapLayer implements Layer {
 		const apX = new Float64Array(n);
 		const apY = new Float64Array(n);
 		const apRadSq = new Float64Array(n);
-		const apCutSq = new Float64Array(n);
 		const apBase = new Float64Array(n);
 		const wupm = this.worldUnitsPerMeter;
 		const wupmSq = wupm * wupm;
@@ -169,7 +169,6 @@ export class HeatmapLayer implements Layer {
 			floorDbThickness[i] = (ap.floorDbPerMeter ?? 0) * (ap.floorThickness ?? 0);
 			const rSq = ap.interferenceRadius * ap.interferenceRadius;
 			apRadSq[i] = rSq;
-			apCutSq[i] = rSq * MAX_RATIO_SQ;
 			apBase[i] = getBaseRate(ap.band, ap.channelWidth) * 0.5;
 			fields.push(
 				this.wallMask
@@ -190,24 +189,6 @@ export class HeatmapLayer implements Layer {
 					: null
 			);
 		}
-
-		// Clip to union of all AP signal reach areas
-		let clipMinX = Infinity,
-			clipMinY = Infinity,
-			clipMaxX = -Infinity,
-			clipMaxY = -Infinity;
-		for (let i = 0; i < n; i++) {
-			const reach = Math.sqrt(apCutSq[i]!);
-			const x0 = apX[i]! - reach;
-			const y0 = apY[i]! - reach;
-			const x1 = apX[i]! + reach;
-			const y1 = apY[i]! + reach;
-			if (x0 < clipMinX) clipMinX = x0;
-			if (y0 < clipMinY) clipMinY = y0;
-			if (x1 > clipMaxX) clipMaxX = x1;
-			if (y1 > clipMaxY) clipMaxY = y1;
-		}
-		const hasClip = clipMinX < clipMaxX && clipMinY < clipMaxY;
 
 		const inv = camera.getInverseTransform();
 		const ia = inv[0]!,
@@ -231,17 +212,11 @@ export class HeatmapLayer implements Layer {
 				const wx = ia * sx + ic * sy + ie;
 				const wy = ib * sx + idd * sy + ig;
 
-				if (hasClip && (wx < clipMinX || wx > clipMaxX || wy < clipMinY || wy > clipMaxY)) {
-					continue;
-				}
-
 				let best = 0;
 				for (let i = 0; i < n; i++) {
 					const dx = wx - apX[i]!;
 					const dy = wy - apY[i]!;
 					const dSq = dx * dx + dy * dy + vertOffSq[i]!;
-					if (dSq > apCutSq[i]!) continue;
-
 					const signal = signalPower(dSq, apRadSq[i]!);
 					let tp = apBase[i]! * signal;
 
