@@ -354,29 +354,52 @@
 		// Current floor's APs (full power)
 		const localAps = apState.aps.filter((ap) => ap.floorId === floorId);
 
-		// Virtual APs from adjacent floors (reduced power by floor attenuation)
-		const adjFloors = floorState.floors.filter(
-			(f) => f.id !== floorId && Math.abs(f.level - cur.level) === 1
-		);
+		// Virtual APs from ALL other floors (attenuated through each slab between)
+		const otherFloors = floorState.floors.filter((f) => f.id !== floorId);
+		const sortedFloors = [...floorState.floors].sort((a, b) => a.level - b.level);
 		const virtualAps = [];
-		for (const adj of adjFloors) {
+		for (const adj of otherFloors) {
 			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
+			if (adjAps.length === 0) continue;
 
-			// Vertical gap = lower floor's ceiling height
-			const lowerFloor = adj.level < cur.level ? adj : cur;
-			const vertGap = lowerFloor.ceilingHeight;
-
-			// Slab between floors = upper floor's material and thickness
-			const upperFloor = adj.level > cur.level ? adj : cur;
-			const floorMat = FLOOR_MATERIALS[upperFloor.floorMaterial];
+			// Sum vertical gap and slab attenuation through every floor between
+			const loLevel = Math.min(cur.level, adj.level);
+			const hiLevel = Math.max(cur.level, adj.level);
+			let totalVertGap = 0;
+			let totalSlabThickness = 0;
+			// We need per-band dB/m, so accumulate weighted thickness
+			// Each slab: upper floor's material & thickness
+			const slabSegments: { dbPerMeter: Record<string, number>; thickness: number }[] = [];
+			for (const f of sortedFloors) {
+				if (f.level < loLevel || f.level >= hiLevel) continue;
+				// This floor's ceiling contributes to the vertical gap
+				totalVertGap += f.ceilingHeight;
+				// The slab between this floor and the one above = upper floor's material
+				const upperIdx = sortedFloors.findIndex((s) => s.level === f.level + 1);
+				if (upperIdx >= 0) {
+					const upper = sortedFloors[upperIdx]!;
+					const mat = FLOOR_MATERIALS[upper.floorMaterial];
+					if (mat) {
+						slabSegments.push({ dbPerMeter: mat.dbPerMeter, thickness: upper.floorThickness });
+						totalSlabThickness += upper.floorThickness;
+					}
+				}
+			}
 
 			for (const ap of adjAps) {
+				// Compute aggregate dB/m for this AP's band across all slabs
+				let totalDb = 0;
+				for (const seg of slabSegments) {
+					totalDb += (seg.dbPerMeter[ap.band] ?? 100) * seg.thickness;
+				}
 				virtualAps.push({
 					...ap,
 					id: `virtual-${ap.id}`,
-					verticalOffset: vertGap,
-					floorDbPerMeter: floorMat?.dbPerMeter[ap.band] ?? 100,
-					floorThickness: upperFloor.floorThickness
+					verticalOffset: totalVertGap,
+					// Pass total dB as floorDbPerMeter * floorThickness = totalDb
+					// Set floorDbPerMeter = totalDb / totalSlabThickness (or totalDb if thickness=1)
+					floorDbPerMeter: totalSlabThickness > 0 ? totalDb / totalSlabThickness : 0,
+					floorThickness: totalSlabThickness
 				});
 			}
 		}
