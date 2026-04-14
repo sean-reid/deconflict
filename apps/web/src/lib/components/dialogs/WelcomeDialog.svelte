@@ -74,13 +74,7 @@
 			</div>
 
 			<p class="description">
-				Drop a floorplan, place APs, get optimal channels.<br />
-				Signal propagates through walls and floors with real physics.
-			</p>
-
-			<p class="hint">
-				Import a floorplan or draw walls, place access points,<br />
-				then press <kbd>H</kbd> to see the heatmap.
+				Import a floorplan, place access points, and press <kbd>H</kbd> to see signal coverage through walls and floors.
 			</p>
 
 			<div class="actions">
@@ -152,6 +146,17 @@
 		color: var(--text-secondary);
 		line-height: 1.5;
 		text-align: center;
+	}
+
+	.description kbd {
+		display: inline-block;
+		padding: 0 5px;
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		color: var(--text-primary);
+		background: var(--bg-primary);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-sm);
 	}
 
 	.hint {
