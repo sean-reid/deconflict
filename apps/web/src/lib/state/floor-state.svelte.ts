@@ -6,6 +6,7 @@ export interface Floor {
 	name: string;
 	level: number;
 	ceilingHeight: number; // meters (default 3.0 residential, 3.5 commercial)
+	floorThickness: number; // meters (slab thickness, default 0.2)
 	floorMaterial: FloorMaterialId;
 	floorplanUrl: string | null;
 	floorplanScale: number;
@@ -23,6 +24,7 @@ function createDefaultFloor(id?: string, name?: string): Floor {
 		name: name ?? 'Floor 1',
 		level: 0,
 		ceilingHeight: 3.0,
+		floorThickness: 0.2,
 		floorMaterial: 1, // Concrete Slab
 		floorplanUrl: null,
 		floorplanScale: 0.4,

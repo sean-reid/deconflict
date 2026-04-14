@@ -151,7 +151,7 @@ export class HeatmapLayer implements Layer {
 		const wupm = this.worldUnitsPerMeter;
 		const wupmSq = wupm * wupm;
 		const defaultDb = WALL_MATERIALS[this.defaultMaterial]?.attenuation ?? this.wallAttenuation;
-		const matDb = WALL_MATERIALS.map((m) => m.attenuation);
+		const matDb = WALL_MATERIALS.map((m) => m.dbPerMeter * m.typicalThickness);
 		const fast = this.isDragging;
 
 		// Vertical offset squared for 3D distance (cross-floor virtual APs)

@@ -17,6 +17,7 @@ interface ProjectFloorV3 {
 	level: number;
 	ceilingHeight: number;
 	floorMaterial: FloorMaterialId;
+	floorThickness: number;
 	floorplanImage?: string;
 	floorplanScale: number;
 	calibration?: { worldUnitsPerMeter: number };
@@ -127,6 +128,7 @@ export async function serialize(): Promise<string> {
 			level: floor.level,
 			ceilingHeight: floor.ceilingHeight,
 			floorMaterial: floor.floorMaterial,
+			floorThickness: floor.floorThickness,
 			floorplanImage,
 			floorplanScale: floor.floorplanScale,
 			calibration: floor.calibration ?? undefined,
@@ -186,6 +188,7 @@ function migrateV2(data: ProjectFileV2): ProjectFileV3 {
 				ceilingHeight: 3.0,
 				floorMaterial: 1,
 				floorplanImage: data.floorplanImage,
+				floorThickness: 0.2,
 				floorplanScale: data.floorplanScale ?? 0.4,
 				calibration: data.calibration,
 				floorplanBoundary: data.floorplanBoundary,
@@ -242,6 +245,7 @@ export function deserialize(json: string): void {
 		level: f.level,
 		ceilingHeight: f.ceilingHeight ?? 3.0,
 		floorMaterial: (f.floorMaterial ?? 1) as FloorMaterialId,
+		floorThickness: (f as any).floorThickness ?? 0.2,
 		floorplanUrl: f.floorplanImage ?? null,
 		floorplanScale: f.floorplanScale ?? 0.4,
 		calibration: f.calibration ?? null,

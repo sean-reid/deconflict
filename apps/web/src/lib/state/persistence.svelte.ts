@@ -40,6 +40,7 @@ interface SavedFloor {
 	level: number;
 	ceilingHeight: number;
 	floorMaterial: FloorMaterialId;
+	floorThickness: number;
 	floorplanScale: number;
 	calibration: { worldUnitsPerMeter: number } | null;
 	floorplanBoundary: Array<{ x: number; y: number }> | null;
@@ -98,6 +99,7 @@ function saveToStorage(): void {
 				level: f.level,
 				ceilingHeight: f.ceilingHeight,
 				floorMaterial: f.floorMaterial,
+				floorThickness: f.floorThickness,
 				floorplanScale: f.floorplanScale,
 				calibration: f.calibration ? JSON.parse(JSON.stringify(f.calibration)) : null,
 				floorplanBoundary: f.floorplanBoundary
@@ -162,6 +164,7 @@ function migrateV2(data: SavedStateV2): SavedStateV3 {
 				ceilingHeight: 3.0,
 				floorMaterial: 1,
 				floorplanScale: data.floorplanScale ?? 0.4,
+				floorThickness: 0.2,
 				calibration: data.calibration ?? null,
 				floorplanBoundary: data.floorplanBoundary ?? null,
 				wallMask: data.wallMask ?? null,
@@ -217,6 +220,7 @@ export function restoreFromStorage(): boolean {
 			level: f.level,
 			ceilingHeight: f.ceilingHeight ?? 3.0,
 			floorMaterial: (f.floorMaterial ?? 1) as FloorMaterialId,
+			floorThickness: (f as any).floorThickness ?? 0.2,
 			floorplanUrl: null,
 			floorplanScale: f.floorplanScale ?? 0.4,
 			calibration: f.calibration ?? null,

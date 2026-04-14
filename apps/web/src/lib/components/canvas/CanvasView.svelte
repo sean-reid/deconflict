@@ -354,7 +354,7 @@
 		for (const adj of adjFloors) {
 			const adjAps = apState.aps.filter((ap) => ap.floorId === adj.id);
 			for (const ap of adjAps) {
-				const atten = getFloorAttenuation(adj.floorMaterial, ap.band);
+				const atten = getFloorAttenuation(adj.floorMaterial, ap.band, adj.floorThickness);
 				const floorDist = Math.abs(adj.level - cur.level);
 				virtualAps.push({
 					...ap,
