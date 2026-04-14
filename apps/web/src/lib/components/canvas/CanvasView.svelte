@@ -287,9 +287,11 @@
 	});
 
 	// Sync AP layer — only tracks apState, not wall/floorplan state
+	// Filter APs to current floor only
 	$effect(() => {
 		if (!apLayer) return;
-		const aps = apState.aps;
+		const floorId = floorState.currentFloorId;
+		const aps = apState.aps.filter((ap) => ap.floorId === floorId);
 		for (const ap of aps) {
 			void ap.x;
 			void ap.y;
@@ -332,10 +334,11 @@
 		engine.markDirty();
 	});
 
-	// Sync heatmap APs — only tracks apState
+	// Sync heatmap APs — filtered to current floor
 	$effect(() => {
 		if (!heatmapLayer) return;
-		const aps = apState.aps;
+		const floorId = floorState.currentFloorId;
+		const aps = apState.aps.filter((ap) => ap.floorId === floorId);
 		for (const ap of aps) {
 			void ap.x;
 			void ap.y;
@@ -694,7 +697,7 @@
 		if (!touchMoved && !touchStartedOnAp && !pendingPan && dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
 			touchMoved = true;
 			const rect = engine.canvas.getBoundingClientRect();
-			const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps);
+			const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps.filter(ap => ap.floorId === floorState.currentFloorId));
 
 			if (hit) {
 				touchStartedOnAp = true;
@@ -733,7 +736,7 @@
 
 			if (!touchMoved && engine) {
 				const rect = engine.canvas.getBoundingClientRect();
-				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps);
+				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps.filter(ap => ap.floorId === floorState.currentFloorId));
 
 				if (hit) {
 					selectHandler.handlePointerDown(new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 }));
@@ -759,7 +762,7 @@
 
 		const rect = engine.canvas.getBoundingClientRect();
 		const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-		const hit = hitTest(screenPoint, engine.camera, apState.aps);
+		const hit = hitTest(screenPoint, engine.camera, apState.aps.filter(ap => ap.floorId === floorState.currentFloorId));
 
 		if (hit) {
 			selectHandler.handlePointerDown(e);
