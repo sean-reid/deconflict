@@ -200,17 +200,15 @@
 
 <style>
 	.ap-list {
+		position: relative;
 		display: flex;
 		flex-direction: column;
-		/* 100vh minus toolbar(40) + tabs(40) + statusbar(24) + coverage(~80) + padding */
-		height: calc(100vh - 64px);
-		height: calc(100dvh - 64px);
+		height: 100%;
 	}
 
 	.ap-list-scroll {
-		flex: 1;
+		flex: 1 1 0;
 		overflow-y: auto;
-		min-height: 0;
 		padding: var(--space-4) var(--space-4) 0;
 	}
 
