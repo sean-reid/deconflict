@@ -44,7 +44,10 @@ export function welshPowell(graph: Graph, options: SolverOptions): SolverResult 
 		let least = Infinity;
 		for (const color of options.availableColors) {
 			const count = neighborColorCount.get(color) ?? 0;
-			if (count < least) { least = count; bestColor = color; }
+			if (count < least) {
+				least = count;
+				bestColor = color;
+			}
 		}
 		assignment.set(node, bestColor);
 		uncolored.delete(node);
