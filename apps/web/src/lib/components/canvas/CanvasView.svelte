@@ -246,8 +246,8 @@
 		// Add layers in draw order: floorplan, boundary, grid, walls, heatmap, APs, selection rect
 		engine.addLayer(floorplanLayer);
 		engine.addLayer(gridLayer);
-		engine.addLayer(wallLayer);
 		engine.addLayer(heatmapLayer);
+		engine.addLayer(wallLayer);
 		engine.addLayer(apLayer);
 		engine.addLayer(selectionRectLayer);
 
