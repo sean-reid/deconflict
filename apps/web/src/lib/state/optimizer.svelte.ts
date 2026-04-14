@@ -157,9 +157,10 @@ export async function runOptimizer(): Promise<void> {
 		const mask = projectState.wallMask;
 		const curFloorId = floorState.currentFloorId;
 
-		// Only optimize APs on the current floor
+		// Only optimize APs on the current floor (or all APs if single floor)
+		const singleFloor = floorState.floors.length === 1;
 		const localAps = projectState.aps
-			.filter((ap) => ap.floorId === curFloorId)
+			.filter((ap) => singleFloor || ap.floorId === curFloorId)
 			.map((ap) => ({
 				id: ap.id,
 				x: ap.x,
