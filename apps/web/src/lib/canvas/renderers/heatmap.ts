@@ -126,6 +126,7 @@ export class HeatmapLayer implements Layer {
 		height: number,
 		camera: { getInverseTransform: () => number[] }
 	): HTMLCanvasElement {
+		const t0 = performance.now();
 		const offscreen = document.createElement('canvas');
 		offscreen.width = width;
 		offscreen.height = height;
@@ -257,6 +258,7 @@ export class HeatmapLayer implements Layer {
 		}
 
 		ctx.putImageData(imgData, 0, 0);
+		console.log(`[heatmap] ${cols}x${rows} cells, ${n} APs, ${(performance.now() - t0).toFixed(1)}ms`);
 		return offscreen;
 	}
 }
