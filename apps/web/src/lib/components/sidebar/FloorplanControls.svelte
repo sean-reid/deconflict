@@ -507,14 +507,18 @@
 		display: flex;
 		gap: 4px;
 		overflow-x: auto;
+		overflow-y: hidden;
 		padding-bottom: var(--space-2);
 		border-bottom: 1px solid var(--border-subtle);
+		flex-wrap: nowrap;
+		min-width: 0;
 	}
 
 	.floor-pill {
 		padding: 4px 10px;
 		border: 1px solid var(--border-default);
 		border-radius: 999px;
+		flex-shrink: 0;
 		background: var(--bg-surface);
 		color: var(--text-secondary);
 		font-family: var(--font-sans);
