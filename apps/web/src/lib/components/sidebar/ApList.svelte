@@ -130,15 +130,7 @@
 					<span class="name">{ap.name}</span>
 					<span class="band">{bandLabels[ap.band] ?? ap.band}</span>
 					<span class="channel" class:unassigned={!ap.assignedChannel}>
-						{#if ap.assignedChannel}
-							<span
-								class="channel-dot"
-								style:background-color={channelColor(ap.assignedChannel, ap.band)}
-							></span>
-							{ap.assignedChannel}
-						{:else}
-							Pending
-						{/if}
+						{ap.assignedChannel ?? 'Pending'}
 					</span>
 					{#if throughputMap.has(ap.id)}
 						<span class="throughput" class:below-target={!throughputMap.get(ap.id)?.meetsTarget}>
