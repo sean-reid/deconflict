@@ -15,19 +15,30 @@ export function greedy(graph: Graph, options: SolverOptions): SolverResult {
 	for (const node of graph.nodes) {
 		if (assignment.has(node)) continue;
 
-		const neighborColors = new Set<number>();
+		const neighborColorCount = new Map<number, number>();
 		for (const nb of neighbors(graph, node)) {
 			const c = assignment.get(nb);
 			if (c !== undefined) {
-				neighborColors.add(c);
+				neighborColorCount.set(c, (neighborColorCount.get(c) ?? 0) + 1);
 			}
 		}
 
+		let assigned = false;
 		for (const color of options.availableColors) {
-			if (!neighborColors.has(color)) {
+			if (!neighborColorCount.has(color)) {
 				assignment.set(node, color);
+				assigned = true;
 				break;
 			}
+		}
+		if (!assigned && options.availableColors.length > 0) {
+			let bestColor = options.availableColors[0]!;
+			let least = Infinity;
+			for (const color of options.availableColors) {
+				const count = neighborColorCount.get(color) ?? 0;
+				if (count < least) { least = count; bestColor = color; }
+			}
+			assignment.set(node, bestColor);
 		}
 	}
 
