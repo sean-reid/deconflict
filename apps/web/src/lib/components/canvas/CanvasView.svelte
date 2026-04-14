@@ -969,7 +969,9 @@
 		ontouchend={handleTouchEnd}
 		ontouchcancel={handleTouchEnd}
 	></canvas>
-	<LayerPanel />
+	{#if !appState.wallEditMode}
+		<LayerPanel />
+	{/if}
 	{#if appState.wallEditMode}
 		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
 		{#if brushCursorVisible}
