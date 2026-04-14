@@ -89,7 +89,6 @@
 					class="field-input"
 					bind:value={projectName}
 					placeholder="Untitled Project"
-					onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleConfirm(); } }}
 				/>
 			</label>
 
