@@ -189,6 +189,7 @@
 		const mod = e.metaKey || e.ctrlKey;
 
 		if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+			if (appState.wallEditMode) return; // no undo during wall drawing
 			e.preventDefault();
 			redo();
 			engine?.markDirty();
@@ -196,6 +197,7 @@
 		}
 
 		if (mod && (e.key === 'z' || e.key === 'Z')) {
+			if (appState.wallEditMode) return; // no undo during wall drawing
 			e.preventDefault();
 			undo();
 			engine?.markDirty();
