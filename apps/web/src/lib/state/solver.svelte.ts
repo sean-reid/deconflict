@@ -360,21 +360,54 @@ export async function runSolver(): Promise<void> {
 
 	try {
 		const graph = await buildSerializedGraph();
-		const availableColors = getColorOptions();
 		const fixedAssignments = getFixedAssignments();
 
-		const result = await bridge.solve(graph, {
-			algorithm: solverState.algorithm,
-			availableColors,
-			fixedAssignments: fixedAssignments.length > 0 ? fixedAssignments : undefined,
-			timeout: 5000
-		});
+		// Solve each band independently — different bands don't interfere
+		const bands = new Set(projectState.aps.map((ap) => ap.band));
+		const mergedAssignment = new Map<string, number>();
+		let totalConflicts: [string, string][] = [];
+		let totalColors = 0;
+		let totalTime = 0;
 
-		solverState.lastResult = result;
-		solverState.lastTiming = result.timeMs;
+		for (const band of bands) {
+			const bandApIds = new Set(
+				projectState.aps.filter((ap) => ap.band === band).map((ap) => ap.id)
+			);
+			// Filter graph to only this band's APs
+			const bandNodes = graph.nodes.filter((id) => bandApIds.has(id));
+			const bandEdges = graph.edges
+				.filter(([id]) => bandApIds.has(id))
+				.map(([id, neighbors]) => [id, neighbors.filter((n) => bandApIds.has(n))] as [string, string[]]);
+
+			const channels = getAvailableChannels(band as any, projectState.regulatoryDomain);
+			const availableColors = channels.map((ch) => ch.number);
+			const bandFixed = fixedAssignments.filter(([id]) => bandApIds.has(id));
+
+			const result = await bridge.solve(
+				{ nodes: bandNodes, edges: bandEdges },
+				{
+					algorithm: solverState.algorithm,
+					availableColors,
+					fixedAssignments: bandFixed.length > 0 ? bandFixed : undefined,
+					timeout: 5000
+				}
+			);
+
+			for (const [id, ch] of result.assignment) mergedAssignment.set(id, ch);
+			totalConflicts = [...totalConflicts, ...result.conflicts];
+			totalColors += result.colorCount;
+			totalTime += result.timeMs;
+		}
+
+		solverState.lastResult = {
+			assignment: mergedAssignment,
+			colorCount: totalColors,
+			conflicts: totalConflicts,
+			timeMs: totalTime
+		};
+		solverState.lastTiming = totalTime;
 		clearAssignments();
-		applyAssignments(result.assignment);
-		// Force Svelte reactivity to see the channel assignment changes
+		applyAssignments(mergedAssignment);
 		projectState.aps = [...projectState.aps];
 		computeThroughput();
 	} catch (err) {
