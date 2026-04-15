@@ -21,6 +21,7 @@
 		onclose: () => void;
 	} = $props();
 
+	let activeTypeId = $state(currentTypeId);
 	let densityOverride = $state(currentDensity ?? ROOM_TYPES.find((t) => t.id === currentTypeId)?.defaultDensity ?? 0.3);
 	let customLabel = $state(currentLabel ?? '');
 	let search = $state('');
@@ -92,9 +93,9 @@
 		const type = ROOM_TYPES.find((t) => t.id === typeId);
 		densityOverride = type?.defaultDensity ?? 0.3;
 		customLabel = '';
+		activeTypeId = typeId;
 		onselect(typeId, densityOverride, undefined);
 		if (typeId === 1) {
-			// Custom: keep popup open, focus label input
 			requestAnimationFrame(() => labelInput?.focus());
 		} else {
 			onclose();
@@ -183,15 +184,15 @@
 		style="left: {clampedX}px; top: {clampedY}px"
 		onclick={(e) => e.stopPropagation()}
 	>
-		{#if currentTypeId > 0}
-			{@const currentType = ROOM_TYPES.find(t => t.id === currentTypeId)}
-			{#if currentType}
+		{#if activeTypeId > 0}
+			{@const activeType = ROOM_TYPES.find(t => t.id === activeTypeId)}
+			{#if activeType}
 				<div class="current-type-header">
 					<span
 						class="swatch"
-						style="background: rgb({currentType.color[0]},{currentType.color[1]},{currentType.color[2]})"
+						style="background: rgb({activeType.color[0]},{activeType.color[1]},{activeType.color[2]})"
 					></span>
-					<span class="current-type-name">{currentType.name}</span>
+					<span class="current-type-name">{activeType.name}</span>
 				</div>
 			{/if}
 		{/if}
@@ -217,7 +218,7 @@
 				{#each group.entries as entry}
 					<button
 						class="type-row"
-						class:active={entry.type.id === currentTypeId}
+						class:active={entry.type.id === activeTypeId}
 						class:highlight={entry.flatIndex === highlightIndex}
 						onclick={() => handleSelect(entry.type.id)}
 						onpointerenter={() => { highlightIndex = entry.flatIndex; }}
@@ -236,8 +237,8 @@
 			{/if}
 		</div>
 
-		{#if currentTypeId > 0}
-			{#if currentTypeId === 1}
+		{#if activeTypeId > 0}
+			{#if activeTypeId === 1}
 				<div class="label-section">
 					<div class="input-with-clear">
 						<input
@@ -246,11 +247,11 @@
 							class="label-input"
 							placeholder="Custom label..."
 							bind:value={customLabel}
-							oninput={() => onselect(currentTypeId, densityOverride, customLabel || undefined)}
-							onkeydown={(e) => { if (e.key === 'Enter') { onselect(currentTypeId, densityOverride, customLabel || undefined); onclose(); } }}
+							oninput={() => onselect(activeTypeId, densityOverride, customLabel || undefined)}
+							onkeydown={(e) => { if (e.key === 'Enter') { onselect(activeTypeId, densityOverride, customLabel || undefined); onclose(); } }}
 						/>
 						{#if customLabel}
-							<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(currentTypeId, densityOverride, undefined); }} aria-label="Clear label">&times;</button>
+							<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(activeTypeId, densityOverride, undefined); }} aria-label="Clear label">&times;</button>
 						{/if}
 					</div>
 				</div>
@@ -266,7 +267,7 @@
 					max="2"
 					step="0.05"
 					bind:value={densityOverride}
-					oninput={() => onselect(currentTypeId, densityOverride, customLabel || undefined)}
+					oninput={() => onselect(activeTypeId, densityOverride, customLabel || undefined)}
 				/>
 			</div>
 			<button class="clear-btn" onclick={handleClear}>Clear</button>
