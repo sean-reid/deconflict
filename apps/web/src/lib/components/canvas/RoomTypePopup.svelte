@@ -238,6 +238,7 @@
 						placeholder="Custom label..."
 						bind:value={customLabel}
 						oninput={() => onselect(currentTypeId, densityOverride, customLabel || undefined)}
+						onkeydown={(e) => { if (e.key === 'Enter') { onselect(currentTypeId, densityOverride, customLabel || undefined); onclose(); } }}
 					/>
 				</div>
 			{/if}
