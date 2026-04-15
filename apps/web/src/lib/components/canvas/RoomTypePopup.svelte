@@ -86,12 +86,19 @@
 		return { groups, totalCount: idx };
 	});
 
+	let labelInput: HTMLInputElement;
+
 	function handleSelect(typeId: number) {
 		const type = ROOM_TYPES.find((t) => t.id === typeId);
 		densityOverride = type?.defaultDensity ?? 0.3;
 		customLabel = '';
 		onselect(typeId, densityOverride, undefined);
-		onclose();
+		if (typeId === 1) {
+			// Custom: keep popup open, focus label input
+			requestAnimationFrame(() => labelInput?.focus());
+		} else {
+			onclose();
+		}
 	}
 
 	function handleClear() {
@@ -234,6 +241,7 @@
 				<div class="label-section">
 					<div class="input-with-clear">
 						<input
+							bind:this={labelInput}
 							type="text"
 							class="label-input"
 							placeholder="Custom label..."
