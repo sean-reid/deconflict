@@ -109,6 +109,16 @@ export const ROOM_TYPES: readonly RoomType[] = [
 		color: [110, 130, 160]
 	},
 
+	// IBC Group A-3; congregants with phones. ~0.1 dev/sqm
+	{
+		id: 9,
+		name: 'Place of Worship',
+		shortName: 'Worship',
+		categories: ['commercial'],
+		defaultDensity: 0.1,
+		color: [135, 135, 155]
+	},
+
 	// ─── Medium traffic ──────────────────────────────────────────
 	{
 		id: 10,
@@ -191,6 +201,79 @@ export const ROOM_TYPES: readonly RoomType[] = [
 		color: [160, 155, 100]
 	},
 
+	// 2-4 people in tiny room + display. ~0.5 dev/sqm
+	{
+		id: 40,
+		name: 'Huddle Room',
+		shortName: 'Huddle',
+		categories: ['commercial'],
+		defaultDensity: 0.5,
+		color: [150, 165, 110]
+	},
+	// FICM 830; workstations, wireless-on-wheels. ~0.35 dev/sqm
+	{
+		id: 41,
+		name: 'Nurse Station',
+		shortName: 'Nurse',
+		categories: ['healthcare'],
+		defaultDensity: 0.35,
+		color: [120, 165, 160]
+	},
+	// FICM 810; patient devices + 5-8 medical IoT. ~0.5 dev/sqm
+	{
+		id: 42,
+		name: 'Patient Room',
+		shortName: 'Patient',
+		categories: ['healthcare'],
+		defaultDensity: 0.5,
+		color: [140, 160, 150]
+	},
+	// 15-20 connected medical devices per ICU room. ~0.7 dev/sqm
+	{
+		id: 43,
+		name: 'ICU',
+		shortName: 'ICU',
+		categories: ['healthcare'],
+		defaultDensity: 0.7,
+		color: [180, 140, 90]
+	},
+	// 1-2 guests x 3 devices + smart TV + IoT. ~0.2 dev/sqm
+	{
+		id: 44,
+		name: 'Guest Room',
+		shortName: 'Guest',
+		categories: ['hospitality'],
+		defaultDensity: 0.2,
+		color: [140, 145, 160]
+	},
+	// Aruba: 1 AP/400sqm; cameras + IoT. ~0.01 dev/sqm
+	{
+		id: 45,
+		name: 'Parking Garage',
+		shortName: 'Parking',
+		categories: ['commercial', 'residential'],
+		defaultDensity: 0.01,
+		color: [110, 110, 120]
+	},
+	// FICM 525; phones + wearables. ~0.1 dev/sqm
+	{
+		id: 46,
+		name: 'Locker Room',
+		shortName: 'Locker',
+		categories: ['education', 'hospitality', 'commercial'],
+		defaultDensity: 0.1,
+		color: [130, 140, 145]
+	},
+	// POS + customer phones. ~0.15 dev/sqm
+	{
+		id: 47,
+		name: 'Food Court',
+		shortName: 'Food',
+		categories: ['commercial', 'hospitality'],
+		defaultDensity: 0.15,
+		color: [165, 150, 95]
+	},
+
 	// ─── High traffic ────────────────────────────────────────────
 	{
 		id: 20,
@@ -255,6 +338,25 @@ export const ROOM_TYPES: readonly RoomType[] = [
 		categories: ['hospitality', 'commercial'],
 		defaultDensity: 0.7,
 		color: [185, 155, 85]
+	},
+
+	// Similar to classroom; all on laptops. ~0.4 dev/sqm
+	{
+		id: 28,
+		name: 'Training Room',
+		shortName: 'Train',
+		categories: ['commercial', 'education'],
+		defaultDensity: 0.4,
+		color: [195, 155, 75]
+	},
+	// Events: 1 person/1.5sqm x 1.5 devices. ~0.6 dev/sqm
+	{
+		id: 29,
+		name: 'Banquet Hall',
+		shortName: 'Banq',
+		categories: ['hospitality', 'commercial'],
+		defaultDensity: 0.6,
+		color: [195, 130, 75]
 	},
 
 	// ─── Residential ─────────────────────────────────────────────
