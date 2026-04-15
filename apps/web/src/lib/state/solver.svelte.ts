@@ -12,7 +12,7 @@ import { WALL_MATERIALS } from '$canvas/materials.js';
 import { rayMarchWallAtten } from '../rf/propagation.js';
 import { wallState } from './wall-state.svelte.js';
 import { decodeMask } from '$canvas/wall-detect.js';
-import { decodeMaterialMask } from '$canvas/wall-labels.js';
+import { decodeMaterialMask } from '$canvas/region-labels.js';
 import { findModel } from '$lib/data/ap-models.js';
 
 type Algorithm = 'greedy' | 'dsatur' | 'welsh-powell' | 'backtracking';

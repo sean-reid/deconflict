@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { computeBuildingInterior } from '../canvas/morph-interior.js';
+import { computeBuildingInterior } from '../canvas/morphology.js';
 import { signalStrengthOptimizer, countWallCrossings } from '../rf/propagation.js';
 
 interface ApInput {

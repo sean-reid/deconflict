@@ -1,4 +1,4 @@
-import { computeBuildingInterior } from './morph-interior.js';
+import { computeBuildingInterior } from './morphology.js';
 
 export interface BoundaryResult {
 	polygon: Array<{ x: number; y: number }>;
