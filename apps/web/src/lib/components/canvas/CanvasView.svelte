@@ -467,6 +467,7 @@
 				outgoing.wallAttenuation = wallState.wallAttenuation;
 				outgoing.wallMaterial = wallState.wallMaterial;
 				outgoing.materialMask = wallState.materialMask;
+				outgoing.roomTypeMask = wallState.roomTypeMask;
 			}
 		}
 
@@ -480,6 +481,7 @@
 		wallState.wallAttenuation = floor.wallAttenuation;
 		wallState.wallMaterial = floor.wallMaterial;
 		wallState.materialMask = floor.materialMask;
+		wallState.roomTypeMask = floor.roomTypeMask;
 
 		// Cancel wall edit mode on floor switch to prevent editing the wrong floor
 		if (appState.wallEditMode) {

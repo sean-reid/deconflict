@@ -12,5 +12,6 @@ export const wallState = $state({
 	wallMask: null as WallMaskData | null,
 	wallAttenuation: 5 as number,
 	wallMaterial: 0 as WallMaterialId,
-	materialMask: null as WallMaskData | null
+	materialMask: null as WallMaskData | null,
+	roomTypeMask: null as WallMaskData | null
 });

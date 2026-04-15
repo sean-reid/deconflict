@@ -24,6 +24,13 @@ interface Snapshot {
 		originX: number;
 		originY: number;
 	} | null;
+	roomTypeMask: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX: number;
+		originY: number;
+	} | null;
 	wallMaterial: WallMaterialId;
 	floors: Floor[];
 	currentFloorId: string;
@@ -37,6 +44,7 @@ function takeSnapshot(): Snapshot {
 		aps: JSON.parse(JSON.stringify(apState.aps)),
 		wallMask: wallState.wallMask ? { ...wallState.wallMask } : null,
 		materialMask: wallState.materialMask ? { ...wallState.materialMask } : null,
+		roomTypeMask: wallState.roomTypeMask ? { ...wallState.roomTypeMask } : null,
 		wallMaterial: wallState.wallMaterial,
 		floors: JSON.parse(JSON.stringify(floorState.floors)),
 		currentFloorId: floorState.currentFloorId
@@ -52,6 +60,7 @@ function applySnapshot(snap: Snapshot): void {
 	if (cur) {
 		wallState.wallMask = cur.wallMask;
 		wallState.materialMask = cur.materialMask;
+		wallState.roomTypeMask = cur.roomTypeMask;
 		wallState.wallMaterial = cur.wallMaterial;
 		wallState.wallAttenuation = cur.wallAttenuation;
 		floorplanState.floorplanUrl = cur.floorplanUrl;
@@ -61,6 +70,7 @@ function applySnapshot(snap: Snapshot): void {
 	} else {
 		wallState.wallMask = snap.wallMask;
 		wallState.materialMask = snap.materialMask;
+		wallState.roomTypeMask = snap.roomTypeMask;
 		wallState.wallMaterial = snap.wallMaterial;
 	}
 }

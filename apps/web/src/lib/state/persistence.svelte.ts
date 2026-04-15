@@ -72,6 +72,14 @@ interface SavedFloor {
 		originX?: number;
 		originY?: number;
 	} | null;
+	roomTypeMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
+	roomDensityOverrides?: Record<string, number>;
 }
 
 interface SavedStateV3 {
@@ -103,6 +111,7 @@ function syncCurrentFloorFromLegacy(): void {
 	cur.wallAttenuation = wallState.wallAttenuation;
 	cur.wallMaterial = wallState.wallMaterial;
 	cur.materialMask = wallState.materialMask;
+	cur.roomTypeMask = wallState.roomTypeMask;
 }
 
 function saveToStorage(): void {
@@ -132,7 +141,9 @@ function saveToStorage(): void {
 				wallMask: f.wallMask ? JSON.parse(JSON.stringify(f.wallMask)) : null,
 				wallAttenuation: f.wallAttenuation,
 				wallMaterial: f.wallMaterial,
-				materialMask: f.materialMask ? JSON.parse(JSON.stringify(f.materialMask)) : null
+				materialMask: f.materialMask ? JSON.parse(JSON.stringify(f.materialMask)) : null,
+				roomTypeMask: f.roomTypeMask ? JSON.parse(JSON.stringify(f.roomTypeMask)) : null,
+				roomDensityOverrides: {}
 			})),
 			aps: JSON.parse(JSON.stringify(apState.aps))
 		};
@@ -206,7 +217,9 @@ function migrateV2(data: SavedStateV2): SavedStateV3 {
 							originX: data.materialMask.originX ?? 0,
 							originY: data.materialMask.originY ?? 0
 						}
-					: null
+					: null,
+				roomTypeMask: null,
+				roomDensityOverrides: {}
 			}
 		],
 		aps: (data.aps || []).map((ap) => ({
@@ -272,7 +285,15 @@ export function restoreFromStorage(): boolean {
 						originX: f.materialMask.originX ?? 0,
 						originY: f.materialMask.originY ?? 0
 					}
-				: null
+				: null,
+			roomTypeMask: f.roomTypeMask
+				? {
+						...f.roomTypeMask,
+						originX: f.roomTypeMask.originX ?? 0,
+						originY: f.roomTypeMask.originY ?? 0
+					}
+				: null,
+			roomDensityOverrides: (f as any).roomDensityOverrides ?? {}
 		}));
 		floorState.currentFloorId = floorState.floors[0]!.id;
 
@@ -285,6 +306,7 @@ export function restoreFromStorage(): boolean {
 		wallState.wallAttenuation = cur.wallAttenuation;
 		wallState.wallMaterial = cur.wallMaterial;
 		wallState.materialMask = cur.materialMask;
+		wallState.roomTypeMask = cur.roomTypeMask;
 
 		// Restore floorplan images
 		for (const floor of floorState.floors) {

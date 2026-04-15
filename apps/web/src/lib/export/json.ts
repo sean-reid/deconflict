@@ -38,6 +38,14 @@ interface ProjectFloorV3 {
 		originX?: number;
 		originY?: number;
 	} | null;
+	roomTypeMask?: {
+		dataUrl: string;
+		width: number;
+		height: number;
+		originX?: number;
+		originY?: number;
+	} | null;
+	roomDensityOverrides?: Record<string, number>;
 }
 
 interface ProjectFileV3 {
@@ -160,7 +168,9 @@ export async function serialize(): Promise<string> {
 			wallMask: floor.wallMask ? JSON.parse(JSON.stringify(floor.wallMask)) : null,
 			wallAttenuation: floor.wallAttenuation,
 			wallMaterial: floor.wallMaterial,
-			materialMask: floor.materialMask ? JSON.parse(JSON.stringify(floor.materialMask)) : null
+			materialMask: floor.materialMask ? JSON.parse(JSON.stringify(floor.materialMask)) : null,
+			roomTypeMask: floor.roomTypeMask ? JSON.parse(JSON.stringify(floor.roomTypeMask)) : null,
+			roomDensityOverrides: {}
 		});
 	}
 
@@ -219,7 +229,9 @@ function migrateV2(data: ProjectFileV2): ProjectFileV3 {
 				wallMask: data.wallMask,
 				wallAttenuation: data.wallAttenuation,
 				wallMaterial: data.wallMaterial,
-				materialMask: data.materialMask
+				materialMask: data.materialMask,
+				roomTypeMask: null,
+				roomDensityOverrides: {}
 			}
 		],
 		aps: (data.aps || []).map((ap) => ({
@@ -285,7 +297,15 @@ export function deserialize(json: string): void {
 					originX: f.materialMask.originX ?? 0,
 					originY: f.materialMask.originY ?? 0
 				}
-			: null
+			: null,
+		roomTypeMask: f.roomTypeMask
+			? {
+					...f.roomTypeMask,
+					originX: f.roomTypeMask.originX ?? 0,
+					originY: f.roomTypeMask.originY ?? 0
+				}
+			: null,
+		roomDensityOverrides: (f as any).roomDensityOverrides ?? {}
 	}));
 	floorState.currentFloorId = floorState.floors[0]!.id;
 
@@ -299,6 +319,7 @@ export function deserialize(json: string): void {
 	wallState.wallAttenuation = cur.wallAttenuation;
 	wallState.wallMaterial = cur.wallMaterial;
 	wallState.materialMask = cur.materialMask;
+	wallState.roomTypeMask = cur.roomTypeMask;
 
 	// APs
 	apState.aps = data.aps.map((ap) => ({

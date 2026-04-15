@@ -29,6 +29,7 @@
 		projectState.wallMask = null;
 		projectState.wallMaterial = 0;
 		projectState.materialMask = null;
+		projectState.roomTypeMask = null;
 		projectState.calibration = null;
 		projectState.floorplanBoundary = null;
 		projectState.ispSpeed = 0;
@@ -50,7 +51,9 @@
 			wallMask: null,
 			wallAttenuation: 5,
 			wallMaterial: 0,
-			materialMask: null
+			materialMask: null,
+			roomTypeMask: null,
+			roomDensityOverrides: {}
 		}];
 		floorState.currentFloorId = newFloorId;
 
