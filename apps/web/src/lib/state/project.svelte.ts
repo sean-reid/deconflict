@@ -137,5 +137,11 @@ export const projectState = {
 	},
 	set materialMask(v) {
 		wallState.materialMask = v;
+	},
+	get roomTypeMask() {
+		return wallState.roomTypeMask;
+	},
+	set roomTypeMask(v) {
+		wallState.roomTypeMask = v;
 	}
 };

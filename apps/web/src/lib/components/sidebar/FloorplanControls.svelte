@@ -279,6 +279,7 @@
 		wallState.wallMask = null;
 		wallState.wallMaterial = 0;
 		wallState.materialMask = null;
+		wallState.roomTypeMask = null;
 		apState.aps = apState.aps.filter((ap) => ap.floorId !== floorState.currentFloorId);
 		detectedWorldArea = null;
 		calibrationDone = false;

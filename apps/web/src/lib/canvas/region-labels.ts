@@ -57,6 +57,14 @@ export const labelWallBlobs = labelConnectedRegions;
 export type WallLabels = RegionLabels;
 
 /**
+ * Label enclosed rooms — contiguous non-wall regions inside the building.
+ * Calls labelConnectedRegions on the interior mask (walkable floor space).
+ */
+export function labelRooms(interior: Uint8Array, w: number, h: number): RegionLabels {
+	return labelConnectedRegions(interior, w, h);
+}
+
+/**
  * Fill all pixels of a given region with a value in a target mask.
  * Used for wall material overrides and room type assignments.
  */
