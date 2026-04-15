@@ -33,27 +33,28 @@
 		open = false;
 	}
 
+	let usingKeyboard = $state(false);
+
 	function handleKeyDown(e: KeyboardEvent) {
-		if (!open) {
-			if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
-				toggle();
-			}
-			return;
-		}
+		if (!open) return;
+		usingKeyboard = true;
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
+			e.stopPropagation();
 			highlighted = (highlighted + 1) % actionableItems.length;
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault();
+			e.stopPropagation();
 			highlighted = highlighted <= 0 ? actionableItems.length - 1 : highlighted - 1;
 		} else if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
+			e.stopPropagation();
 			if (highlighted >= 0 && highlighted < actionableItems.length) {
 				handleClick(actionableItems[highlighted]!);
 			}
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
+			e.stopPropagation();
 			open = false;
 			triggerEl?.focus();
 		}
@@ -93,7 +94,7 @@
 		</svg>
 	</button>
 	{#if open}
-		<div class="dropdown-menu" style={menuStyle}>
+		<div class="dropdown-menu" class:keyboard-nav={usingKeyboard} style={menuStyle}>
 			{#each items as item, idx}
 				{#if item.separator}
 					<div class="dropdown-separator"></div>
@@ -103,6 +104,7 @@
 						class:disabled={item.disabled}
 						class:highlighted={highlighted >= 0 && actionableItems[highlighted] === item}
 						onclick={() => handleClick(item)}
+						onmouseenter={() => { usingKeyboard = false; highlighted = -1; }}
 					>
 						<span class="item-label">{item.label}</span>
 						{#if item.shortcut}
@@ -198,7 +200,15 @@
 		text-align: left;
 	}
 
-	.dropdown-item:hover,
+	.dropdown-item:hover {
+		background: var(--bg-hover);
+	}
+
+	/* Suppress hover when navigating by keyboard */
+	.keyboard-nav .dropdown-item:hover {
+		background: transparent;
+	}
+
 	.dropdown-item.highlighted {
 		background: var(--bg-hover);
 	}
