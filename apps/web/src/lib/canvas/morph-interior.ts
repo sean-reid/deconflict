@@ -1,8 +1,7 @@
 /**
- * Shared morphological close + flood fill utility.
- * Computes building interior from a binary wall mask.
- * Used by boundary-detect, wall-detect, and optimizer-worker.
- * No DOM dependencies - safe for Web Workers.
+ * Morphological operations and building interior detection.
+ * Used by boundary-detect, wall-detect, optimizer-worker, and room detection.
+ * No DOM dependencies — safe for Web Workers.
  */
 
 export interface InteriorResult {
@@ -20,6 +19,91 @@ export interface MorphInteriorOptions {
 	/** Minimum dilation radius in pixels. Default 10. */
 	minDilateR?: number;
 }
+
+// ─── Reusable morphological operations ─────────────────────────────
+
+/**
+ * Dilate truthy pixels in a binary mask by a square radius.
+ * Each truthy pixel expands to fill a (2r+1)×(2r+1) square.
+ * Returns a new mask (does not mutate input).
+ */
+export function dilateMask(mask: Uint8Array, w: number, h: number, radius: number): Uint8Array {
+	const out = new Uint8Array(mask);
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			if (!mask[y * w + x]) continue;
+			const ylo = Math.max(0, y - radius);
+			const yhi = Math.min(h - 1, y + radius);
+			const xlo = Math.max(0, x - radius);
+			const xhi = Math.min(w - 1, x + radius);
+			for (let ny = ylo; ny <= yhi; ny++) {
+				for (let nx = xlo; nx <= xhi; nx++) {
+					out[ny * w + nx] = 1;
+				}
+			}
+		}
+	}
+	return out;
+}
+
+/**
+ * Erode: expand truthy pixels in a binary mask by a square radius.
+ * The inverse of dilate — each truthy pixel spreads its value to neighbors.
+ * Used to restore wall thickness after dilation.
+ */
+export function erodeMask(mask: Uint8Array, w: number, h: number, radius: number): Uint8Array {
+	const out = new Uint8Array(mask);
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			if (mask[y * w + x] !== 1) continue;
+			const ylo = Math.max(0, y - radius);
+			const yhi = Math.min(h - 1, y + radius);
+			const xlo = Math.max(0, x - radius);
+			const xhi = Math.min(w - 1, x + radius);
+			for (let ny = ylo; ny <= yhi; ny++) {
+				for (let nx = xlo; nx <= xhi; nx++) {
+					out[ny * w + nx] = 1;
+				}
+			}
+		}
+	}
+	return out;
+}
+
+/**
+ * Flood fill from all border pixels through passable (truthy) pixels.
+ * Returns a mask where 1 = reachable from border (exterior).
+ */
+export function floodFillExterior(passable: Uint8Array, w: number, h: number): Uint8Array {
+	const exterior = new Uint8Array(w * h);
+	const queue: number[] = [];
+
+	// Seed from all border pixels
+	for (let x = 0; x < w; x++) {
+		if (passable[x]) queue.push(x);
+		if (passable[(h - 1) * w + x]) queue.push((h - 1) * w + x);
+	}
+	for (let y = 0; y < h; y++) {
+		if (passable[y * w]) queue.push(y * w);
+		if (passable[y * w + w - 1]) queue.push(y * w + w - 1);
+	}
+
+	while (queue.length > 0) {
+		const idx = queue.pop()!;
+		if (exterior[idx]) continue;
+		exterior[idx] = 1;
+		const x = idx % w;
+		const y = Math.floor(idx / w);
+		if (y > 0 && !exterior[idx - w] && passable[idx - w]) queue.push(idx - w);
+		if (y < h - 1 && !exterior[idx + w] && passable[idx + w]) queue.push(idx + w);
+		if (x > 0 && !exterior[idx - 1] && passable[idx - 1]) queue.push(idx - 1);
+		if (x < w - 1 && !exterior[idx + 1] && passable[idx + 1]) queue.push(idx + 1);
+	}
+
+	return exterior;
+}
+
+// ─── Building interior detection ───────────────────────────────────
 
 /**
  * Compute building interior from a binary wall mask.
@@ -68,62 +152,14 @@ export function computeBuildingInterior(
 	const passable = new Uint8Array(sw * sh);
 	for (let i = 0; i < sw * sh; i++) passable[i] = small[i] ? 0 : 1;
 
-	// Dilate walls (shrink passable region)
-	const dilPass = new Uint8Array(passable);
-	for (let y = 0; y < sh; y++) {
-		for (let x = 0; x < sw; x++) {
-			if (!small[y * sw + x]) continue;
-			const ylo = Math.max(0, y - dilateR),
-				yhi = Math.min(sh - 1, y + dilateR);
-			const xlo = Math.max(0, x - dilateR),
-				xhi = Math.min(sw - 1, x + dilateR);
-			for (let ny = ylo; ny <= yhi; ny++) {
-				for (let nx = xlo; nx <= xhi; nx++) {
-					dilPass[ny * sw + nx] = 0;
-				}
-			}
-		}
-	}
-
-	// Erode walls back (dilate passable region)
-	const closedPass = new Uint8Array(dilPass);
-	for (let y = 0; y < sh; y++) {
-		for (let x = 0; x < sw; x++) {
-			if (dilPass[y * sw + x] !== 1) continue;
-			const ylo = Math.max(0, y - dilateR),
-				yhi = Math.min(sh - 1, y + dilateR);
-			const xlo = Math.max(0, x - dilateR),
-				xhi = Math.min(sw - 1, x + dilateR);
-			for (let ny = ylo; ny <= yhi; ny++) {
-				for (let nx = xlo; nx <= xhi; nx++) {
-					closedPass[ny * sw + nx] = 1;
-				}
-			}
-		}
-	}
+	// Morphological close: dilate walls (shrink passable) then erode back
+	const dilated = dilateMask(small, sw, sh, dilateR);
+	const closedPass = new Uint8Array(sw * sh);
+	for (let i = 0; i < sw * sh; i++) closedPass[i] = dilated[i] ? 0 : 1;
+	const eroded = erodeMask(closedPass, sw, sh, dilateR);
 
 	// Flood fill exterior from border
-	const smallExterior = new Uint8Array(sw * sh);
-	const queue: number[] = [];
-	for (let x = 0; x < sw; x++) {
-		if (closedPass[x]) queue.push(x);
-		if (closedPass[(sh - 1) * sw + x]) queue.push((sh - 1) * sw + x);
-	}
-	for (let y = 0; y < sh; y++) {
-		if (closedPass[y * sw]) queue.push(y * sw);
-		if (closedPass[y * sw + sw - 1]) queue.push(y * sw + sw - 1);
-	}
-	while (queue.length > 0) {
-		const idx = queue.pop()!;
-		if (smallExterior[idx]) continue;
-		smallExterior[idx] = 1;
-		const x = idx % sw,
-			y = Math.floor(idx / sw);
-		if (y > 0 && !smallExterior[idx - sw] && closedPass[idx - sw]) queue.push(idx - sw);
-		if (y < sh - 1 && !smallExterior[idx + sw] && closedPass[idx + sw]) queue.push(idx + sw);
-		if (x > 0 && !smallExterior[idx - 1] && closedPass[idx - 1]) queue.push(idx - 1);
-		if (x < sw - 1 && !smallExterior[idx + 1] && closedPass[idx + 1]) queue.push(idx + 1);
-	}
+	const smallExterior = floodFillExterior(eroded, sw, sh);
 
 	// Upsample to original resolution if needed
 	const exterior = new Uint8Array(w * h);

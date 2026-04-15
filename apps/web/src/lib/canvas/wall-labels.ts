@@ -1,21 +1,24 @@
 /**
- * Connected component labeling for wall blobs.
- * Used to identify which wall blob a clicked pixel belongs to,
- * so an entire wall segment can be relabeled with a new material.
+ * Connected component labeling and region operations.
+ * Used for wall blob detection (click-to-override material) and room detection.
  */
 
-export interface WallLabels {
-	labels: Int32Array; // pixel -> blob ID (-1 = not wall)
-	blobCount: number;
+export interface RegionLabels {
+	labels: Int32Array; // pixel → region ID (-1 = not in any region)
+	regionCount: number;
 }
 
-/** Label connected components of wall pixels via BFS. */
-export function labelWallBlobs(wallData: Uint8Array, w: number, h: number): WallLabels {
+/**
+ * Label connected regions in a binary mask via BFS.
+ * Works on any Uint8Array where truthy pixels are the regions to label.
+ * Used for wall blobs (mask = wallData) and rooms (mask = interior).
+ */
+export function labelConnectedRegions(mask: Uint8Array, w: number, h: number): RegionLabels {
 	const labels = new Int32Array(w * h).fill(-1);
 	let nextLabel = 0;
 
 	for (let i = 0; i < w * h; i++) {
-		if (!wallData[i] || labels[i] !== -1) continue;
+		if (!mask[i] || labels[i] !== -1) continue;
 
 		const label = nextLabel++;
 		const queue = [i];
@@ -26,52 +29,63 @@ export function labelWallBlobs(wallData: Uint8Array, w: number, h: number): Wall
 			const x = idx % w;
 			const y = Math.floor(idx / w);
 
-			if (y > 0 && wallData[idx - w] && labels[idx - w] === -1) {
+			if (y > 0 && mask[idx - w] && labels[idx - w] === -1) {
 				labels[idx - w] = label;
 				queue.push(idx - w);
 			}
-			if (y < h - 1 && wallData[idx + w] && labels[idx + w] === -1) {
+			if (y < h - 1 && mask[idx + w] && labels[idx + w] === -1) {
 				labels[idx + w] = label;
 				queue.push(idx + w);
 			}
-			if (x > 0 && wallData[idx - 1] && labels[idx - 1] === -1) {
+			if (x > 0 && mask[idx - 1] && labels[idx - 1] === -1) {
 				labels[idx - 1] = label;
 				queue.push(idx - 1);
 			}
-			if (x < w - 1 && wallData[idx + 1] && labels[idx + 1] === -1) {
+			if (x < w - 1 && mask[idx + 1] && labels[idx + 1] === -1) {
 				labels[idx + 1] = label;
 				queue.push(idx + 1);
 			}
 		}
 	}
 
-	return { labels, blobCount: nextLabel };
+	return { labels, regionCount: nextLabel };
 }
 
-/** Set all pixels of a given blob to a new material ID in the material mask. */
-export function relabelBlob(
+/** Backward-compatible alias. */
+export const labelWallBlobs = labelConnectedRegions;
+/** Backward-compatible type alias. */
+export type WallLabels = RegionLabels;
+
+/**
+ * Fill all pixels of a given region with a value in a target mask.
+ * Used for wall material overrides and room type assignments.
+ */
+export function fillRegion(
 	labels: Int32Array,
-	materialMask: Uint8Array,
-	blobId: number,
-	newMaterialId: number
+	targetMask: Uint8Array,
+	regionId: number,
+	value: number
 ): void {
 	for (let i = 0; i < labels.length; i++) {
-		if (labels[i] === blobId) {
-			materialMask[i] = newMaterialId;
+		if (labels[i] === regionId) {
+			targetMask[i] = value;
 		}
 	}
 }
 
-/** Encode a Uint8Array material mask as a PNG data URL. */
-export function encodeMaterialMask(materialMask: Uint8Array, w: number, h: number): string {
+/** Backward-compatible alias. */
+export const relabelBlob = fillRegion;
+
+/** Encode a Uint8Array mask as a PNG data URL (R channel stores the value). */
+export function encodeMaterialMask(mask: Uint8Array, w: number, h: number): string {
 	const canvas = document.createElement('canvas');
 	canvas.width = w;
 	canvas.height = h;
 	const ctx = canvas.getContext('2d')!;
 	const imgData = ctx.createImageData(w, h);
-	for (let i = 0; i < materialMask.length; i++) {
+	for (let i = 0; i < mask.length; i++) {
 		const j = i * 4;
-		imgData.data[j] = materialMask[i]!; // material ID in R channel
+		imgData.data[j] = mask[i]!;
 		imgData.data[j + 1] = 0;
 		imgData.data[j + 2] = 0;
 		imgData.data[j + 3] = 255;
@@ -80,7 +94,7 @@ export function encodeMaterialMask(materialMask: Uint8Array, w: number, h: numbe
 	return canvas.toDataURL('image/png');
 }
 
-/** Decode a material mask PNG data URL to a Uint8Array. */
+/** Decode a PNG data URL to a Uint8Array mask (reads R channel). */
 export function decodeMaterialMask(dataUrl: string, w: number, h: number): Promise<Uint8Array> {
 	return new Promise((resolve) => {
 		const img = new Image();
@@ -93,7 +107,7 @@ export function decodeMaterialMask(dataUrl: string, w: number, h: number): Promi
 			const data = ctx.getImageData(0, 0, w, h).data;
 			const mask = new Uint8Array(w * h);
 			for (let i = 0; i < mask.length; i++) {
-				mask[i] = data[i * 4]!; // material ID from R channel
+				mask[i] = data[i * 4]!;
 			}
 			resolve(mask);
 		};
