@@ -59,6 +59,7 @@
 	);
 	let singleAp = $derived(selectedAps.length === 1 ? selectedAps[0] : null);
 	let multiSelect = $derived(selectedAps.length > 1);
+	let nameInput: HTMLInputElement;
 
 	let batchPower = $state(20);
 
@@ -236,6 +237,7 @@
 			</Tooltip>
 			<div class="input-with-clear">
 				<input
+					bind:this={nameInput}
 					class="text-input"
 					type="text"
 					value={singleAp.name}
@@ -244,7 +246,7 @@
 					aria-label="AP name"
 				/>
 				{#if singleAp.name}
-					<button class="clear-input-btn" onclick={() => { pushState(); updateAp(singleAp.id, { name: '' }); }} aria-label="Clear name">&times;</button>
+					<button class="clear-input-btn" onclick={() => { pushState(); updateAp(singleAp.id, { name: '' }); nameInput?.focus(); }} aria-label="Clear name">&times;</button>
 				{/if}
 			</div>
 		</div>

@@ -251,7 +251,7 @@
 							onkeydown={(e) => { if (e.key === 'Enter') { onselect(activeTypeId, densityOverride, customLabel || undefined); onclose(); } }}
 						/>
 						{#if customLabel}
-							<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(activeTypeId, densityOverride, undefined); }} aria-label="Clear label">&times;</button>
+							<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(activeTypeId, densityOverride, undefined); labelInput?.focus(); }} aria-label="Clear label">&times;</button>
 						{/if}
 					</div>
 				</div>
@@ -309,7 +309,7 @@
 		border-radius: var(--radius-sm);
 		padding: var(--space-1) var(--space-2);
 		font-family: var(--font-sans);
-		font-size: 16px; /* prevents iOS zoom */
+		font-size: var(--text-sm);
 		height: 28px;
 		box-sizing: border-box;
 	}
@@ -473,7 +473,7 @@
 		border-radius: var(--radius-sm);
 		padding: var(--space-1) var(--space-2);
 		font-family: var(--font-sans);
-		font-size: 16px;
+		font-size: var(--text-sm);
 		height: 28px;
 		box-sizing: border-box;
 	}
