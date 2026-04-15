@@ -9,6 +9,7 @@
 		{ key: 'showFloorplan', label: 'Floorplan' },
 		{ key: 'showAPs', label: 'Access points' },
 		{ key: 'showWalls', label: 'Walls' },
+		{ key: 'showRoomLabels', label: 'Room labels' },
 		{ key: 'showLabels', label: 'Labels' },
 		{ key: 'showGrid', label: 'Grid' }
 	] as const;

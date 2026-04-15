@@ -53,7 +53,8 @@
 			wallMaterial: 0,
 			materialMask: null,
 			roomTypeMask: null,
-			roomDensityOverrides: {}
+			roomDensityOverrides: {},
+			roomCustomLabels: {}
 		}];
 		floorState.currentFloorId = newFloorId;
 

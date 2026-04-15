@@ -15,6 +15,10 @@
 		onclose: () => void;
 	} = $props();
 
+	let popupEl: HTMLDivElement;
+	let clampedX = $state(x);
+	let clampedY = $state(y);
+
 	function handleSelect(id: WallMaterialId) {
 		onselect(id);
 		onclose();
@@ -23,16 +27,31 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onclose();
 	}
+
+	$effect(() => {
+		if (!popupEl) return;
+		const rect = popupEl.getBoundingClientRect();
+		const pad = 8;
+		let nx = x;
+		let ny = y;
+		if (rect.right > window.innerWidth - pad) nx = window.innerWidth - rect.width - pad;
+		if (rect.bottom > window.innerHeight - pad) ny = window.innerHeight - rect.height - pad;
+		if (nx < pad) nx = pad;
+		if (ny < pad) ny = pad;
+		clampedX = nx;
+		clampedY = ny;
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="popup-backdrop" onclick={onclose}>
+<div class="popup-backdrop" onclick={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}>
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="popup"
-		style="left: {x}px; top: {y}px"
+		bind:this={popupEl}
+		style="left: {clampedX}px; top: {clampedY}px"
 		onclick={(e) => e.stopPropagation()}
 	>
 		{#each WALL_MATERIALS as mat}
