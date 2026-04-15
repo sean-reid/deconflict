@@ -1,78 +1,354 @@
 /**
  * Room type definitions with device density for capacity-aware optimization.
  *
- * Device density values are sourced from:
+ * Default density values sourced from:
  *   - Cisco Wireless High Client Density Design Guide (8.7)
  *   - Aruba VHD VRD Planning Guide
  *   - IBC Table 1004.5 (occupancy load factors)
  *   - Parks Associates CES 2024 (17 devices/US household)
- *   - Deloitte Connected Consumer Survey 2023 (21 devices/household)
+ *   - Deloitte Connected Consumer Survey 2023
  *
- * Density = expected concurrent WiFi devices per square meter,
- * accounting for phones, laptops, tablets, and IoT.
+ * Density = expected concurrent WiFi devices per square meter.
+ * Users can override the default density per room via the popup.
  */
+
+export type BuildingCategory =
+	| 'commercial'
+	| 'residential'
+	| 'education'
+	| 'healthcare'
+	| 'hospitality'
+	| 'industrial';
 
 export interface RoomType {
 	id: number;
 	name: string;
 	shortName: string; // canvas label pill
-	devicesPerSqm: number;
+	categories: BuildingCategory[]; // which building types this room appears in
+	defaultDensity: number; // devices per sqm (user-overridable per room)
 	color: [number, number, number]; // RGB for canvas tint (rendered at ~15% alpha)
 }
 
-export type RoomTypeId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
-
 /**
  * Room types. ID 0 = unassigned (not in this array).
- * Colors use a cool→warm gradient by density:
- * low density = cool blue-gray, high density = warm amber/coral.
- * All are muted to stay cohesive with the dark UI at 15% alpha.
+ * Colors follow a cool→warm gradient by density within each category.
  */
 export const ROOM_TYPES: readonly RoomType[] = [
-	// ─── Commercial ──────────────────────────────────────────────
-	// Cisco: transient, phones only. ~0.10-0.13 dev/sqm
-	{ id: 1, name: 'Hallway', shortName: 'Hall', devicesPerSqm: 0.1, color: [130, 140, 160] },
-	// Minimal human presence, IoT sensors only. ~0.05 dev/sqm
-	{ id: 2, name: 'Storage', shortName: 'Store', devicesPerSqm: 0.05, color: [120, 120, 130] },
-	// IBC: 14 sqm/person. Cisco: 2-3 dev/person. ~0.2 dev/sqm
+	// ─── Default ─────────────────────────────────────────────────
+	{
+		id: 1,
+		name: 'Custom',
+		shortName: 'Custom',
+		categories: [
+			'commercial',
+			'residential',
+			'education',
+			'healthcare',
+			'hospitality',
+			'industrial'
+		],
+		defaultDensity: 0.3,
+		color: [150, 150, 155]
+	},
+
+	// ─── Low traffic ─────────────────────────────────────────────
+	{
+		id: 2,
+		name: 'Hallway',
+		shortName: 'Hall',
+		categories: ['commercial', 'education', 'healthcare', 'hospitality'],
+		defaultDensity: 0.1,
+		color: [130, 140, 160]
+	},
 	{
 		id: 3,
+		name: 'Stairwell',
+		shortName: 'Stair',
+		categories: ['commercial', 'education', 'healthcare'],
+		defaultDensity: 0.03,
+		color: [115, 115, 125]
+	},
+	{
+		id: 4,
+		name: 'Storage',
+		shortName: 'Store',
+		categories: ['commercial', 'residential', 'industrial'],
+		defaultDensity: 0.05,
+		color: [120, 120, 130]
+	},
+	{
+		id: 5,
+		name: 'Restroom',
+		shortName: 'WC',
+		categories: ['commercial', 'education', 'healthcare', 'hospitality'],
+		defaultDensity: 0.08,
+		color: [125, 130, 145]
+	},
+	{
+		id: 6,
+		name: 'Elevator Lobby',
+		shortName: 'Elev',
+		categories: ['commercial', 'hospitality'],
+		defaultDensity: 0.1,
+		color: [125, 135, 150]
+	},
+	{
+		id: 7,
+		name: 'Warehouse',
+		shortName: 'Whse',
+		categories: ['commercial', 'industrial'],
+		defaultDensity: 0.05,
+		color: [115, 120, 130]
+	},
+	{
+		id: 8,
+		name: 'Server Room',
+		shortName: 'Server',
+		categories: ['commercial', 'education'],
+		defaultDensity: 0.2,
+		color: [110, 130, 160]
+	},
+
+	// ─── Medium traffic ──────────────────────────────────────────
+	{
+		id: 10,
 		name: 'Private Office',
 		shortName: 'Office',
-		devicesPerSqm: 0.2,
+		categories: ['commercial', 'education', 'healthcare'],
+		defaultDensity: 0.2,
 		color: [100, 170, 140]
 	},
-	// IBC: 8 sqm/person. Cisco: 2.5 dev/person. ~0.3 dev/sqm
-	{ id: 4, name: 'Open Office', shortName: 'Open', devicesPerSqm: 0.3, color: [80, 170, 165] },
-	// IBC: 2 sqm/person assembly. Cisco HD: 2 dev/person. ~0.8 dev/sqm
-	{ id: 5, name: 'Conference Room', shortName: 'Conf', devicesPerSqm: 0.8, color: [200, 170, 70] },
-	// IBC: 1.9 sqm/person. 2 dev/student. ~1.0 dev/sqm
-	{ id: 6, name: 'Classroom', shortName: 'Class', devicesPerSqm: 1.0, color: [210, 150, 60] },
-	// IBC: 0.65 sqm/person concentrated. 1.5 dev/person. ~1.2 dev/sqm
-	{ id: 7, name: 'Auditorium', shortName: 'Audit', devicesPerSqm: 1.2, color: [200, 100, 80] },
-	// Variable: 5-15 transient. ~0.3 dev/sqm
-	{ id: 8, name: 'Lobby', shortName: 'Lobby', devicesPerSqm: 0.3, color: [90, 170, 190] },
-	// IBC: 1.4 sqm/person dining. 1.5 dev/person. ~0.8 dev/sqm
-	{ id: 9, name: 'Cafeteria', shortName: 'Cafe', devicesPerSqm: 0.8, color: [190, 160, 80] },
-	// IBC: 2.8 sqm/person retail. Staff POS + customer phones. ~0.2 dev/sqm
-	{ id: 10, name: 'Retail Floor', shortName: 'Retail', devicesPerSqm: 0.2, color: [150, 140, 170] },
-	// IoT sensors + management. Low human traffic. ~0.2 dev/sqm
-	{ id: 11, name: 'Server Room', shortName: 'Server', devicesPerSqm: 0.2, color: [110, 130, 160] },
+	{
+		id: 11,
+		name: 'Open Office',
+		shortName: 'Open',
+		categories: ['commercial'],
+		defaultDensity: 0.3,
+		color: [80, 170, 165]
+	},
+	{
+		id: 12,
+		name: 'Lobby',
+		shortName: 'Lobby',
+		categories: ['commercial', 'hospitality', 'healthcare'],
+		defaultDensity: 0.3,
+		color: [90, 170, 190]
+	},
+	{
+		id: 13,
+		name: 'Retail Floor',
+		shortName: 'Retail',
+		categories: ['commercial'],
+		defaultDensity: 0.2,
+		color: [150, 140, 170]
+	},
+	{
+		id: 14,
+		name: 'Waiting Room',
+		shortName: 'Wait',
+		categories: ['healthcare', 'commercial'],
+		defaultDensity: 0.35,
+		color: [110, 160, 170]
+	},
+	{
+		id: 15,
+		name: 'Library',
+		shortName: 'Library',
+		categories: ['education', 'commercial'],
+		defaultDensity: 0.25,
+		color: [120, 155, 150]
+	},
+	{
+		id: 16,
+		name: 'Lab',
+		shortName: 'Lab',
+		categories: ['education', 'healthcare', 'commercial'],
+		defaultDensity: 0.2,
+		color: [130, 150, 160]
+	},
+	{
+		id: 17,
+		name: 'Exam Room',
+		shortName: 'Exam',
+		categories: ['healthcare'],
+		defaultDensity: 0.25,
+		color: [130, 165, 155]
+	},
+	{
+		id: 18,
+		name: 'Hotel Room',
+		shortName: 'Hotel',
+		categories: ['hospitality'],
+		defaultDensity: 0.3,
+		color: [140, 150, 165]
+	},
+	{
+		id: 19,
+		name: 'Gym',
+		shortName: 'Gym',
+		categories: ['commercial', 'hospitality', 'residential'],
+		defaultDensity: 0.4,
+		color: [160, 155, 100]
+	},
+
+	// ─── High traffic ────────────────────────────────────────────
+	{
+		id: 20,
+		name: 'Conference Room',
+		shortName: 'Conf',
+		categories: ['commercial'],
+		defaultDensity: 0.8,
+		color: [200, 170, 70]
+	},
+	{
+		id: 21,
+		name: 'Boardroom',
+		shortName: 'Board',
+		categories: ['commercial'],
+		defaultDensity: 0.6,
+		color: [190, 165, 80]
+	},
+	{
+		id: 22,
+		name: 'Cafeteria',
+		shortName: 'Cafe',
+		categories: ['commercial', 'education', 'healthcare'],
+		defaultDensity: 0.8,
+		color: [190, 160, 80]
+	},
+	{
+		id: 23,
+		name: 'Classroom',
+		shortName: 'Class',
+		categories: ['education'],
+		defaultDensity: 1.0,
+		color: [210, 150, 60]
+	},
+	{
+		id: 24,
+		name: 'Call Center',
+		shortName: 'Calls',
+		categories: ['commercial'],
+		defaultDensity: 0.5,
+		color: [170, 160, 90]
+	},
+	{
+		id: 25,
+		name: 'Auditorium',
+		shortName: 'Audit',
+		categories: ['education', 'commercial'],
+		defaultDensity: 1.2,
+		color: [200, 100, 80]
+	},
+	{
+		id: 26,
+		name: 'Event Space',
+		shortName: 'Event',
+		categories: ['hospitality', 'commercial'],
+		defaultDensity: 1.5,
+		color: [210, 90, 70]
+	},
+	{
+		id: 27,
+		name: 'Restaurant',
+		shortName: 'Rest',
+		categories: ['hospitality', 'commercial'],
+		defaultDensity: 0.7,
+		color: [185, 155, 85]
+	},
 
 	// ─── Residential ─────────────────────────────────────────────
-	// Parks: 30-40% of 17 devices concentrate here. ~0.4 dev/sqm
-	{ id: 12, name: 'Living Room', shortName: 'Living', devicesPerSqm: 0.4, color: [130, 165, 140] },
-	// 1-2 people, 3-5 devices. ~0.25 dev/sqm
-	{ id: 13, name: 'Bedroom', shortName: 'Bed', devicesPerSqm: 0.25, color: [140, 140, 165] },
-	// Smart appliances + phone. ~0.25 dev/sqm
-	{ id: 14, name: 'Kitchen', shortName: 'Kitchen', devicesPerSqm: 0.25, color: [160, 150, 130] },
-	// Highest residential density. Small room, full workstation. ~0.6 dev/sqm
-	{ id: 15, name: 'Home Office', shortName: 'Office', devicesPerSqm: 0.6, color: [100, 170, 140] },
-	// Large, sparse. IoT + occasional use. ~0.08 dev/sqm
-	{ id: 16, name: 'Garage', shortName: 'Garage', devicesPerSqm: 0.08, color: [130, 130, 135] }
+	{
+		id: 30,
+		name: 'Living Room',
+		shortName: 'Living',
+		categories: ['residential'],
+		defaultDensity: 0.4,
+		color: [130, 165, 140]
+	},
+	{
+		id: 31,
+		name: 'Bedroom',
+		shortName: 'Bed',
+		categories: ['residential', 'hospitality'],
+		defaultDensity: 0.25,
+		color: [140, 140, 165]
+	},
+	{
+		id: 32,
+		name: 'Kitchen',
+		shortName: 'Kitchen',
+		categories: ['residential'],
+		defaultDensity: 0.25,
+		color: [160, 150, 130]
+	},
+	{
+		id: 33,
+		name: 'Dining Room',
+		shortName: 'Dining',
+		categories: ['residential'],
+		defaultDensity: 0.2,
+		color: [145, 150, 140]
+	},
+	{
+		id: 34,
+		name: 'Home Office',
+		shortName: 'Office',
+		categories: ['residential'],
+		defaultDensity: 0.6,
+		color: [100, 170, 140]
+	},
+	{
+		id: 35,
+		name: 'Bathroom',
+		shortName: 'Bath',
+		categories: ['residential'],
+		defaultDensity: 0.15,
+		color: [130, 145, 155]
+	},
+	{
+		id: 36,
+		name: 'Garage',
+		shortName: 'Garage',
+		categories: ['residential', 'industrial'],
+		defaultDensity: 0.08,
+		color: [130, 130, 135]
+	},
+	{
+		id: 37,
+		name: 'Basement',
+		shortName: 'Bsmt',
+		categories: ['residential'],
+		defaultDensity: 0.06,
+		color: [120, 125, 130]
+	},
+	{
+		id: 38,
+		name: 'Laundry',
+		shortName: 'Lndry',
+		categories: ['residential', 'commercial'],
+		defaultDensity: 0.1,
+		color: [125, 135, 140]
+	},
+	{
+		id: 39,
+		name: 'Patio',
+		shortName: 'Patio',
+		categories: ['residential'],
+		defaultDensity: 0.1,
+		color: [120, 150, 135]
+	}
 ];
 
 /** Look up a room type by ID. Returns undefined for ID 0 (unassigned). */
 export function getRoomType(id: number): RoomType | undefined {
 	return ROOM_TYPES.find((t) => t.id === id);
+}
+
+/** The default room type — used when users don't know the room function yet. */
+export const DEFAULT_ROOM_TYPE_ID = 1;
+
+/** Get room types filtered by building category. */
+export function getRoomTypesForCategory(category: BuildingCategory): RoomType[] {
+	return ROOM_TYPES.filter((t) => t.categories.includes(category));
 }

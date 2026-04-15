@@ -52,7 +52,8 @@
 			wallAttenuation: 5,
 			wallMaterial: 0,
 			materialMask: null,
-			roomTypeMask: null
+			roomTypeMask: null,
+			roomDensityOverrides: {}
 		}];
 		floorState.currentFloorId = newFloorId;
 

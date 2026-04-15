@@ -45,6 +45,7 @@ interface ProjectFloorV3 {
 		originX?: number;
 		originY?: number;
 	} | null;
+	roomDensityOverrides?: Record<string, number>;
 }
 
 interface ProjectFileV3 {
@@ -168,7 +169,8 @@ export async function serialize(): Promise<string> {
 			wallAttenuation: floor.wallAttenuation,
 			wallMaterial: floor.wallMaterial,
 			materialMask: floor.materialMask ? JSON.parse(JSON.stringify(floor.materialMask)) : null,
-			roomTypeMask: floor.roomTypeMask ? JSON.parse(JSON.stringify(floor.roomTypeMask)) : null
+			roomTypeMask: floor.roomTypeMask ? JSON.parse(JSON.stringify(floor.roomTypeMask)) : null,
+			roomDensityOverrides: {}
 		});
 	}
 
@@ -228,7 +230,8 @@ function migrateV2(data: ProjectFileV2): ProjectFileV3 {
 				wallAttenuation: data.wallAttenuation,
 				wallMaterial: data.wallMaterial,
 				materialMask: data.materialMask,
-				roomTypeMask: null
+				roomTypeMask: null,
+				roomDensityOverrides: {}
 			}
 		],
 		aps: (data.aps || []).map((ap) => ({
@@ -301,7 +304,8 @@ export function deserialize(json: string): void {
 					originX: f.roomTypeMask.originX ?? 0,
 					originY: f.roomTypeMask.originY ?? 0
 				}
-			: null
+			: null,
+		roomDensityOverrides: (f as any).roomDensityOverrides ?? {}
 	}));
 	floorState.currentFloorId = floorState.floors[0]!.id;
 

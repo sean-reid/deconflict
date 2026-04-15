@@ -79,6 +79,7 @@ interface SavedFloor {
 		originX?: number;
 		originY?: number;
 	} | null;
+	roomDensityOverrides?: Record<string, number>;
 }
 
 interface SavedStateV3 {
@@ -141,7 +142,8 @@ function saveToStorage(): void {
 				wallAttenuation: f.wallAttenuation,
 				wallMaterial: f.wallMaterial,
 				materialMask: f.materialMask ? JSON.parse(JSON.stringify(f.materialMask)) : null,
-				roomTypeMask: f.roomTypeMask ? JSON.parse(JSON.stringify(f.roomTypeMask)) : null
+				roomTypeMask: f.roomTypeMask ? JSON.parse(JSON.stringify(f.roomTypeMask)) : null,
+				roomDensityOverrides: {}
 			})),
 			aps: JSON.parse(JSON.stringify(apState.aps))
 		};
@@ -216,7 +218,8 @@ function migrateV2(data: SavedStateV2): SavedStateV3 {
 							originY: data.materialMask.originY ?? 0
 						}
 					: null,
-				roomTypeMask: null
+				roomTypeMask: null,
+				roomDensityOverrides: {}
 			}
 		],
 		aps: (data.aps || []).map((ap) => ({
@@ -289,7 +292,8 @@ export function restoreFromStorage(): boolean {
 						originX: f.roomTypeMask.originX ?? 0,
 						originY: f.roomTypeMask.originY ?? 0
 					}
-				: null
+				: null,
+			roomDensityOverrides: (f as any).roomDensityOverrides ?? {}
 		}));
 		floorState.currentFloorId = floorState.floors[0]!.id;
 
