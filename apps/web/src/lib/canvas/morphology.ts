@@ -11,7 +11,7 @@ export interface InteriorResult {
 	exterior: Uint8Array;
 }
 
-export interface MorphInteriorOptions {
+export interface BuildingInteriorOptions {
 	/** Downsample to this max dimension before morph close. 0 = no downsample. */
 	maxDim?: number;
 	/** Dilation radius as fraction of (downsampled) width. Default 0.04. */
@@ -119,7 +119,7 @@ export function computeBuildingInterior(
 	wallMask: Uint8Array,
 	w: number,
 	h: number,
-	options?: MorphInteriorOptions
+	options?: BuildingInteriorOptions
 ): InteriorResult {
 	const maxDim = options?.maxDim ?? 0;
 	const dilateRatio = options?.dilateRatio ?? 0.04;

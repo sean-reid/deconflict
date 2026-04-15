@@ -1,5 +1,5 @@
 import { createWorker, type Worker } from 'tesseract.js';
-import { computeBuildingInterior } from './morph-interior.js';
+import { computeBuildingInterior } from './morphology.js';
 
 export interface WallMask {
 	dataUrl: string;

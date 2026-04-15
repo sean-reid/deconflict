@@ -2,7 +2,7 @@ import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
 import { decodeMask, computeWallAttenuation, type DecodedWallMask } from '$canvas/wall-detect.js';
 import { WALL_MATERIALS } from '$canvas/materials.js';
-import { computeBuildingInterior } from '$canvas/morph-interior.js';
+import { computeBuildingInterior } from '$canvas/morphology.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
 import { floorState, getFloorSlabAttenuation } from './floor-state.svelte.js';
 import type { Band } from '@deconflict/channels';
