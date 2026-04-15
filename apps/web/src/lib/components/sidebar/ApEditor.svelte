@@ -234,14 +234,19 @@
 			<Tooltip text="A label for this access point. Use something descriptive like 'Living Room' or 'Upstairs Hall'." position="left">
 				<span class="field-label">Name</span>
 			</Tooltip>
-			<input
-				class="text-input"
-				type="text"
-				value={singleAp.name}
-				oninput={handleNameInput}
-				onfocus={handleNameFocus}
-				aria-label="AP name"
-			/>
+			<div class="input-with-clear">
+				<input
+					class="text-input"
+					type="text"
+					value={singleAp.name}
+					oninput={handleNameInput}
+					onfocus={handleNameFocus}
+					aria-label="AP name"
+				/>
+				{#if singleAp.name}
+					<button class="clear-input-btn" onclick={() => { pushState(); updateAp(singleAp.id, { name: '' }); }} aria-label="Clear name">&times;</button>
+				{/if}
+			</div>
 		</div>
 
 		<div class="field">
@@ -412,6 +417,39 @@
 		color: var(--text-tertiary);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+	}
+
+	.input-with-clear {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+
+	.input-with-clear .text-input {
+		padding-right: 24px;
+	}
+
+	.clear-input-btn {
+		position: absolute;
+		right: 4px;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--text-tertiary);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+	}
+
+	.clear-input-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-hover);
 	}
 
 	.text-input {

@@ -232,14 +232,19 @@
 		{#if currentTypeId > 0}
 			{#if currentTypeId === 1}
 				<div class="label-section">
-					<input
-						type="text"
-						class="label-input"
-						placeholder="Custom label..."
-						bind:value={customLabel}
-						oninput={() => onselect(currentTypeId, densityOverride, customLabel || undefined)}
-						onkeydown={(e) => { if (e.key === 'Enter') { onselect(currentTypeId, densityOverride, customLabel || undefined); onclose(); } }}
-					/>
+					<div class="input-with-clear">
+						<input
+							type="text"
+							class="label-input"
+							placeholder="Custom label..."
+							bind:value={customLabel}
+							oninput={() => onselect(currentTypeId, densityOverride, customLabel || undefined)}
+							onkeydown={(e) => { if (e.key === 'Enter') { onselect(currentTypeId, densityOverride, customLabel || undefined); onclose(); } }}
+						/>
+						{#if customLabel}
+							<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(currentTypeId, densityOverride, undefined); }} aria-label="Clear label">&times;</button>
+						{/if}
+					</div>
 				</div>
 			{/if}
 			<div class="density-section">
@@ -416,6 +421,39 @@
 	.label-section {
 		padding: var(--space-1) var(--space-2);
 		border-top: 1px solid var(--border-subtle);
+	}
+
+	.input-with-clear {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+
+	.input-with-clear .label-input {
+		padding-right: 24px;
+	}
+
+	.clear-input-btn {
+		position: absolute;
+		right: 4px;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--text-tertiary);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+	}
+
+	.clear-input-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-hover);
 	}
 
 	.label-input {
