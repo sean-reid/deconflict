@@ -4,20 +4,23 @@
 	let {
 		x,
 		y,
+		maxY = typeof window !== 'undefined' ? window.innerHeight : 800,
 		currentMaterial,
 		onselect,
 		onclose
 	}: {
 		x: number;
 		y: number;
+		maxY?: number;
 		currentMaterial: WallMaterialId;
 		onselect: (id: WallMaterialId) => void;
 		onclose: () => void;
 	} = $props();
 
 	let popupEl: HTMLDivElement;
-	let clampedX = $state(x);
-	let clampedY = $state(y);
+	const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+	let posX = $state(Math.max(8, Math.min(x, vw - 180)));
+	let posY = $state(y);
 
 	function handleSelect(id: WallMaterialId) {
 		onselect(id);
@@ -30,16 +33,12 @@
 
 	$effect(() => {
 		if (!popupEl) return;
-		const rect = popupEl.getBoundingClientRect();
-		const pad = 8;
-		let nx = x;
-		let ny = y;
-		if (rect.right > window.innerWidth - pad) nx = window.innerWidth - rect.width - pad;
-		if (rect.bottom > window.innerHeight - pad) ny = window.innerHeight - rect.height - pad;
-		if (nx < pad) nx = pad;
-		if (ny < pad) ny = pad;
-		clampedX = nx;
-		clampedY = ny;
+		requestAnimationFrame(() => {
+			const rect = popupEl.getBoundingClientRect();
+			if (rect.right > vw - 8) posX = vw - rect.width - 8;
+			if (posX < 8) posX = 8;
+			if (rect.bottom > maxY) posY = Math.max(8, maxY - rect.height);
+		});
 	});
 </script>
 
@@ -51,7 +50,7 @@
 	<div
 		class="popup"
 		bind:this={popupEl}
-		style="left: {clampedX}px; top: {clampedY}px"
+		style="left: {posX}px; top: {posY}px; max-height: {maxY - posY - 8}px"
 		onclick={(e) => e.stopPropagation()}
 	>
 		{#each WALL_MATERIALS as mat}

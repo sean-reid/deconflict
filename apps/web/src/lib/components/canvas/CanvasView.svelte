@@ -1255,6 +1255,7 @@
 	<WallMaterialPopup
 		x={wallPopup.x}
 		y={wallPopup.y}
+		maxY={containerEl?.getBoundingClientRect().bottom ?? window.innerHeight}
 		currentMaterial={wallPopup.material}
 		onselect={handleMaterialSelect}
 		onclose={() => { wallPopup = null; }}
@@ -1265,6 +1266,7 @@
 	<RoomTypePopup
 		x={roomPopup.x}
 		y={roomPopup.y}
+		maxY={containerEl?.getBoundingClientRect().bottom ?? window.innerHeight}
 		currentTypeId={roomPopup.typeId}
 		currentDensity={roomPopup.density}
 		currentLabel={roomPopup.customLabel}

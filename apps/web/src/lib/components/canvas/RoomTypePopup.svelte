@@ -4,6 +4,7 @@
 	let {
 		x,
 		y,
+		maxY = typeof window !== 'undefined' ? window.innerHeight : 800,
 		currentTypeId = 0,
 		currentDensity,
 		currentLabel,
@@ -13,6 +14,7 @@
 	}: {
 		x: number;
 		y: number;
+		maxY?: number;
 		currentTypeId: number;
 		currentDensity?: number;
 		currentLabel?: string;
@@ -28,10 +30,9 @@
 	let searchInput: HTMLInputElement;
 	let popupEl: HTMLDivElement;
 	let highlightIndex = $state(-1);
-	// Pre-clamp: estimate max popup height (~400px or viewport - 16px) and ensure it fits
-	const estimatedMaxH = typeof window !== 'undefined' ? Math.min(400, window.innerHeight - 16) : 400;
-	let clampedX = $state(Math.max(8, Math.min(x, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 230)));
-	let clampedY = $state(Math.max(8, Math.min(y, (typeof window !== 'undefined' ? window.innerHeight : 800) - estimatedMaxH - 8)));
+	const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+	let posX = $state(Math.max(8, Math.min(x, vw - 230)));
+	let posY = $state(y);
 
 	const CATEGORY_ORDER: BuildingCategory[] = ['commercial', 'residential', 'education', 'healthcare', 'hospitality', 'industrial'];
 	const CATEGORY_LABELS: Record<BuildingCategory, string> = {
@@ -159,27 +160,23 @@
 		if (searchInput) searchInput.focus();
 	});
 
-	// Clamp popup position to viewport. Reruns when content changes (activeTypeId).
-	function clampToViewport() {
+	// After render: shift popup up if it overflows past maxY (canvas bottom)
+	function adjustPosition() {
 		if (!popupEl) return;
 		const rect = popupEl.getBoundingClientRect();
-		const pad = 8;
-		let nx = x;
-		let ny = y;
-		if (rect.right > window.innerWidth - pad) nx = window.innerWidth - rect.width - pad;
-		if (rect.bottom > window.innerHeight - pad) ny = window.innerHeight - rect.height - pad;
-		if (nx < pad) nx = pad;
-		if (ny < pad) ny = pad;
-		clampedX = nx;
-		clampedY = ny;
+		// Horizontal clamp
+		if (rect.right > vw - 8) posX = vw - rect.width - 8;
+		if (posX < 8) posX = 8;
+		// Vertical: top at cursor, shift up if bottom exceeds canvas area
+		if (rect.bottom > maxY) {
+			posY = Math.max(8, maxY - rect.height);
+		}
 	}
 
 	$effect(() => {
 		if (!popupEl) return;
-		// Track content changes that affect popup height
-		void activeTypeId;
-		void customLabel;
-		requestAnimationFrame(() => requestAnimationFrame(clampToViewport));
+		void activeTypeId; // re-run when content changes (Custom adds inputs)
+		requestAnimationFrame(() => requestAnimationFrame(adjustPosition));
 	});
 </script>
 
@@ -191,7 +188,7 @@
 	<div
 		class="popup"
 		bind:this={popupEl}
-		style="left: {clampedX}px; top: {clampedY}px; max-height: calc(100vh - {clampedY}px - 8px)"
+		style="left: {posX}px; top: {posY}px"
 		onclick={(e) => e.stopPropagation()}
 	>
 		{#if activeTypeId > 0}
@@ -345,6 +342,7 @@
 		z-index: 51;
 		min-width: 180px;
 		max-width: 220px;
+		max-height: 420px;
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-default);
 		border-radius: var(--radius-lg);
