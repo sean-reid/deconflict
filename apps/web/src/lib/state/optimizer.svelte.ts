@@ -1,9 +1,10 @@
 import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
-import { decodeMask, computeWallAttenuation, type DecodedWallMask } from '$canvas/wall-detect.js';
+import { decodeMask, type DecodedWallMask } from '$canvas/wall-detect.js';
 import { decodeMaterialMask } from '$canvas/region-labels.js';
 import { WALL_MATERIALS } from '$canvas/materials.js';
 import { computeBuildingInterior } from '$canvas/morphology.js';
+import { countWallCrossings } from '$lib/rf/propagation.js';
 import { labelRooms } from '$canvas/region-labels.js';
 import { ROOM_TYPES, getRoomType } from '$canvas/room-types.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
@@ -38,18 +39,13 @@ export function getBuildingCoverage(): number {
 
 // Cached interior sample points and decoded mask for real-time coverage
 let cachedMaskUrl: string | null = null;
-let cachedRtMaskUrl: string | null = null;
 let cachedMask: DecodedWallMask | null = null;
 let cachedSamples: Array<{ x: number; y: number }> | null = null;
-let cachedSampleWeights: number[] | null = null;
 
 async function ensureCoverageCache(): Promise<boolean> {
 	const mask = projectState.wallMask;
 	if (!mask) return false;
-	const rtUrl = wallState.roomTypeMask?.dataUrl ?? null;
-	if (mask.dataUrl === cachedMaskUrl && rtUrl === cachedRtMaskUrl && cachedMask && cachedSamples)
-		return true;
-	cachedRtMaskUrl = rtUrl;
+	if (mask.dataUrl === cachedMaskUrl && cachedMask && cachedSamples) return true;
 
 	cachedMask = await decodeMask(mask.dataUrl, mask.width, mask.height);
 	cachedMaskUrl = mask.dataUrl;
@@ -66,42 +62,12 @@ async function ensureCoverageCache(): Promise<boolean> {
 		if (interior[i]) interiorPixels.push(i);
 	}
 
-	// Build per-pixel density lookup from room type mask
-	let pixelDensity: Float32Array | null = null;
-	const rtMask = wallState.roomTypeMask;
-	if (rtMask && rtMask.width === mask.width && rtMask.height === mask.height) {
-		const rtData = await decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height);
-		const typeDensity = new Map<number, number>();
-		for (const t of ROOM_TYPES) typeDensity.set(t.id, t.defaultDensity);
-		pixelDensity = new Float32Array(mask.width * mask.height).fill(-1);
-		for (let i = 0; i < rtData.length; i++) {
-			const typeId = rtData[i]!;
-			if (typeId > 0) pixelDensity[i] = typeDensity.get(typeId) ?? 0;
-		}
-	}
-
 	const sampleCount = Math.min(200, interiorPixels.length);
 	const step = interiorPixels.length / sampleCount;
 	cachedSamples = [];
-	// Compute median of labeled densities for baseline
-	let coverageMedian = 0.3;
-	if (pixelDensity) {
-		const labeled: number[] = [];
-		for (let i = 0; i < pixelDensity.length; i++) {
-			if (pixelDensity[i]! >= 0) labeled.push(pixelDensity[i]!);
-		}
-		if (labeled.length > 0) {
-			labeled.sort((a, b) => a - b);
-			coverageMedian = labeled[Math.floor(labeled.length / 2)]!;
-		}
-	}
-
-	cachedSampleWeights = [];
 	for (let i = 0; i < sampleCount; i++) {
 		const idx = interiorPixels[Math.floor(i * step)]!;
 		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
-		const raw = pixelDensity ? (pixelDensity[idx] ?? -1) : -1;
-		cachedSampleWeights.push(raw >= 0 ? raw : coverageMedian);
 	}
 
 	return cachedSamples.length > 0;
@@ -120,14 +86,7 @@ export async function updateCoverage(): Promise<void> {
 	}
 
 	const { data, width, height } = cachedMask;
-	const defaultDb =
-		WALL_MATERIALS[projectState.wallMaterial]?.attenuation ?? projectState.wallAttenuation;
-	// Decode material mask if available
-	let matData: Uint8Array | null = null;
-	if (projectState.materialMask && cachedMask) {
-		// Reuse cached mask dimensions for material mask decode
-		// For now, material map may not be loaded yet - skip if null
-	}
+	const wallDb = projectState.wallAttenuation;
 	// Include virtual APs from other floors as fixed signal sources
 	const curFloorId = floorState.currentFloorId;
 	const localAps = projectState.aps.filter((ap) => ap.floorId === curFloorId);
@@ -144,12 +103,9 @@ export async function updateCoverage(): Promise<void> {
 	}
 	const allAps = [...localAps.map((ap) => ({ ...ap, signalScale: 1 })), ...virtualAps];
 
-	let totalWeightedSignal = 0;
-	let totalWeight = 0;
-	const weights = cachedSampleWeights ?? [];
+	let totalSignal = 0;
 
-	for (let i = 0; i < cachedSamples.length; i++) {
-		const sample = cachedSamples[i]!;
+	for (const sample of cachedSamples) {
 		let best = 0;
 		for (const ap of allAps) {
 			const dx = sample.x - ap.x;
@@ -159,28 +115,17 @@ export async function updateCoverage(): Promise<void> {
 			if (ratio >= 1.5) continue;
 			let signal = Math.pow(1 - ratio / 1.5, 2);
 			if (signal > 0.001) {
-				const wallLoss = computeWallAttenuation(
-					{ data, width, height, originX: cachedMask.originX, originY: cachedMask.originY },
-					matData,
-					WALL_MATERIALS,
-					defaultDb,
-					ap.x,
-					ap.y,
-					sample.x,
-					sample.y
-				);
-				if (wallLoss > 0) signal *= Math.pow(10, -wallLoss / 20);
+				// Same wall model as optimizer worker: flat dB per wall crossing
+				const crossings = countWallCrossings(data, width, height, ap.x, ap.y, sample.x, sample.y);
+				if (crossings > 0) signal *= Math.pow(10, (-crossings * wallDb) / 20);
 			}
-			signal *= ap.signalScale; // floor slab attenuation for virtual APs
+			signal *= ap.signalScale;
 			if (signal > best) best = signal;
 		}
-		const w = weights[i] ?? 1;
-		totalWeightedSignal += best * w;
-		totalWeight += w;
+		totalSignal += best;
 	}
 
-	optimizerState.coverage =
-		totalWeight > 0 ? Math.round((totalWeightedSignal / totalWeight) * 100) : 0;
+	optimizerState.coverage = Math.round((totalSignal / cachedSamples.length) * 100);
 
 	// Cache per-floor coverage (weighted by sample count as area proxy)
 	floorCoverage.set(curFloorId, {

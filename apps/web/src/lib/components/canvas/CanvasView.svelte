@@ -885,7 +885,6 @@
 	$effect(() => {
 		const _key = autoSolveKey;
 		const _mask = wallState.wallMask;
-		const _rtMask = wallState.roomTypeMask; // re-run when room types change
 		if (apState.aps.length === 0 || !_mask) return;
 		if (coverageTimeout) clearTimeout(coverageTimeout);
 		coverageTimeout = setTimeout(() => updateCoverage(), 300);
