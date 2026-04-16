@@ -58,8 +58,8 @@
 				<section class="section">
 					<h3 class="section-heading">TIPS</h3>
 					<ul class="quick-start">
-						<li>Click a wall to change its material</li>
-						<li>Right-click a room to assign its type and density</li>
+						<li>Tap a wall to change its material</li>
+						<li>Long-press a room to assign its type and density</li>
 						<li>Edit Walls to erase, draw, or paint materials</li>
 						<li>Add floors in the Floorplan tab</li>
 						<li>Optimize Placement finds best AP positions</li>
