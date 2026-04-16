@@ -8,8 +8,8 @@ import type { CanvasEngine } from '$canvas/engine.js';
 /** Wait for Svelte effects + async decodes to settle after a floor switch. */
 function waitForRender(): Promise<void> {
 	return new Promise((resolve) => {
-		// Two rAFs to flush Svelte effects, then a timeout for async image/mask decode
-		requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 200)));
+		// Two rAFs to flush Svelte effects, then a timeout for async image/mask/room-type decode
+		requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 400)));
 	});
 }
 

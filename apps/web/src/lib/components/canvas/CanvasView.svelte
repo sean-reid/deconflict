@@ -21,7 +21,7 @@
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
 	import { solverState, runSolver, invalidateSolverMaskCache, setLiveSolverMask } from '$state/solver.svelte.js';
-	import { updateCoverage } from '$state/optimizer.svelte.js';
+	import { updateCoverage, optimizerState, floorCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
@@ -117,6 +117,7 @@
 		canvasDragOver = false;
 		const file = e.dataTransfer?.files[0];
 		if (file) {
+			pushState();
 			importFloorplanFile(file);
 			appState.sidebarPanel = 'floorplan';
 			appState.sidebarOpen = true;
@@ -622,6 +623,7 @@
 		// the previous floor doesn't render while the decode is in-flight.
 		lastWallMaskUrl = null;
 		lastMatMaskUrl = null;
+		lastRoomTypeMaskUrl = null;
 		cachedWallData = null;
 		cachedMaterialData = null;
 		cachedWallLabels = null;
@@ -647,6 +649,11 @@
 
 		lastSyncedFloorId = id;
 		clearSelection();
+
+		// Immediately show cached coverage for this floor (recomputed after decode)
+		const fc = floorCoverage.get(id);
+		optimizerState.coverage = fc?.coverage ?? 0;
+
 		engine?.markDirty();
 	});
 
@@ -670,7 +677,7 @@
 		engine.markDirty();
 	});
 
-	// Decode wall mask + material mask — only tracks wallState (not apState)
+	// Decode wall mask + material mask — tracks wallState URLs
 	let wallMaskVersion = 0;
 	let lastWallMaskUrl: string | null = null;
 	let lastMatMaskUrl: string | null = null;
@@ -679,7 +686,7 @@
 		const mask = wallState.wallMask;
 		const matMask = wallState.materialMask;
 
-		// Skip re-decode if the data URLs haven't changed (avoids stale overwrites)
+		// Skip re-decode if the data URLs haven't changed
 		const wallUrl = mask?.dataUrl ?? null;
 		const matUrl = matMask?.dataUrl ?? null;
 		if (wallUrl === lastWallMaskUrl && matUrl === lastMatMaskUrl && cachedWallData) return;
@@ -789,6 +796,37 @@
 		roomLabelsLayer.visible = appState.showRoomLabels;
 		engine.markDirty();
 	});
+
+	// Decode room type mask independently of wall mask (handles undo/redo, floor switch)
+	let lastRoomTypeMaskUrl: string | null = null;
+	$effect(() => {
+		if (!roomLabelsLayer) return;
+		const rtMask = wallState.roomTypeMask;
+		const rtUrl = rtMask?.dataUrl ?? null;
+		if (rtUrl === lastRoomTypeMaskUrl) return;
+		lastRoomTypeMaskUrl = rtUrl;
+
+		const mask = wallState.wallMask;
+		if (!rtMask || !mask || rtMask.width !== mask.width || rtMask.height !== mask.height) {
+			cachedRoomTypeData = null;
+			roomLabelsLayer.roomTypeData = null;
+			roomLabelsLayer.invalidateCache();
+			engine.markDirty();
+			return;
+		}
+
+		decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height).then((rtData) => {
+			if (wallState.roomTypeMask?.dataUrl !== rtMask.dataUrl) return; // stale
+			cachedRoomTypeData = rtData;
+			roomLabelsLayer.roomTypeData = rtData;
+			roomLabelsLayer.roomLabels = cachedRoomLabels;
+			roomLabelsLayer.densityOverrides = currentFloor().roomDensityOverrides;
+			roomLabelsLayer.customLabels = currentFloor().roomCustomLabels ?? {};
+			roomLabelsLayer.invalidateCache();
+			engine.markDirty();
+		});
+	});
+
 
 	$effect(() => {
 		if (!apLayer) return;
@@ -1286,6 +1324,9 @@
 		overflow: hidden;
 		background: var(--canvas-bg);
 		position: relative;
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
 	}
 
 	.brush-cursor {

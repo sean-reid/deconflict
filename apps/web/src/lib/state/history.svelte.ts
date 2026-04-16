@@ -40,6 +40,21 @@ let undoStack: Snapshot[] = $state([]);
 let redoStack: Snapshot[] = $state([]);
 
 function takeSnapshot(): Snapshot {
+	// Sync current floor's legacy atom state before snapshotting
+	// (floor data is normally only synced on floor switch)
+	const cur = floorState.floors.find((f) => f.id === floorState.currentFloorId);
+	if (cur) {
+		cur.floorplanUrl = floorplanState.floorplanUrl;
+		cur.floorplanScale = floorplanState.floorplanScale;
+		cur.calibration = floorplanState.calibration;
+		cur.floorplanBoundary = floorplanState.floorplanBoundary;
+		cur.wallMask = wallState.wallMask;
+		cur.wallAttenuation = wallState.wallAttenuation;
+		cur.wallMaterial = wallState.wallMaterial;
+		cur.materialMask = wallState.materialMask;
+		cur.roomTypeMask = wallState.roomTypeMask;
+	}
+
 	return {
 		aps: JSON.parse(JSON.stringify(apState.aps)),
 		wallMask: wallState.wallMask ? { ...wallState.wallMask } : null,
