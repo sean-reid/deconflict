@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { ROOM_TYPES, DEFAULT_ROOM_TYPE_ID, type BuildingCategory } from '$canvas/room-types.js';
+	import CanvasPopup from './CanvasPopup.svelte';
 
 	let {
 		x,
 		y,
-		maxY = typeof window !== 'undefined' ? window.innerHeight : 800,
+		maxY,
 		currentTypeId = 0,
 		currentDensity,
 		currentLabel,
@@ -28,11 +29,7 @@
 	let customLabel = $state(currentLabel ?? '');
 	let search = $state('');
 	let searchInput: HTMLInputElement;
-	let popupEl: HTMLDivElement;
 	let highlightIndex = $state(-1);
-	const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-	let posX = $state(Math.max(8, Math.min(x, vw - 230)));
-	let posY = $state(y);
 
 	const CATEGORY_ORDER: BuildingCategory[] = ['commercial', 'residential', 'education', 'healthcare', 'hospitality', 'industrial'];
 	const CATEGORY_LABELS: Record<BuildingCategory, string> = {
@@ -51,7 +48,6 @@
 		totalCount: number;
 	}
 
-	// Group types by every category they belong to, filtered by search
 	let grouped = $derived((): GroupedTypes => {
 		let types = category ? ROOM_TYPES.filter((t) => t.categories.includes(category)) : [...ROOM_TYPES];
 		if (search.trim()) {
@@ -63,13 +59,11 @@
 			);
 		}
 
-		// When searching, show flat list (no grouping) for faster scanning
 		if (search.trim()) {
 			const entries = types.map((type, i) => ({ type, flatIndex: i }));
 			return { groups: [{ category: 'commercial', label: '', entries }], totalCount: types.length };
 		}
 
-		// Group by every category the type belongs to
 		const catMap = new Map<BuildingCategory, typeof ROOM_TYPES[number][]>();
 		for (const t of types) {
 			const cats = category ? [category] : t.categories;
@@ -146,11 +140,6 @@
 		});
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onclose();
-	}
-
-	// Reset highlight when search changes
 	$effect(() => {
 		void search;
 		highlightIndex = -1;
@@ -159,136 +148,100 @@
 	$effect(() => {
 		if (searchInput) searchInput.focus();
 	});
-
-	// After render: shift popup up if it overflows past maxY (canvas bottom)
-	function adjustPosition() {
-		if (!popupEl) return;
-		const rect = popupEl.getBoundingClientRect();
-		// Horizontal clamp
-		if (rect.right > vw - 8) posX = vw - rect.width - 8;
-		if (posX < 8) posX = 8;
-		// Vertical: top at cursor, shift up if bottom exceeds canvas area
-		if (rect.bottom > maxY) {
-			posY = Math.max(8, maxY - rect.height);
-		}
-	}
-
-	$effect(() => {
-		if (!popupEl) return;
-		void activeTypeId; // re-run when content changes (Custom adds inputs)
-		requestAnimationFrame(() => requestAnimationFrame(adjustPosition));
-	});
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="popup-backdrop" onclick={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}>
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="popup"
-		bind:this={popupEl}
-		style="left: {posX}px; top: {posY}px"
-		onclick={(e) => e.stopPropagation()}
-	>
-		{#if activeTypeId > 0}
-			{@const activeType = ROOM_TYPES.find(t => t.id === activeTypeId)}
-			{#if activeType}
-				<div class="current-type-header">
+<CanvasPopup {x} {y} {maxY} {onclose} minWidth={180} maxWidth={220}>
+	{#if activeTypeId > 0}
+		{@const activeType = ROOM_TYPES.find(t => t.id === activeTypeId)}
+		{#if activeType}
+			<div class="current-type-header">
+				<span
+					class="swatch"
+					style="background: rgb({activeType.color[0]},{activeType.color[1]},{activeType.color[2]})"
+				></span>
+				<span class="current-type-name">{activeType.name}</span>
+			</div>
+		{/if}
+	{/if}
+	<div class="search-box">
+		<input
+			bind:this={searchInput}
+			bind:value={search}
+			type="text"
+			class="search-input"
+			placeholder="Search rooms..."
+			onkeydown={handleSearchKeydown}
+		/>
+	</div>
+	<div class="list-header">
+		<span>Room type</span>
+		<span>devices/m²</span>
+	</div>
+	<div class="type-list">
+		{#each grouped().groups as group}
+			{#if group.label}
+				<div class="category-header">{group.label}</div>
+			{/if}
+			{#each group.entries as entry}
+				<button
+					class="type-row"
+					class:active={entry.type.id === activeTypeId}
+					class:highlight={entry.flatIndex === highlightIndex}
+					onclick={() => handleSelect(entry.type.id)}
+					onpointerenter={() => { highlightIndex = entry.flatIndex; }}
+				>
 					<span
 						class="swatch"
-						style="background: rgb({activeType.color[0]},{activeType.color[1]},{activeType.color[2]})"
+						style="background: rgb({entry.type.color[0]},{entry.type.color[1]},{entry.type.color[2]})"
 					></span>
-					<span class="current-type-name">{activeType.name}</span>
-				</div>
-			{/if}
-		{/if}
-		<div class="search-box">
-			<input
-				bind:this={searchInput}
-				bind:value={search}
-				type="text"
-				class="search-input"
-				placeholder="Search rooms..."
-				onkeydown={handleSearchKeydown}
-			/>
-		</div>
-		<div class="list-header">
-			<span>Room type</span>
-			<span>devices/m²</span>
-		</div>
-		<div class="type-list">
-			{#each grouped().groups as group}
-				{#if group.label}
-					<div class="category-header">{group.label}</div>
-				{/if}
-				{#each group.entries as entry}
-					<button
-						class="type-row"
-						class:active={entry.type.id === activeTypeId}
-						class:highlight={entry.flatIndex === highlightIndex}
-						onclick={() => handleSelect(entry.type.id)}
-						onpointerenter={() => { highlightIndex = entry.flatIndex; }}
-					>
-						<span
-							class="swatch"
-							style="background: rgb({entry.type.color[0]},{entry.type.color[1]},{entry.type.color[2]})"
-						></span>
-						<span class="type-name">{entry.type.name}</span>
-						<span class="type-density">{entry.type.defaultDensity}</span>
-					</button>
-				{/each}
+					<span class="type-name">{entry.type.name}</span>
+					<span class="type-density">{entry.type.defaultDensity}</span>
+				</button>
 			{/each}
-			{#if grouped().totalCount === 0}
-				<div class="no-results">No matching room types</div>
-			{/if}
-		</div>
-
-		{#if activeTypeId > 0}
-			{#if activeTypeId === 1}
-				<div class="label-section">
-					<div class="input-with-clear">
-						<input
-							bind:this={labelInput}
-							type="text"
-							class="label-input"
-							placeholder="Custom label..."
-							bind:value={customLabel}
-							oninput={() => onselect(activeTypeId, densityOverride, customLabel || undefined)}
-							onkeydown={(e) => { if (e.key === 'Enter') { onselect(activeTypeId, densityOverride, customLabel || undefined); onclose(); } }}
-						/>
-						{#if customLabel}
-							<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(activeTypeId, densityOverride, undefined); labelInput?.focus(); }} aria-label="Clear label">&times;</button>
-						{/if}
-					</div>
-				</div>
-			{/if}
-			<div class="density-section">
-				<label class="density-label">
-					<span>Density</span>
-					<span class="density-value">{densityOverride.toFixed(2)} devices/m²</span>
-				</label>
-				<input
-					type="range"
-					min="0"
-					max="2"
-					step="0.05"
-					bind:value={densityOverride}
-					oninput={() => onselect(activeTypeId, densityOverride, customLabel || undefined)}
-				/>
-			</div>
-			<button class="clear-btn" onclick={handleClear}>Clear</button>
+		{/each}
+		{#if grouped().totalCount === 0}
+			<div class="no-results">No matching room types</div>
 		{/if}
 	</div>
-</div>
+
+	{#if activeTypeId > 0}
+		{#if activeTypeId === 1}
+			<div class="label-section">
+				<div class="input-with-clear">
+					<input
+						bind:this={labelInput}
+						type="text"
+						class="label-input"
+						placeholder="Custom label..."
+						bind:value={customLabel}
+						oninput={() => onselect(activeTypeId, densityOverride, customLabel || undefined)}
+						onkeydown={(e) => { if (e.key === 'Enter') { onselect(activeTypeId, densityOverride, customLabel || undefined); onclose(); } }}
+					/>
+					{#if customLabel}
+						<button class="clear-input-btn" onclick={() => { customLabel = ''; onselect(activeTypeId, densityOverride, undefined); labelInput?.focus(); }} aria-label="Clear label">&times;</button>
+					{/if}
+				</div>
+			</div>
+		{/if}
+		<div class="density-section">
+			<label class="density-label">
+				<span>Density</span>
+				<span class="density-value">{densityOverride.toFixed(2)} devices/m²</span>
+			</label>
+			<input
+				type="range"
+				min="0"
+				max="2"
+				step="0.05"
+				bind:value={densityOverride}
+				oninput={() => onselect(activeTypeId, densityOverride, customLabel || undefined)}
+			/>
+		</div>
+		<button class="clear-btn" onclick={handleClear}>Clear</button>
+	{/if}
+</CanvasPopup>
 
 <style>
-	.popup-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 50;
-	}
-
 	.current-type-header {
 		display: flex;
 		align-items: center;
@@ -335,23 +288,6 @@
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
 		text-align: center;
-	}
-
-	.popup {
-		position: absolute;
-		z-index: 51;
-		min-width: 180px;
-		max-width: 220px;
-		max-height: 420px;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-default);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow-lg);
-		padding: var(--space-1);
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		overflow: hidden;
 	}
 
 	.type-list {
@@ -536,21 +472,5 @@
 	.clear-btn:hover {
 		color: var(--color-error);
 		background: var(--bg-hover);
-	}
-
-	@media (max-width: 768px) {
-		.popup {
-			position: fixed;
-			left: 0 !important;
-			right: 0;
-			bottom: 0;
-			top: auto !important;
-			max-width: 100%;
-			border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-		}
-
-		.type-list {
-			max-height: 50vh;
-		}
 	}
 </style>
