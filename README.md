@@ -16,8 +16,9 @@ Drop a floorplan, place access points, and get optimal channel assignments in re
 - **6 wall materials** with thickness-aware RF attenuation and real-time heatmap updates
 - **100+ real AP models** from Ubiquiti, Cisco, Aruba, Ruckus, TP-Link, and more
 - **Auto channel assignment** that accounts for walls, floors, and material properties
-- **3-stage AP optimizer**: Lloyd's + PSO + Coordinate Descent
-- **Professional PDF reports** with per-floor layouts and building coverage
+- **46 room types** with device density for capacity-aware optimization
+- **3-stage AP optimizer**: Lloyd's + PSO + Coordinate Descent, density-weighted
+- **Professional PDF reports** with per-floor layouts, room labels, and building coverage
 
 ## Quick Start
 
