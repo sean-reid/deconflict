@@ -93,7 +93,7 @@ test.describe('Room types', () => {
 		await page.waitForTimeout(800);
 
 		await page.screenshot({
-			path: '/Users/seanreid/deconflict/apps/web/test-results/room-popup-shift-up.png',
+			path: 'test-results/room-popup-shift-up.png',
 			fullPage: true
 		});
 
@@ -112,7 +112,7 @@ test.describe('Room types', () => {
 			await page.waitForTimeout(600);
 
 			await page.screenshot({
-				path: '/Users/seanreid/deconflict/apps/web/test-results/room-popup-shift-up-custom.png',
+				path: 'test-results/room-popup-shift-up-custom.png',
 				fullPage: true
 			});
 
