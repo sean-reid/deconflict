@@ -80,11 +80,18 @@ jobs:
           name: build-output
           path: apps/web/build/
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
-      - run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
+          restore-keys: playwright-
+      - name: Install Playwright (cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
+      - name: Install Playwright (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @deconflict/web exec playwright install chromium
       - run: pnpm --filter @deconflict/web test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -118,12 +125,18 @@ jobs:
             echo "has_tests=false" >> $GITHUB_OUTPUT
           fi
       - if: steps.check-visual.outputs.has_tests == 'true'
+        id: visual-pw-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
-      - if: steps.check-visual.outputs.has_tests == 'true'
+          restore-keys: playwright-
+      - name: Install Playwright (cache miss)
+        if: steps.check-visual.outputs.has_tests == 'true' && steps.visual-pw-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @deconflict/web exec playwright install --with-deps chromium
+      - name: Install Playwright (cache hit)
+        if: steps.check-visual.outputs.has_tests == 'true' && steps.visual-pw-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @deconflict/web exec playwright install chromium
       - if: steps.check-visual.outputs.has_tests == 'true'
         run: pnpm --filter @deconflict/web test:visual
       - uses: actions/upload-artifact@v4
