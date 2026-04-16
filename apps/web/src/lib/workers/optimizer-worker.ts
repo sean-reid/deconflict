@@ -26,8 +26,10 @@ interface OptimizeMessage {
 	maskHeight: number;
 	wallAttenuation: number;
 	iterations: number;
-	/** Per-pixel device density (devices/sqm). Null = uniform weight. Same dims as wallMask. */
+	/** Per-pixel device density (devices/sqm). 0 = unlabeled. Null = no room data. */
 	densityMap: Float32Array | null;
+	/** Median density of labeled rooms — used as baseline for unlabeled pixels. */
+	medianDensity: number;
 }
 
 interface CancelMessage {
@@ -230,7 +232,7 @@ function evaluateCoverage(
 			}
 			if (signal > best) best = signal;
 		}
-		const w = 1 + (sampleDensity[s] ?? 0) * 2;
+		const w = sampleDensity[s] ?? 1;
 		totalWeighted += best * w;
 		totalWeight += w;
 	}
@@ -310,7 +312,8 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		maskWidth: w,
 		maskHeight: h,
 		wallAttenuation,
-		densityMap
+		densityMap,
+		medianDensity
 	} = msg;
 
 	const { interior } = computeBuildingInterior(mask, w, h, {
@@ -340,6 +343,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	}
 
 	const numAps = aps.length;
+	const baseline = medianDensity > 0 ? medianDensity : 0.3;
 
 	// Sample points — density-weighted if room type data is available
 	const sampleCount = Math.min(400, interiorPixels.length);
@@ -348,16 +352,15 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	const sampleDensity: number[] = [];
 
 	if (densityMap && densityMap.length === w * h) {
-		// Weighted sampling: build cumulative distribution from density
-		// Unassigned pixels (density=0) get a baseline weight of 1
+		// Weighted sampling: unlabeled pixels use median density as baseline
 		const weights = new Float32Array(interiorPixels.length);
 		let totalWeight = 0;
 		for (let i = 0; i < interiorPixels.length; i++) {
-			const d = densityMap[interiorPixels[i]!]!;
-			// Scale: density 0 (unassigned) → weight 1, density 0.3 → 1.6, density 1.0 → 3.0
-			const w8 = 1 + d * 2;
-			weights[i] = w8;
-			totalWeight += w8;
+			const raw = densityMap[interiorPixels[i]!]!;
+			// 0 = unlabeled → use baseline; otherwise use actual density
+			const d = raw > 0 ? raw : baseline;
+			weights[i] = d;
+			totalWeight += d;
 		}
 
 		// Systematic weighted resampling (deterministic, no randomness)
@@ -372,7 +375,8 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 			}
 			const idx = interiorPixels[pi]!;
 			samples.push({ x: idx % w, y: Math.floor(idx / w) });
-			sampleDensity.push(densityMap[idx]! || 0);
+			const raw = densityMap[idx]!;
+			sampleDensity.push(raw > 0 ? raw : baseline);
 			nextThreshold += stepW;
 			cum += weights[pi]!;
 			pi++;
@@ -491,9 +495,9 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				if (signal > bestSignal) bestSignal = signal;
 			}
 			const deficit = 1.0 - bestSignal;
-			// Density multiplier: unassigned areas weight 1x, high-density areas up to 3x
-			const densityMul = 1 + (sampleDensity[s] ?? 0) * 2;
-			const weight = (1 + deficit * 3) * densityMul;
+			// Density-proportional: conference room (0.8) pulls ~3x harder than stairwell (0.03)
+			const densityW = sampleDensity[s] ?? baseline;
+			const weight = (1 + deficit * 3) * densityW;
 			buckets[bestAp]!.sumX += samples[s]!.x * weight;
 			buckets[bestAp]!.sumY += samples[s]!.y * weight;
 			buckets[bestAp]!.sumW += weight;

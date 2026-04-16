@@ -63,6 +63,7 @@ export class OptimizerBridge {
 			iterations?: number;
 			onProgress?: (progress: OptimizeProgress) => void;
 			densityMap?: Float32Array | null;
+			medianDensity?: number;
 		}
 	): Promise<OptimizeResult> {
 		return new Promise((resolve, reject) => {
@@ -88,7 +89,8 @@ export class OptimizerBridge {
 				maskHeight,
 				wallAttenuation,
 				iterations: options?.iterations ?? 5000,
-				densityMap: densityCopy
+				densityMap: densityCopy,
+				medianDensity: options?.medianDensity ?? 0
 			};
 			this.getWorker().postMessage(msg, transferable);
 		});

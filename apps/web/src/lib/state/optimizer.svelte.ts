@@ -79,12 +79,25 @@ async function ensureCoverageCache(): Promise<boolean> {
 	const sampleCount = Math.min(200, interiorPixels.length);
 	const step = interiorPixels.length / sampleCount;
 	cachedSamples = [];
+	// Compute median of labeled densities for baseline
+	let coverageMedian = 0.3;
+	if (pixelDensity) {
+		const labeled: number[] = [];
+		for (let i = 0; i < pixelDensity.length; i++) {
+			if (pixelDensity[i]! > 0) labeled.push(pixelDensity[i]!);
+		}
+		if (labeled.length > 0) {
+			labeled.sort((a, b) => a - b);
+			coverageMedian = labeled[Math.floor(labeled.length / 2)]!;
+		}
+	}
+
 	cachedSampleWeights = [];
 	for (let i = 0; i < sampleCount; i++) {
 		const idx = interiorPixels[Math.floor(i * step)]!;
 		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
-		const d = pixelDensity ? (pixelDensity[idx] ?? 0) : 0;
-		cachedSampleWeights.push(1 + d * 2);
+		const raw = pixelDensity ? (pixelDensity[idx] ?? 0) : 0;
+		cachedSampleWeights.push(raw > 0 ? raw : coverageMedian);
 	}
 
 	return cachedSamples.length > 0;
@@ -172,6 +185,11 @@ export async function updateCoverage(): Promise<void> {
 	});
 }
 
+interface DensityMapResult {
+	map: Float32Array;
+	medianDensity: number;
+}
+
 /**
  * Build a per-pixel device density map (Float32Array, same dims as wall mask).
  * Combines room type default densities with per-region overrides.
@@ -180,7 +198,7 @@ export async function updateCoverage(): Promise<void> {
 async function buildDensityMap(
 	maskWidth: number,
 	maskHeight: number
-): Promise<Float32Array | null> {
+): Promise<DensityMapResult | null> {
 	const rtMask = wallState.roomTypeMask;
 	if (!rtMask || rtMask.width !== maskWidth || rtMask.height !== maskHeight) return null;
 
@@ -236,7 +254,17 @@ async function buildDensityMap(
 		}
 	}
 
-	return hasAnyDensity ? densityMap : null;
+	if (!hasAnyDensity) return null;
+
+	// Compute median of non-zero (labeled) densities
+	const labeled: number[] = [];
+	for (let i = 0; i < densityMap.length; i++) {
+		if (densityMap[i]! > 0) labeled.push(densityMap[i]!);
+	}
+	labeled.sort((a, b) => a - b);
+	const medianDensity = labeled.length > 0 ? labeled[Math.floor(labeled.length / 2)]! : 0.3;
+
+	return { map: densityMap, medianDensity };
 }
 
 export async function runOptimizer(): Promise<void> {
@@ -299,7 +327,7 @@ export async function runOptimizer(): Promise<void> {
 		const decoded = await decodeMask(mask.dataUrl, mask.width, mask.height);
 
 		// Build density map from room type assignments
-		const densityMap = await buildDensityMap(mask.width, mask.height);
+		const densityResult = await buildDensityMap(mask.width, mask.height);
 
 		const result = await bridge.optimize(
 			localAps,
@@ -309,7 +337,8 @@ export async function runOptimizer(): Promise<void> {
 			projectState.wallAttenuation,
 			{
 				fixedAps,
-				densityMap,
+				densityMap: densityResult?.map ?? null,
+				medianDensity: densityResult?.medianDensity ?? 0,
 				iterations: 10000,
 				onProgress: (p: OptimizeProgress) => {
 					optimizerState.progress = Math.round((p.iteration / p.totalIterations) * 100);
