@@ -2,7 +2,7 @@
 
 **Free, open-source WiFi channel planning for network engineers who shouldn't need a $5,000 license to avoid co-channel interference.**
 
-**[Try it live](https://deconflict.pages.dev)**
+**[Try it live](https://deconflict.app)**
 
 <a href="https://www.producthunt.com/products/deconflict?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-deconflict" target="_blank" rel="noopener noreferrer"><img alt="Deconflict on Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1122414&theme=light&t=1776061264236"></a>
 
