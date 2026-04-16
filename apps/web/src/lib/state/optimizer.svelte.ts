@@ -1,10 +1,14 @@
 import { projectState, updateAp, beginMove } from './project.svelte.js';
 import { scheduleSave } from './persistence.svelte.js';
 import { decodeMask, computeWallAttenuation, type DecodedWallMask } from '$canvas/wall-detect.js';
+import { decodeMaterialMask } from '$canvas/region-labels.js';
 import { WALL_MATERIALS } from '$canvas/materials.js';
 import { computeBuildingInterior } from '$canvas/morphology.js';
+import { labelRooms } from '$canvas/region-labels.js';
+import { ROOM_TYPES, getRoomType } from '$canvas/room-types.js';
 import { OptimizerBridge, type OptimizeProgress } from '../workers/optimizer-bridge.js';
-import { floorState, getFloorSlabAttenuation } from './floor-state.svelte.js';
+import { floorState, currentFloor, getFloorSlabAttenuation } from './floor-state.svelte.js';
+import { wallState } from './wall-state.svelte.js';
 import type { Band } from '@deconflict/channels';
 
 const bridge = new OptimizerBridge();
@@ -36,6 +40,7 @@ export function getBuildingCoverage(): number {
 let cachedMaskUrl: string | null = null;
 let cachedMask: DecodedWallMask | null = null;
 let cachedSamples: Array<{ x: number; y: number }> | null = null;
+let cachedSampleWeights: number[] | null = null;
 
 async function ensureCoverageCache(): Promise<boolean> {
 	const mask = projectState.wallMask;
@@ -57,12 +62,29 @@ async function ensureCoverageCache(): Promise<boolean> {
 		if (interior[i]) interiorPixels.push(i);
 	}
 
+	// Build per-pixel density lookup from room type mask
+	let pixelDensity: Float32Array | null = null;
+	const rtMask = wallState.roomTypeMask;
+	if (rtMask && rtMask.width === mask.width && rtMask.height === mask.height) {
+		const rtData = await decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height);
+		const typeDensity = new Map<number, number>();
+		for (const t of ROOM_TYPES) typeDensity.set(t.id, t.defaultDensity);
+		pixelDensity = new Float32Array(mask.width * mask.height);
+		for (let i = 0; i < rtData.length; i++) {
+			const typeId = rtData[i]!;
+			if (typeId > 0) pixelDensity[i] = typeDensity.get(typeId) ?? 0;
+		}
+	}
+
 	const sampleCount = Math.min(200, interiorPixels.length);
 	const step = interiorPixels.length / sampleCount;
 	cachedSamples = [];
+	cachedSampleWeights = [];
 	for (let i = 0; i < sampleCount; i++) {
 		const idx = interiorPixels[Math.floor(i * step)]!;
 		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
+		const d = pixelDensity ? (pixelDensity[idx] ?? 0) : 0;
+		cachedSampleWeights.push(1 + d * 2);
 	}
 
 	return cachedSamples.length > 0;
@@ -105,9 +127,12 @@ export async function updateCoverage(): Promise<void> {
 	}
 	const allAps = [...localAps.map((ap) => ({ ...ap, signalScale: 1 })), ...virtualAps];
 
-	let totalSignal = 0;
+	let totalWeightedSignal = 0;
+	let totalWeight = 0;
+	const weights = cachedSampleWeights ?? [];
 
-	for (const sample of cachedSamples) {
+	for (let i = 0; i < cachedSamples.length; i++) {
+		const sample = cachedSamples[i]!;
 		let best = 0;
 		for (const ap of allAps) {
 			const dx = sample.x - ap.x;
@@ -132,16 +157,79 @@ export async function updateCoverage(): Promise<void> {
 			signal *= ap.signalScale; // floor slab attenuation for virtual APs
 			if (signal > best) best = signal;
 		}
-		totalSignal += best;
+		const w = weights[i] ?? 1;
+		totalWeightedSignal += best * w;
+		totalWeight += w;
 	}
 
-	optimizerState.coverage = Math.round((totalSignal / cachedSamples.length) * 100);
+	optimizerState.coverage = totalWeight > 0 ? Math.round((totalWeightedSignal / totalWeight) * 100) : 0;
 
 	// Cache per-floor coverage (weighted by sample count as area proxy)
 	floorCoverage.set(curFloorId, {
 		coverage: optimizerState.coverage,
 		samples: cachedSamples.length
 	});
+}
+
+/**
+ * Build a per-pixel device density map (Float32Array, same dims as wall mask).
+ * Combines room type default densities with per-region overrides.
+ * Returns null if no room type data is available.
+ */
+async function buildDensityMap(
+	maskWidth: number,
+	maskHeight: number
+): Promise<Float32Array | null> {
+	const rtMask = wallState.roomTypeMask;
+	if (!rtMask || rtMask.width !== maskWidth || rtMask.height !== maskHeight) return null;
+
+	const rtData = await decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height);
+	const floor = currentFloor();
+	const overrides = floor.roomDensityOverrides ?? {};
+
+	// We need room labels to map regions to density overrides
+	// For the density map, each pixel gets the density of its room type
+	// Per-region overrides require knowing which region each pixel belongs to
+	const densityMap = new Float32Array(maskWidth * maskHeight);
+	let hasAnyDensity = false;
+
+	// Build type ID → default density lookup
+	const typeDensity = new Map<number, number>();
+	for (const t of ROOM_TYPES) typeDensity.set(t.id, t.defaultDensity);
+
+	for (let i = 0; i < rtData.length; i++) {
+		const typeId = rtData[i]!;
+		if (typeId === 0) continue;
+		const density = typeDensity.get(typeId) ?? 0;
+		if (density > 0) {
+			densityMap[i] = density;
+			hasAnyDensity = true;
+		}
+	}
+
+	// Apply per-region density overrides if we have room labels
+	if (Object.keys(overrides).length > 0) {
+		// Need interior + room labels to map pixels to regions
+		const wallMaskData = wallState.wallMask;
+		if (wallMaskData) {
+			const decoded = await decodeMask(wallMaskData.dataUrl, wallMaskData.width, wallMaskData.height);
+			const { interior } = computeBuildingInterior(decoded.data, maskWidth, maskHeight, {
+				maxDim: 200, dilateRatio: 0.04, minDilateR: 4
+			});
+			const roomLabels = labelRooms(interior, maskWidth, maskHeight);
+			for (let i = 0; i < roomLabels.labels.length; i++) {
+				const regionId = roomLabels.labels[i]!;
+				if (regionId < 0) continue;
+				const override = overrides[String(regionId)];
+				if (override !== undefined) {
+					densityMap[i] = override;
+					hasAnyDensity = true;
+				}
+			}
+		}
+	}
+
+	return hasAnyDensity ? densityMap : null;
 }
 
 export async function runOptimizer(): Promise<void> {
@@ -203,6 +291,9 @@ export async function runOptimizer(): Promise<void> {
 		// Decode mask on main thread (has canvas access) and send raw buffer
 		const decoded = await decodeMask(mask.dataUrl, mask.width, mask.height);
 
+		// Build density map from room type assignments
+		const densityMap = await buildDensityMap(mask.width, mask.height);
+
 		const result = await bridge.optimize(
 			localAps,
 			decoded.data,
@@ -211,6 +302,7 @@ export async function runOptimizer(): Promise<void> {
 			projectState.wallAttenuation,
 			{
 				fixedAps,
+				densityMap,
 				iterations: 10000,
 				onProgress: (p: OptimizeProgress) => {
 					optimizerState.progress = Math.round((p.iteration / p.totalIterations) * 100);
