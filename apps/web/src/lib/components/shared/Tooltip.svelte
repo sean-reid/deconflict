@@ -13,11 +13,28 @@
 
 	let visible = $state(false);
 	let timeout: ReturnType<typeof setTimeout> | null = null;
+	let tooltipEl: HTMLDivElement;
 
 	function show() {
 		timeout = setTimeout(() => {
 			visible = true;
+			requestAnimationFrame(clampToViewport);
 		}, 400);
+	}
+
+	function clampToViewport() {
+		if (!tooltipEl) return;
+		const rect = tooltipEl.getBoundingClientRect();
+		if (rect.right > window.innerWidth - 8) {
+			tooltipEl.style.left = 'auto';
+			tooltipEl.style.right = '0';
+			tooltipEl.style.transform = position === 'top' || position === 'bottom' ? 'none' : tooltipEl.style.transform;
+		}
+		if (rect.left < 8) {
+			tooltipEl.style.left = '0';
+			tooltipEl.style.right = 'auto';
+			tooltipEl.style.transform = position === 'top' || position === 'bottom' ? 'none' : tooltipEl.style.transform;
+		}
 	}
 
 	function hide() {
@@ -39,7 +56,7 @@
 >
 	{@render children()}
 	{#if visible}
-		<div class="tooltip tooltip-{position}" role="tooltip">
+		<div class="tooltip tooltip-{position}" role="tooltip" bind:this={tooltipEl}>
 			{text}
 		</div>
 	{/if}

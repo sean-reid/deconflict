@@ -10,6 +10,7 @@ export const appState = $state({
 	showFloorplan: true,
 	showAPs: true,
 	showWalls: true,
+	showRoomLabels: true,
 	wallEditMode: null as WallEditMode,
 	wallEditLastMode: 'erase' as Exclude<WallEditMode, null>,
 	wallBrushSize: 15

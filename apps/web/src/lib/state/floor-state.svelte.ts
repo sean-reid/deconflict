@@ -39,6 +39,8 @@ export interface Floor {
 	} | null;
 	/** Per-region density overrides: regionId → devices/sqm (overrides room type default). */
 	roomDensityOverrides: Record<string, number>;
+	/** Per-region custom labels: regionId → label string (shown on canvas instead of type shortName). */
+	roomCustomLabels: Record<string, string>;
 }
 
 function createDefaultFloor(id?: string, name?: string): Floor {
@@ -58,7 +60,8 @@ function createDefaultFloor(id?: string, name?: string): Floor {
 		wallMaterial: 0,
 		materialMask: null,
 		roomTypeMask: null,
-		roomDensityOverrides: {}
+		roomDensityOverrides: {},
+		roomCustomLabels: {}
 	};
 }
 

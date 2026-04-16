@@ -108,13 +108,14 @@
 <style>
 	.select-wrapper {
 		position: relative;
-		display: inline-flex;
+		display: flex;
 	}
 
 	.trigger {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
 		gap: var(--space-1);
+		width: 100%;
 		background: var(--bg-surface);
 		color: var(--text-primary);
 		border: 1px solid var(--border-default);
@@ -129,6 +130,7 @@
 		line-height: 1;
 		white-space: nowrap;
 		text-align: left;
+		box-sizing: border-box;
 	}
 
 	.trigger:hover {

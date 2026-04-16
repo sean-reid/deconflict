@@ -26,15 +26,20 @@
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
-	import { labelWallBlobs, relabelBlob, encodeMaterialMask, decodeMaterialMask } from '$canvas/region-labels.js';
+	import { labelWallBlobs, relabelBlob, labelRooms, fillRegion, encodeMaterialMask, decodeMaterialMask } from '$canvas/region-labels.js';
+	import type { RegionLabels } from '$canvas/region-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import { floorState, currentFloor, getFloorSlabAttenuation } from '$state/floor-state.svelte.js';
 	import { FLOOR_MATERIALS } from '$canvas/floor-materials.js';
 	import type { Band } from '@deconflict/channels';
 	import { TiledMask } from '$canvas/tiled-mask.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
+	import { computeBuildingInterior } from '$canvas/morphology.js';
+	import { RoomLabelsLayer } from '$canvas/renderers/room-labels.js';
+	import { ROOM_TYPES } from '$canvas/room-types.js';
 	import LayerPanel from '$components/canvas/LayerPanel.svelte';
 	import WallMaterialPopup from '$components/canvas/WallMaterialPopup.svelte';
+	import RoomTypePopup from '$components/canvas/RoomTypePopup.svelte';
 	import WallEditToolbar from '$components/canvas/WallEditToolbar.svelte';
 
 	let wallEditMaterial = $state<WallMaterialId>(0);
@@ -72,6 +77,26 @@
 
 			// Recompute blob labels so click-to-override works on the edited walls
 			cachedWallLabels = labelWallBlobs(data, width, height);
+
+			// Recompute interior + room labels for room type detection
+			const interiorResult = computeBuildingInterior(data, width, height);
+			cachedInterior = interiorResult.interior;
+			cachedRoomLabels = labelRooms(cachedInterior, width, height);
+
+			// Room type data may need resizing if mask dimensions changed
+			if (cachedRoomTypeData && cachedRoomTypeData.length !== width * height) {
+				cachedRoomTypeData = null;
+				wallState.roomTypeMask = null;
+			}
+			if (roomLabelsLayer) {
+				roomLabelsLayer.roomLabels = cachedRoomLabels;
+				roomLabelsLayer.roomTypeData = cachedRoomTypeData;
+				roomLabelsLayer.maskWidth = width;
+				roomLabelsLayer.maskHeight = height;
+				roomLabelsLayer.originX = originX;
+				roomLabelsLayer.originY = originY;
+				roomLabelsLayer.invalidateCache();
+			}
 
 			// Trigger re-solve (wallMaskVersion drives auto-solve key)
 			wallMaskVersion++;
@@ -116,10 +141,21 @@
 	let cachedMaskOriginX = 0;
 	let cachedMaskOriginY = 0;
 
+	// Room type popup state
+	let roomPopup = $state<{ x: number; y: number; typeId: number; density: number; customLabel: string; regionId: number } | null>(null);
+	let cachedInterior: Uint8Array | null = null;
+	let cachedRoomLabels: RegionLabels | null = null;
+	let cachedRoomTypeData: Uint8Array | null = null;
+	let roomLabelsLayer: RoomLabelsLayer;
+
+	// Long-press detection for mobile contextual actions
+	let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+	const LONG_PRESS_MS = 500;
+	let longPressFired = false;
+
 	function handleWallClick(screenX: number, screenY: number): boolean {
 		if (!engine || !cachedWallData || !cachedWallLabels) return false;
 		const world = engine.camera.screenToWorld({ x: screenX, y: screenY });
-		// Convert world coords to mask-local coords
 		const px = Math.round(world.x) - cachedMaskOriginX;
 		const py = Math.round(world.y) - cachedMaskOriginY;
 		const mask = wallState.wallMask;
@@ -133,6 +169,94 @@
 		const matId = cachedMaterialData ? (cachedMaterialData[idx] ?? wallState.wallMaterial) : wallState.wallMaterial;
 		wallPopup = { x: screenX, y: screenY, material: matId as WallMaterialId, blobId };
 		return true;
+	}
+
+	function handleRoomClick(screenX: number, screenY: number): boolean {
+		if (!engine || !cachedInterior || !cachedRoomLabels) return false;
+		const world = engine.camera.screenToWorld({ x: screenX, y: screenY });
+		const px = Math.round(world.x) - cachedMaskOriginX;
+		const py = Math.round(world.y) - cachedMaskOriginY;
+		const mask = wallState.wallMask;
+		if (!mask || px < 0 || px >= mask.width || py < 0 || py >= mask.height) return false;
+		const idx = py * mask.width + px;
+
+		// Must be an interior pixel (not a wall, not exterior)
+		if (!cachedInterior[idx]) return false;
+
+		const regionId = cachedRoomLabels.labels[idx]!;
+		if (regionId < 0) return false;
+
+		const typeId = cachedRoomTypeData ? (cachedRoomTypeData[idx] ?? 0) : 0;
+		const floor = currentFloor();
+		const densityOverride = floor.roomDensityOverrides[String(regionId)];
+		const roomType = ROOM_TYPES.find(t => t.id === typeId);
+		const density = densityOverride ?? roomType?.defaultDensity ?? 0;
+		const customLabel = floor.roomCustomLabels?.[String(regionId)] ?? '';
+
+		roomPopup = { x: screenX, y: screenY, typeId, density, customLabel, regionId };
+		return true;
+	}
+
+	/** Right-click / long-press contextual handler: wall popup or room popup. */
+	function handleContextAction(screenX: number, screenY: number): boolean {
+		// Try wall first, then room
+		if (handleWallClick(screenX, screenY)) return true;
+		if (handleRoomClick(screenX, screenY)) return true;
+		return false;
+	}
+
+	function handleContextMenu(e: MouseEvent) {
+		if (!engine || appState.wallEditMode) return;
+		e.preventDefault();
+		// Close any existing popups before opening a new one
+		wallPopup = null;
+		roomPopup = null;
+		const rect = engine.canvas.getBoundingClientRect();
+		const sx = e.clientX - rect.left;
+		const sy = e.clientY - rect.top;
+		handleContextAction(sx, sy);
+	}
+
+	async function handleRoomTypeSelect(typeId: number, density: number, customLabel?: string) {
+		if (!roomPopup || !cachedRoomLabels || !wallState.wallMask) return;
+		pushState();
+		const mask = wallState.wallMask;
+
+		// Create or clone room type mask
+		if (!cachedRoomTypeData) {
+			cachedRoomTypeData = new Uint8Array(mask.width * mask.height);
+		}
+
+		fillRegion(cachedRoomLabels.labels, cachedRoomTypeData, roomPopup.regionId, typeId);
+
+		// Save per-region density override and custom label
+		const floor = currentFloor();
+		const regionKey = String(roomPopup.regionId);
+		if (typeId === 0) {
+			delete floor.roomDensityOverrides[regionKey];
+			delete floor.roomCustomLabels[regionKey];
+		} else {
+			floor.roomDensityOverrides[regionKey] = density;
+			if (customLabel) {
+				if (!floor.roomCustomLabels) floor.roomCustomLabels = {};
+				floor.roomCustomLabels[regionKey] = customLabel;
+			} else {
+				delete floor.roomCustomLabels?.[regionKey];
+			}
+		}
+
+		// Update renderer
+		roomLabelsLayer.roomTypeData = cachedRoomTypeData;
+		roomLabelsLayer.roomLabels = cachedRoomLabels;
+		roomLabelsLayer.densityOverrides = floor.roomDensityOverrides;
+		roomLabelsLayer.customLabels = floor.roomCustomLabels ?? {};
+		roomLabelsLayer.invalidateCache();
+		engine.markDirty();
+
+		// Encode and persist
+		const dataUrl = encodeMaterialMask(cachedRoomTypeData, mask.width, mask.height);
+		wallState.roomTypeMask = { dataUrl, width: mask.width, height: mask.height, originX: cachedMaskOriginX, originY: cachedMaskOriginY };
+		scheduleSave();
 	}
 
 	async function handleMaterialSelect(newMaterial: WallMaterialId) {
@@ -240,14 +364,16 @@
 		gridLayer = new GridLayer();
 		heatmapLayer = new HeatmapLayer();
 		wallLayer = new WallLayer();
+		roomLabelsLayer = new RoomLabelsLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
 
-		// Add layers in draw order: floorplan, boundary, grid, walls, heatmap, APs, selection rect
+		// Add layers in draw order: floorplan, grid, heatmap, walls, room labels, APs, selection rect
 		engine.addLayer(floorplanLayer);
 		engine.addLayer(gridLayer);
 		engine.addLayer(heatmapLayer);
 		engine.addLayer(wallLayer);
+		engine.addLayer(roomLabelsLayer);
 		engine.addLayer(apLayer);
 		engine.addLayer(selectionRectLayer);
 
@@ -497,6 +623,9 @@
 		cachedMaterialData = null;
 		cachedWallLabels = null;
 		cachedTiledMask = null;
+		cachedInterior = null;
+		cachedRoomLabels = null;
+		cachedRoomTypeData = null;
 		if (wallLayer) {
 			wallLayer.mask = null;
 			wallLayer.materialMap = null;
@@ -506,6 +635,11 @@
 			heatmapLayer.wallMask = null;
 			heatmapLayer.materialMap = null;
 			heatmapLayer.markWallsDirty();
+		}
+		if (roomLabelsLayer) {
+			roomLabelsLayer.roomTypeData = null;
+			roomLabelsLayer.roomLabels = null;
+			roomLabelsLayer.invalidateCache();
 		}
 
 		lastSyncedFloorId = id;
@@ -559,6 +693,14 @@
 			cachedWallData = null;
 			cachedWallLabels = null;
 			cachedMaterialData = null;
+			cachedInterior = null;
+			cachedRoomLabels = null;
+			cachedRoomTypeData = null;
+			if (roomLabelsLayer) {
+				roomLabelsLayer.roomTypeData = null;
+				roomLabelsLayer.roomLabels = null;
+				roomLabelsLayer.invalidateCache();
+			}
 			engine.markDirty();
 			return;
 		}
@@ -600,6 +742,34 @@
 				wallEditHandler.tiledMask = cachedTiledMask;
 			}
 
+			// Compute building interior + room labels for room type detection
+			const interiorResult = computeBuildingInterior(decoded.data, decoded.width, decoded.height);
+			cachedInterior = interiorResult.interior;
+			cachedRoomLabels = labelRooms(cachedInterior, decoded.width, decoded.height);
+
+			// Decode room type mask if persisted
+			const rtMask = wallState.roomTypeMask;
+			if (rtMask && rtMask.width === decoded.width && rtMask.height === decoded.height) {
+				const rtData = await decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height);
+				if (wallMaskVersion !== thisVersion) return;
+				cachedRoomTypeData = rtData;
+			} else {
+				cachedRoomTypeData = null;
+			}
+
+			// Feed room data to renderer
+			if (roomLabelsLayer) {
+				roomLabelsLayer.roomTypeData = cachedRoomTypeData;
+				roomLabelsLayer.roomLabels = cachedRoomLabels;
+				roomLabelsLayer.maskWidth = decoded.width;
+				roomLabelsLayer.maskHeight = decoded.height;
+				roomLabelsLayer.originX = decoded.originX;
+				roomLabelsLayer.originY = decoded.originY;
+				roomLabelsLayer.densityOverrides = currentFloor().roomDensityOverrides;
+				roomLabelsLayer.customLabels = currentFloor().roomCustomLabels ?? {};
+				roomLabelsLayer.invalidateCache();
+			}
+
 			engine.markDirty();
 		});
 	});
@@ -608,6 +778,12 @@
 	$effect(() => {
 		if (!wallLayer) return;
 		wallLayer.visible = appState.showWalls;
+		engine.markDirty();
+	});
+
+	$effect(() => {
+		if (!roomLabelsLayer) return;
+		roomLabelsLayer.visible = appState.showRoomLabels;
 		engine.markDirty();
 	});
 
@@ -744,6 +920,7 @@
 			touchMoved = false;
 			touchStartedOnAp = false;
 			pendingPan = false;
+			longPressFired = false;
 
 			// Wall edit mode: single touch draws
 			if (appState.wallEditMode) {
@@ -755,9 +932,26 @@
 				);
 				return;
 			}
+
+			// Start long-press timer for contextual wall/room actions
+			if (longPressTimer) clearTimeout(longPressTimer);
+			const lpX = t.clientX;
+			const lpY = t.clientY;
+			longPressTimer = setTimeout(() => {
+				longPressTimer = null;
+				if (touchMoved || activeTouches !== 1) return;
+				if (!engine) return;
+				const rect = engine.canvas.getBoundingClientRect();
+				const sx = lpX - rect.left;
+				const sy = lpY - rect.top;
+				if (handleContextAction(sx, sy)) {
+					longPressFired = true;
+				}
+			}, LONG_PRESS_MS);
 		} else if (activeTouches >= 2) {
 			e.preventDefault();
-			// Cancel single-finger state (including wall edit stroke)
+			// Cancel long-press and single-finger state
+			if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 			if (appState.wallEditMode) {
 				wallEditHandler.handlePointerUp();
 				brushCursorVisible = false;
@@ -835,6 +1029,7 @@
 
 		if (!touchMoved && !touchStartedOnAp && !pendingPan && dx * dx + dy * dy > DRAG_THRESHOLD * DRAG_THRESHOLD) {
 			touchMoved = true;
+			if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 			const rect = engine.canvas.getBoundingClientRect();
 			const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps.filter(ap => ap.floorId === floorState.currentFloorId));
 
@@ -864,6 +1059,8 @@
 	}
 
 	function handleTouchEnd(e: TouchEvent) {
+		if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
 		if (activeTouches === 1 && e.touches.length === 0) {
 			// Wall edit mode: end stroke
 			if (appState.wallEditMode) {
@@ -873,13 +1070,17 @@
 				return;
 			}
 
-			if (!touchMoved && engine) {
+			// Skip tap action if long-press already fired a contextual popup
+			if (!touchMoved && !longPressFired && engine) {
 				const rect = engine.canvas.getBoundingClientRect();
-				const hit = hitTest({ x: touchStartX - rect.left, y: touchStartY - rect.top }, engine.camera, apState.aps.filter(ap => ap.floorId === floorState.currentFloorId));
+				const sx = touchStartX - rect.left;
+				const sy = touchStartY - rect.top;
+				const hit = hitTest({ x: sx, y: sy }, engine.camera, apState.aps.filter(ap => ap.floorId === floorState.currentFloorId));
 
 				if (hit) {
 					selectHandler.handlePointerDown(new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 }));
-				} else {
+				} else if (!handleWallClick(sx, sy)) {
+					// Not an AP, not a wall — place AP
 					placeHandler.handlePointerDown(new PointerEvent('pointerdown', { clientX: touchStartX, clientY: touchStartY, button: 0 }));
 				}
 			}
@@ -922,7 +1123,7 @@
 
 	function handlePointerDown(e: PointerEvent) {
 		if (!engine) return;
-		if (e.button === 1) return;
+		if (e.button !== 0) return; // Only handle primary (left) button
 		if (e.pointerType === 'touch') return;
 		// Wall edit mode intercepts primary pointer
 		if (appState.wallEditMode) {
@@ -979,6 +1180,7 @@
 
 	function handlePointerUp(e: PointerEvent) {
 		if (!engine) return;
+		if (e.button !== 0) return; // Only handle primary (left) button
 		if (appState.wallEditMode) {
 			wallEditHandler.handlePointerUp();
 			return;
@@ -1023,6 +1225,7 @@
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
 		onpointerleave={() => { brushCursorVisible = false; }}
+		oncontextmenu={handleContextMenu}
 		ontouchstart={handleTouchStart}
 		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}
@@ -1055,6 +1258,18 @@
 		currentMaterial={wallPopup.material}
 		onselect={handleMaterialSelect}
 		onclose={() => { wallPopup = null; }}
+	/>
+{/if}
+
+{#if roomPopup}
+	<RoomTypePopup
+		x={roomPopup.x}
+		y={roomPopup.y}
+		currentTypeId={roomPopup.typeId}
+		currentDensity={roomPopup.density}
+		currentLabel={roomPopup.customLabel}
+		onselect={handleRoomTypeSelect}
+		onclose={() => { roomPopup = null; }}
 	/>
 {/if}
 

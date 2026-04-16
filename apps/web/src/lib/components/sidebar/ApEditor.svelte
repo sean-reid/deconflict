@@ -59,6 +59,7 @@
 	);
 	let singleAp = $derived(selectedAps.length === 1 ? selectedAps[0] : null);
 	let multiSelect = $derived(selectedAps.length > 1);
+	let nameInput: HTMLInputElement;
 
 	let batchPower = $state(20);
 
@@ -234,14 +235,20 @@
 			<Tooltip text="A label for this access point. Use something descriptive like 'Living Room' or 'Upstairs Hall'." position="left">
 				<span class="field-label">Name</span>
 			</Tooltip>
-			<input
-				class="text-input"
-				type="text"
-				value={singleAp.name}
-				oninput={handleNameInput}
-				onfocus={handleNameFocus}
-				aria-label="AP name"
-			/>
+			<div class="input-with-clear">
+				<input
+					bind:this={nameInput}
+					class="text-input"
+					type="text"
+					value={singleAp.name}
+					oninput={handleNameInput}
+					onfocus={handleNameFocus}
+					aria-label="AP name"
+				/>
+				{#if singleAp.name}
+					<button class="clear-input-btn" onclick={() => { pushState(); updateAp(singleAp.id, { name: '' }); nameInput?.focus(); }} aria-label="Clear name">&times;</button>
+				{/if}
+			</div>
 		</div>
 
 		<div class="field">
@@ -252,7 +259,6 @@
 				value={singleAp.band}
 				options={bandOptions}
 				onchange={handleBandChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -264,7 +270,6 @@
 				value={String(singleAp.channelWidth)}
 				options={getWidths(singleAp.band)}
 				onchange={handleWidthChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -276,7 +281,6 @@
 				value={singleAp.fixedChannel != null ? String(singleAp.fixedChannel) : ''}
 				options={channelOptions}
 				onchange={handleChannelChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -344,7 +348,6 @@
 				value={selectedAps[0]?.band ?? '5ghz'}
 				options={bandOptions}
 				onchange={handleBandChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -356,7 +359,6 @@
 				value={String(selectedAps[0]?.channelWidth ?? 20)}
 				options={getWidths(selectedAps[0]?.band ?? '5ghz')}
 				onchange={handleWidthChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -412,6 +414,39 @@
 		color: var(--text-tertiary);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+	}
+
+	.input-with-clear {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+
+	.input-with-clear .text-input {
+		padding-right: 24px;
+	}
+
+	.clear-input-btn {
+		position: absolute;
+		right: 4px;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--text-tertiary);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+	}
+
+	.clear-input-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-hover);
 	}
 
 	.text-input {
@@ -539,13 +574,6 @@
 		margin-top: 2px;
 	}
 
-	:global(.full-width) {
-		width: 100%;
-	}
-
-	:global(.full-width select) {
-		width: 100%;
-	}
 
 	.back-link {
 		display: inline-flex;

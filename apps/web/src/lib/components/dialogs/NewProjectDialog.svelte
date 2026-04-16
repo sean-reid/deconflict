@@ -53,7 +53,8 @@
 			wallMaterial: 0,
 			materialMask: null,
 			roomTypeMask: null,
-			roomDensityOverrides: {}
+			roomDensityOverrides: {},
+			roomCustomLabels: {}
 		}];
 		floorState.currentFloorId = newFloorId;
 
@@ -179,7 +180,7 @@
 		border-radius: var(--radius-md);
 		padding: var(--space-1) var(--space-2);
 		font-family: var(--font-sans);
-		font-size: 16px; /* >= 16px prevents iOS auto-zoom on focus */
+		font-size: var(--text-sm);
 		height: 32px;
 	}
 

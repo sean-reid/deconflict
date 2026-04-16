@@ -93,8 +93,7 @@
 	const sampleFloorplans = [
 		{ name: 'Apartment (48sqm)', file: '/samples/apartment-48sqm.svg', areaSqm: 48 },
 		{ name: 'House (120sqm)', file: '/samples/house-120sqm.svg', areaSqm: 120 },
-		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.svg', areaSqm: 300 },
-		{ name: 'West Wing (14000sqft)', file: '/samples/west-wing.svg', areaSqm: 1300 }
+		{ name: 'Office (300sqm)', file: '/samples/office-300sqm.svg', areaSqm: 300 }
 	];
 
 	let scaleDisplay = $derived.by(() => {
@@ -280,6 +279,8 @@
 		wallState.wallMaterial = 0;
 		wallState.materialMask = null;
 		wallState.roomTypeMask = null;
+		currentFloor().roomDensityOverrides = {};
+		currentFloor().roomCustomLabels = {};
 		apState.aps = apState.aps.filter((ap) => ap.floorId !== floorState.currentFloorId);
 		detectedWorldArea = null;
 		calibrationDone = false;
