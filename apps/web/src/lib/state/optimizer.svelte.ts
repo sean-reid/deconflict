@@ -73,7 +73,7 @@ async function ensureCoverageCache(): Promise<boolean> {
 		const rtData = await decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height);
 		const typeDensity = new Map<number, number>();
 		for (const t of ROOM_TYPES) typeDensity.set(t.id, t.defaultDensity);
-		pixelDensity = new Float32Array(mask.width * mask.height);
+		pixelDensity = new Float32Array(mask.width * mask.height).fill(-1);
 		for (let i = 0; i < rtData.length; i++) {
 			const typeId = rtData[i]!;
 			if (typeId > 0) pixelDensity[i] = typeDensity.get(typeId) ?? 0;
@@ -88,7 +88,7 @@ async function ensureCoverageCache(): Promise<boolean> {
 	if (pixelDensity) {
 		const labeled: number[] = [];
 		for (let i = 0; i < pixelDensity.length; i++) {
-			if (pixelDensity[i]! > 0) labeled.push(pixelDensity[i]!);
+			if (pixelDensity[i]! >= 0) labeled.push(pixelDensity[i]!);
 		}
 		if (labeled.length > 0) {
 			labeled.sort((a, b) => a - b);
@@ -100,8 +100,8 @@ async function ensureCoverageCache(): Promise<boolean> {
 	for (let i = 0; i < sampleCount; i++) {
 		const idx = interiorPixels[Math.floor(i * step)]!;
 		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
-		const raw = pixelDensity ? (pixelDensity[idx] ?? 0) : 0;
-		cachedSampleWeights.push(raw > 0 ? raw : coverageMedian);
+		const raw = pixelDensity ? (pixelDensity[idx] ?? -1) : -1;
+		cachedSampleWeights.push(raw >= 0 ? raw : coverageMedian);
 	}
 
 	return cachedSamples.length > 0;
@@ -210,11 +210,9 @@ async function buildDensityMap(
 	const floor = currentFloor();
 	const overrides = floor.roomDensityOverrides ?? {};
 
-	// We need room labels to map regions to density overrides
-	// For the density map, each pixel gets the density of its room type
-	// Per-region overrides require knowing which region each pixel belongs to
-	const densityMap = new Float32Array(maskWidth * maskHeight);
-	let hasAnyDensity = false;
+	// -1 = unlabeled (use median baseline), >= 0 = explicit density (including 0)
+	const densityMap = new Float32Array(maskWidth * maskHeight).fill(-1);
+	let hasAnyLabeled = false;
 
 	// Build type ID → default density lookup
 	const typeDensity = new Map<number, number>();
@@ -223,11 +221,8 @@ async function buildDensityMap(
 	for (let i = 0; i < rtData.length; i++) {
 		const typeId = rtData[i]!;
 		if (typeId === 0) continue;
-		const density = typeDensity.get(typeId) ?? 0;
-		if (density > 0) {
-			densityMap[i] = density;
-			hasAnyDensity = true;
-		}
+		densityMap[i] = typeDensity.get(typeId) ?? 0;
+		hasAnyLabeled = true;
 	}
 
 	// Apply per-region density overrides if we have room labels
@@ -252,18 +247,18 @@ async function buildDensityMap(
 				const override = overrides[String(regionId)];
 				if (override !== undefined) {
 					densityMap[i] = override;
-					hasAnyDensity = true;
+					hasAnyLabeled = true;
 				}
 			}
 		}
 	}
 
-	if (!hasAnyDensity) return null;
+	if (!hasAnyLabeled) return null;
 
-	// Compute median of non-zero (labeled) densities
+	// Compute median of labeled densities (those >= 0, excluding -1 sentinel)
 	const labeled: number[] = [];
 	for (let i = 0; i < densityMap.length; i++) {
-		if (densityMap[i]! > 0) labeled.push(densityMap[i]!);
+		if (densityMap[i]! >= 0) labeled.push(densityMap[i]!);
 	}
 	labeled.sort((a, b) => a - b);
 	const medianDensity = labeled.length > 0 ? labeled[Math.floor(labeled.length / 2)]! : 0.3;

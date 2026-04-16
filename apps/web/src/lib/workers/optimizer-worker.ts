@@ -26,7 +26,7 @@ interface OptimizeMessage {
 	maskHeight: number;
 	wallAttenuation: number;
 	iterations: number;
-	/** Per-pixel device density (devices/sqm). 0 = unlabeled. Null = no room data. */
+	/** Per-pixel device density (devices/sqm). -1 = unlabeled. Null = no room data. */
 	densityMap: Float32Array | null;
 	/** Median density of labeled rooms — used as baseline for unlabeled pixels. */
 	medianDensity: number;
@@ -357,8 +357,8 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		let totalWeight = 0;
 		for (let i = 0; i < interiorPixels.length; i++) {
 			const raw = densityMap[interiorPixels[i]!]!;
-			// 0 = unlabeled → use baseline; otherwise use actual density
-			const d = raw > 0 ? raw : baseline;
+			// -1 = unlabeled → use baseline; >= 0 = explicit (including 0)
+			const d = raw >= 0 ? raw : baseline;
 			weights[i] = d;
 			totalWeight += d;
 		}
@@ -376,7 +376,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 			const idx = interiorPixels[pi]!;
 			samples.push({ x: idx % w, y: Math.floor(idx / w) });
 			const raw = densityMap[idx]!;
-			sampleDensity.push(raw > 0 ? raw : baseline);
+			sampleDensity.push(raw >= 0 ? raw : baseline);
 			nextThreshold += stepW;
 			cum += weights[pi]!;
 			pi++;
