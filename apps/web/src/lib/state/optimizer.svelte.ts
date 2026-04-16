@@ -39,16 +39,22 @@ export function getBuildingCoverage(): number {
 
 // Cached interior sample points and decoded mask for real-time coverage
 let cachedMaskUrl: string | null = null;
+let cachedRtUrl: string | null = null;
 let cachedMask: DecodedWallMask | null = null;
 let cachedSamples: Array<{ x: number; y: number }> | null = null;
+/** Per-sample density weight. Uses same -1 sentinel / median baseline as optimizer worker. */
+let cachedSampleDensity: number[] | null = null;
 
 async function ensureCoverageCache(): Promise<boolean> {
 	const mask = projectState.wallMask;
 	if (!mask) return false;
-	if (mask.dataUrl === cachedMaskUrl && cachedMask && cachedSamples) return true;
+	const rtUrl = wallState.roomTypeMask?.dataUrl ?? null;
+	if (mask.dataUrl === cachedMaskUrl && rtUrl === cachedRtUrl && cachedMask && cachedSamples)
+		return true;
 
 	cachedMask = await decodeMask(mask.dataUrl, mask.width, mask.height);
 	cachedMaskUrl = mask.dataUrl;
+	cachedRtUrl = rtUrl;
 
 	// Compute interior and sample points
 	const { interior } = computeBuildingInterior(cachedMask.data, mask.width, mask.height, {
@@ -62,12 +68,27 @@ async function ensureCoverageCache(): Promise<boolean> {
 		if (interior[i]) interiorPixels.push(i);
 	}
 
+	// Reuse buildDensityMap for consistent density computation
+	const densityResult = await buildDensityMap(mask.width, mask.height);
+	const baseline = densityResult
+		? densityResult.medianDensity > 0
+			? densityResult.medianDensity
+			: 0.3
+		: 0.3;
+
 	const sampleCount = Math.min(200, interiorPixels.length);
 	const step = interiorPixels.length / sampleCount;
 	cachedSamples = [];
+	cachedSampleDensity = [];
 	for (let i = 0; i < sampleCount; i++) {
 		const idx = interiorPixels[Math.floor(i * step)]!;
 		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
+		if (densityResult) {
+			const raw = densityResult.map[idx]!;
+			cachedSampleDensity.push(raw >= 0 ? raw : baseline);
+		} else {
+			cachedSampleDensity.push(1);
+		}
 	}
 
 	return cachedSamples.length > 0;
@@ -103,9 +124,12 @@ export async function updateCoverage(): Promise<void> {
 	}
 	const allAps = [...localAps.map((ap) => ({ ...ap, signalScale: 1 })), ...virtualAps];
 
-	let totalSignal = 0;
+	let totalWeighted = 0;
+	let totalWeight = 0;
+	const densities = cachedSampleDensity ?? [];
 
-	for (const sample of cachedSamples) {
+	for (let i = 0; i < cachedSamples.length; i++) {
+		const sample = cachedSamples[i]!;
 		let best = 0;
 		for (const ap of allAps) {
 			const dx = sample.x - ap.x;
@@ -122,10 +146,13 @@ export async function updateCoverage(): Promise<void> {
 			signal *= ap.signalScale;
 			if (signal > best) best = signal;
 		}
-		totalSignal += best;
+		// Same density weighting as optimizer worker evaluateCoverage
+		const w = densities[i] ?? 1;
+		totalWeighted += best * w;
+		totalWeight += w;
 	}
 
-	optimizerState.coverage = Math.round((totalSignal / cachedSamples.length) * 100);
+	optimizerState.coverage = totalWeight > 0 ? Math.round((totalWeighted / totalWeight) * 100) : 0;
 
 	// Cache per-floor coverage (weighted by sample count as area proxy)
 	floorCoverage.set(curFloorId, {
