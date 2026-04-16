@@ -39,24 +39,18 @@ export function getBuildingCoverage(): number {
 
 // Cached interior sample points and decoded mask for real-time coverage
 let cachedMaskUrl: string | null = null;
-let cachedRtUrl: string | null = null;
 let cachedMask: DecodedWallMask | null = null;
 let cachedSamples: Array<{ x: number; y: number }> | null = null;
-/** Per-sample density weight. Uses same -1 sentinel / median baseline as optimizer worker. */
-let cachedSampleDensity: number[] | null = null;
+let cachedSamplePixelIdx: number[] | null = null;
 
 async function ensureCoverageCache(): Promise<boolean> {
 	const mask = projectState.wallMask;
 	if (!mask) return false;
-	const rtUrl = wallState.roomTypeMask?.dataUrl ?? null;
-	if (mask.dataUrl === cachedMaskUrl && rtUrl === cachedRtUrl && cachedMask && cachedSamples)
-		return true;
+	if (mask.dataUrl === cachedMaskUrl && cachedMask && cachedSamples) return true;
 
 	cachedMask = await decodeMask(mask.dataUrl, mask.width, mask.height);
 	cachedMaskUrl = mask.dataUrl;
-	cachedRtUrl = rtUrl;
 
-	// Compute interior and sample points
 	const { interior } = computeBuildingInterior(cachedMask.data, mask.width, mask.height, {
 		maxDim: 200,
 		dilateRatio: 0.04,
@@ -68,27 +62,14 @@ async function ensureCoverageCache(): Promise<boolean> {
 		if (interior[i]) interiorPixels.push(i);
 	}
 
-	// Reuse buildDensityMap for consistent density computation
-	const densityResult = await buildDensityMap(mask.width, mask.height);
-	const baseline = densityResult
-		? densityResult.medianDensity > 0
-			? densityResult.medianDensity
-			: 0.3
-		: 0.3;
-
 	const sampleCount = Math.min(200, interiorPixels.length);
 	const step = interiorPixels.length / sampleCount;
 	cachedSamples = [];
-	cachedSampleDensity = [];
+	cachedSamplePixelIdx = [];
 	for (let i = 0; i < sampleCount; i++) {
 		const idx = interiorPixels[Math.floor(i * step)]!;
 		cachedSamples.push({ x: idx % mask.width, y: Math.floor(idx / mask.width) });
-		if (densityResult) {
-			const raw = densityResult.map[idx]!;
-			cachedSampleDensity.push(raw >= 0 ? raw : baseline);
-		} else {
-			cachedSampleDensity.push(1);
-		}
+		cachedSamplePixelIdx.push(idx);
 	}
 
 	return cachedSamples.length > 0;
@@ -108,6 +89,24 @@ export async function updateCoverage(): Promise<void> {
 
 	const { data, width, height } = cachedMask;
 	const wallDb = projectState.wallAttenuation;
+
+	// Build density weights fresh each call (cheap, handles override changes)
+	const densityResult = await buildDensityMap(width, height);
+	const baseline = densityResult
+		? densityResult.medianDensity > 0
+			? densityResult.medianDensity
+			: 0.3
+		: 0.3;
+	const sampleDensity: number[] = [];
+	for (let i = 0; i < cachedSamples.length; i++) {
+		if (densityResult && cachedSamplePixelIdx) {
+			const raw = densityResult.map[cachedSamplePixelIdx[i]!]!;
+			sampleDensity.push(raw >= 0 ? raw : baseline);
+		} else {
+			sampleDensity.push(1);
+		}
+	}
+
 	// Include virtual APs from other floors as fixed signal sources
 	const curFloorId = floorState.currentFloorId;
 	const localAps = projectState.aps.filter((ap) => ap.floorId === curFloorId);
@@ -126,7 +125,6 @@ export async function updateCoverage(): Promise<void> {
 
 	let totalWeighted = 0;
 	let totalWeight = 0;
-	const densities = cachedSampleDensity ?? [];
 
 	for (let i = 0; i < cachedSamples.length; i++) {
 		const sample = cachedSamples[i]!;
@@ -146,8 +144,7 @@ export async function updateCoverage(): Promise<void> {
 			signal *= ap.signalScale;
 			if (signal > best) best = signal;
 		}
-		// Same density weighting as optimizer worker evaluateCoverage
-		const w = densities[i] ?? 1;
+		const w = sampleDensity[i] ?? 1;
 		totalWeighted += best * w;
 		totalWeight += w;
 	}

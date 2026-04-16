@@ -257,6 +257,9 @@
 		const dataUrl = encodeMaterialMask(cachedRoomTypeData, mask.width, mask.height);
 		wallState.roomTypeMask = { dataUrl, width: mask.width, height: mask.height, originX: cachedMaskOriginX, originY: cachedMaskOriginY };
 		scheduleSave();
+
+		// Update coverage with new density weights
+		updateCoverage();
 	}
 
 	async function handleMaterialSelect(newMaterial: WallMaterialId) {
