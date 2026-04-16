@@ -209,9 +209,6 @@
 
 	async function loadSample(url: string, knownAreaSqm?: number) {
 		pushState();
-		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
-			URL.revokeObjectURL(floorplanState.floorplanUrl);
-		}
 		try {
 			const response = await fetch(url);
 			const blob = await response.blob();
@@ -234,9 +231,6 @@
 		const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
 		if (!validTypes.includes(file.type)) return;
 		pushState();
-		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
-			URL.revokeObjectURL(floorplanState.floorplanUrl);
-		}
 		const blobUrl = URL.createObjectURL(file);
 		floorplanState.floorplanUrl = blobUrl;
 		runBoundaryDetection(blobUrl, file.type === 'image/svg+xml');
@@ -271,9 +265,6 @@
 
 	function doRemoveFloorplan() {
 		pushState();
-		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
-			URL.revokeObjectURL(floorplanState.floorplanUrl);
-		}
 		floorplanState.floorplanUrl = null;
 		floorplanState.floorplanBoundary = null;
 		floorplanState.calibration = null;

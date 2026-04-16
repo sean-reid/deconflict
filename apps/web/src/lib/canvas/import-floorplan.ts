@@ -13,10 +13,6 @@ export async function importFloorplanFile(file: File): Promise<void> {
 	const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
 	if (!validTypes.includes(file.type)) return;
 
-	if (projectState.floorplanUrl?.startsWith('blob:')) {
-		URL.revokeObjectURL(projectState.floorplanUrl);
-	}
-
 	const blobUrl = URL.createObjectURL(file);
 	projectState.floorplanUrl = blobUrl;
 	const isSvg = file.type === 'image/svg+xml';
