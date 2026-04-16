@@ -79,7 +79,7 @@
 			cachedWallLabels = labelWallBlobs(data, width, height);
 
 			// Recompute interior + room labels for room type detection
-			const interiorResult = computeBuildingInterior(data, width, height);
+			const interiorResult = computeBuildingInterior(data, width, height, { maxDim: 400 });
 			cachedInterior = interiorResult.interior;
 			cachedRoomLabels = labelRooms(cachedInterior, width, height);
 
@@ -743,7 +743,7 @@
 			}
 
 			// Compute building interior + room labels for room type detection
-			const interiorResult = computeBuildingInterior(decoded.data, decoded.width, decoded.height);
+			const interiorResult = computeBuildingInterior(decoded.data, decoded.width, decoded.height, { maxDim: 400 });
 			cachedInterior = interiorResult.interior;
 			cachedRoomLabels = labelRooms(cachedInterior, decoded.width, decoded.height);
 

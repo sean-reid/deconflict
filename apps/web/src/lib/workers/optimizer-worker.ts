@@ -303,7 +303,15 @@ function yieldToEventLoop(): Promise<void> {
 // ─── Main optimization pipeline ─────────────────────────────────────
 
 async function runOptimization(msg: OptimizeMessage): Promise<void> {
-	const { aps, fixedAps, wallMask: mask, maskWidth: w, maskHeight: h, wallAttenuation, densityMap } = msg;
+	const {
+		aps,
+		fixedAps,
+		wallMask: mask,
+		maskWidth: w,
+		maskHeight: h,
+		wallAttenuation,
+		densityMap
+	} = msg;
 
 	const { interior } = computeBuildingInterior(mask, w, h, {
 		maxDim: 200,

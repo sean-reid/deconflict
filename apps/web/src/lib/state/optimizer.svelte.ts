@@ -162,7 +162,8 @@ export async function updateCoverage(): Promise<void> {
 		totalWeight += w;
 	}
 
-	optimizerState.coverage = totalWeight > 0 ? Math.round((totalWeightedSignal / totalWeight) * 100) : 0;
+	optimizerState.coverage =
+		totalWeight > 0 ? Math.round((totalWeightedSignal / totalWeight) * 100) : 0;
 
 	// Cache per-floor coverage (weighted by sample count as area proxy)
 	floorCoverage.set(curFloorId, {
@@ -212,9 +213,15 @@ async function buildDensityMap(
 		// Need interior + room labels to map pixels to regions
 		const wallMaskData = wallState.wallMask;
 		if (wallMaskData) {
-			const decoded = await decodeMask(wallMaskData.dataUrl, wallMaskData.width, wallMaskData.height);
+			const decoded = await decodeMask(
+				wallMaskData.dataUrl,
+				wallMaskData.width,
+				wallMaskData.height
+			);
 			const { interior } = computeBuildingInterior(decoded.data, maskWidth, maskHeight, {
-				maxDim: 200, dilateRatio: 0.04, minDilateR: 4
+				maxDim: 200,
+				dilateRatio: 0.04,
+				minDilateR: 4
 			});
 			const roomLabels = labelRooms(interior, maskWidth, maskHeight);
 			for (let i = 0; i < roomLabels.labels.length; i++) {
