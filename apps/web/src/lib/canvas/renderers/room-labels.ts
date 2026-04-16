@@ -146,7 +146,10 @@ export class RoomLabelsLayer implements Layer {
 		for (const t of ROOM_TYPES) typeMap.set(t.id, t);
 
 		// Accumulate per-region centroid sums
-		const regions = new Map<number, { sumX: number; sumY: number; count: number; typeId: number }>();
+		const regions = new Map<
+			number,
+			{ sumX: number; sumY: number; count: number; typeId: number }
+		>();
 
 		for (let i = 0; i < labels.labels.length; i++) {
 			const regionId = labels.labels[i]!;
