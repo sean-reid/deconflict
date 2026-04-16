@@ -622,7 +622,7 @@
 		// the previous floor doesn't render while the decode is in-flight.
 		lastWallMaskUrl = null;
 		lastMatMaskUrl = null;
-		lastRtMaskUrl = null;
+		lastRoomTypeMaskUrl = null;
 		cachedWallData = null;
 		cachedMaterialData = null;
 		cachedWallLabels = null;
@@ -671,25 +671,21 @@
 		engine.markDirty();
 	});
 
-	// Decode wall mask + material mask + room type mask — tracks wallState URLs
+	// Decode wall mask + material mask — tracks wallState URLs
 	let wallMaskVersion = 0;
 	let lastWallMaskUrl: string | null = null;
 	let lastMatMaskUrl: string | null = null;
-	let lastRtMaskUrl: string | null = null;
 	$effect(() => {
 		if (!wallLayer || !heatmapLayer) return;
 		const mask = wallState.wallMask;
 		const matMask = wallState.materialMask;
-		const rtMask = wallState.roomTypeMask;
 
-		// Skip re-decode if none of the data URLs changed
+		// Skip re-decode if the data URLs haven't changed
 		const wallUrl = mask?.dataUrl ?? null;
 		const matUrl = matMask?.dataUrl ?? null;
-		const rtUrl = rtMask?.dataUrl ?? null;
-		if (wallUrl === lastWallMaskUrl && matUrl === lastMatMaskUrl && rtUrl === lastRtMaskUrl && cachedWallData) return;
+		if (wallUrl === lastWallMaskUrl && matUrl === lastMatMaskUrl && cachedWallData) return;
 		lastWallMaskUrl = wallUrl;
 		lastMatMaskUrl = matUrl;
-		lastRtMaskUrl = rtUrl;
 
 		wallMaskVersion++;
 		invalidateSolverMaskCache();
@@ -793,6 +789,36 @@
 		if (!roomLabelsLayer) return;
 		roomLabelsLayer.visible = appState.showRoomLabels;
 		engine.markDirty();
+	});
+
+	// Decode room type mask independently of wall mask (handles undo/redo, floor switch)
+	let lastRoomTypeMaskUrl: string | null = null;
+	$effect(() => {
+		if (!roomLabelsLayer) return;
+		const rtMask = wallState.roomTypeMask;
+		const rtUrl = rtMask?.dataUrl ?? null;
+		if (rtUrl === lastRoomTypeMaskUrl) return;
+		lastRoomTypeMaskUrl = rtUrl;
+
+		const mask = wallState.wallMask;
+		if (!rtMask || !mask || rtMask.width !== mask.width || rtMask.height !== mask.height) {
+			cachedRoomTypeData = null;
+			roomLabelsLayer.roomTypeData = null;
+			roomLabelsLayer.invalidateCache();
+			engine.markDirty();
+			return;
+		}
+
+		decodeMaterialMask(rtMask.dataUrl, rtMask.width, rtMask.height).then((rtData) => {
+			if (wallState.roomTypeMask?.dataUrl !== rtMask.dataUrl) return; // stale
+			cachedRoomTypeData = rtData;
+			roomLabelsLayer.roomTypeData = rtData;
+			roomLabelsLayer.roomLabels = cachedRoomLabels;
+			roomLabelsLayer.densityOverrides = currentFloor().roomDensityOverrides;
+			roomLabelsLayer.customLabels = currentFloor().roomCustomLabels ?? {};
+			roomLabelsLayer.invalidateCache();
+			engine.markDirty();
+		});
 	});
 
 
