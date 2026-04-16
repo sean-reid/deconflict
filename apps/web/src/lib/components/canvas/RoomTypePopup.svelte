@@ -157,8 +157,8 @@
 		if (searchInput) searchInput.focus();
 	});
 
-	// Clamp popup to viewport after mount
-	$effect(() => {
+	// Clamp popup to viewport after full render
+	function clampToViewport() {
 		if (!popupEl) return;
 		const rect = popupEl.getBoundingClientRect();
 		const pad = 8;
@@ -170,6 +170,12 @@
 		if (ny < pad) ny = pad;
 		clampedX = nx;
 		clampedY = ny;
+	}
+
+	$effect(() => {
+		if (!popupEl) return;
+		// Two frames: first renders content, second measures final layout
+		requestAnimationFrame(() => requestAnimationFrame(clampToViewport));
 	});
 </script>
 
