@@ -330,6 +330,10 @@ export async function runOptimizer(): Promise<void> {
 
 		// Force a small state mutation to guarantee canvas reactivity triggers
 		projectState.aps = [...projectState.aps];
+
+		// Invalidate coverage for all floors — AP positions changed, affecting
+		// virtual AP contributions on every floor
+		floorCoverage.clear();
 	} catch (err) {
 		if (err instanceof Error && err.message === 'Cancelled') {
 			// User cancelled - no error
