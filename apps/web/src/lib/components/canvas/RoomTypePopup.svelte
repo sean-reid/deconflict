@@ -157,7 +157,7 @@
 		if (searchInput) searchInput.focus();
 	});
 
-	// Clamp popup to viewport after full render
+	// Clamp popup position to viewport. Reruns when content changes (activeTypeId).
 	function clampToViewport() {
 		if (!popupEl) return;
 		const rect = popupEl.getBoundingClientRect();
@@ -174,7 +174,9 @@
 
 	$effect(() => {
 		if (!popupEl) return;
-		// Two frames: first renders content, second measures final layout
+		// Track content changes that affect popup height
+		void activeTypeId;
+		void customLabel;
 		requestAnimationFrame(() => requestAnimationFrame(clampToViewport));
 	});
 </script>
@@ -341,6 +343,7 @@
 		z-index: 51;
 		min-width: 180px;
 		max-width: 220px;
+		max-height: calc(100vh - 16px);
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-default);
 		border-radius: var(--radius-lg);
@@ -349,10 +352,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
+		overflow: hidden;
 	}
 
 	.type-list {
-		max-height: 280px;
+		flex: 1 1 0;
+		min-height: 80px;
 		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
