@@ -52,7 +52,7 @@ async function ensureCoverageCache(): Promise<boolean> {
 	cachedMaskUrl = mask.dataUrl;
 
 	const { interior } = computeBuildingInterior(cachedMask.data, mask.width, mask.height, {
-		maxDim: 200,
+		maxDim: 400,
 		dilateRatio: 0.04,
 		minDilateR: 4
 	});
@@ -205,7 +205,7 @@ async function buildDensityMap(
 				wallMaskData.height
 			);
 			const { interior } = computeBuildingInterior(decoded.data, maskWidth, maskHeight, {
-				maxDim: 200,
+				maxDim: 400,
 				dilateRatio: 0.04,
 				minDilateR: 4
 			});
