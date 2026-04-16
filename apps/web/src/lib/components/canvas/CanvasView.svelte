@@ -21,7 +21,7 @@
 	import { appState } from '$state/app.svelte.js';
 	import { undo, redo, pushState } from '$state/history.svelte.js';
 	import { solverState, runSolver, invalidateSolverMaskCache, setLiveSolverMask } from '$state/solver.svelte.js';
-	import { updateCoverage } from '$state/optimizer.svelte.js';
+	import { updateCoverage, optimizerState, floorCoverage } from '$state/optimizer.svelte.js';
 	import { hitTest } from '$canvas/hit-test.js';
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
@@ -649,6 +649,11 @@
 
 		lastSyncedFloorId = id;
 		clearSelection();
+
+		// Immediately show cached coverage for this floor (recomputed after decode)
+		const fc = floorCoverage.get(id);
+		optimizerState.coverage = fc?.coverage ?? 0;
+
 		engine?.markDirty();
 	});
 
