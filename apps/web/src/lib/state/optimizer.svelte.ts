@@ -38,6 +38,7 @@ export function getBuildingCoverage(): number {
 
 // Cached interior sample points and decoded mask for real-time coverage
 let cachedMaskUrl: string | null = null;
+let cachedRtMaskUrl: string | null = null;
 let cachedMask: DecodedWallMask | null = null;
 let cachedSamples: Array<{ x: number; y: number }> | null = null;
 let cachedSampleWeights: number[] | null = null;
@@ -45,7 +46,10 @@ let cachedSampleWeights: number[] | null = null;
 async function ensureCoverageCache(): Promise<boolean> {
 	const mask = projectState.wallMask;
 	if (!mask) return false;
-	if (mask.dataUrl === cachedMaskUrl && cachedMask && cachedSamples) return true;
+	const rtUrl = wallState.roomTypeMask?.dataUrl ?? null;
+	if (mask.dataUrl === cachedMaskUrl && rtUrl === cachedRtMaskUrl && cachedMask && cachedSamples)
+		return true;
+	cachedRtMaskUrl = rtUrl;
 
 	cachedMask = await decodeMask(mask.dataUrl, mask.width, mask.height);
 	cachedMaskUrl = mask.dataUrl;
