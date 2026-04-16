@@ -81,6 +81,49 @@ test.describe('Room types', () => {
 		}
 	});
 
+	test('popup shifts up when right-clicking near bottom of canvas', async ({ page }) => {
+		const canvas = page.locator('canvas');
+		const canvasBox = await canvas.boundingBox();
+		if (!canvasBox) return;
+		const canvasBottom = canvasBox.y + canvasBox.height;
+
+		// Right-click in the bottom quarter of the canvas
+		const clickY = Math.round(canvasBox.height * 0.75);
+		await canvas.click({ position: { x: 300, y: clickY }, button: 'right' });
+		await page.waitForTimeout(800);
+
+		await page.screenshot({
+			path: 'test-results/room-popup-shift-up.png',
+			fullPage: true
+		});
+
+		const popup = page.locator('.popup');
+		if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
+			const popupBox = await popup.boundingBox();
+
+			// Popup must not overflow past the canvas bottom
+			expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(canvasBottom + 2);
+			// Popup top must stay on screen
+			expect(popupBox!.y).toBeGreaterThanOrEqual(0);
+
+			// Select Custom — popup content changes, should still fit
+			const customRow = popup.locator('.type-row', { hasText: 'Custom' }).first();
+			await customRow.click();
+			await page.waitForTimeout(600);
+
+			await page.screenshot({
+				path: 'test-results/room-popup-shift-up-custom.png',
+				fullPage: true
+			});
+
+			const popupBox2 = await popup.boundingBox();
+			expect(popupBox2!.y + popupBox2!.height).toBeLessThanOrEqual(canvasBottom + 2);
+			expect(popupBox2!.y).toBeGreaterThanOrEqual(0);
+
+			await page.keyboard.press('Escape');
+		}
+	});
+
 	test('left-click on interior places AP (not room popup)', async ({ page }) => {
 		const canvas = page.locator('canvas');
 

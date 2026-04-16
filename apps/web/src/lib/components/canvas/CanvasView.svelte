@@ -79,7 +79,7 @@
 			cachedWallLabels = labelWallBlobs(data, width, height);
 
 			// Recompute interior + room labels for room type detection
-			const interiorResult = computeBuildingInterior(data, width, height);
+			const interiorResult = computeBuildingInterior(data, width, height, { maxDim: 400 });
 			cachedInterior = interiorResult.interior;
 			cachedRoomLabels = labelRooms(cachedInterior, width, height);
 
@@ -257,6 +257,9 @@
 		const dataUrl = encodeMaterialMask(cachedRoomTypeData, mask.width, mask.height);
 		wallState.roomTypeMask = { dataUrl, width: mask.width, height: mask.height, originX: cachedMaskOriginX, originY: cachedMaskOriginY };
 		scheduleSave();
+
+		// Update coverage with new density weights
+		updateCoverage();
 	}
 
 	async function handleMaterialSelect(newMaterial: WallMaterialId) {
@@ -743,7 +746,7 @@
 			}
 
 			// Compute building interior + room labels for room type detection
-			const interiorResult = computeBuildingInterior(decoded.data, decoded.width, decoded.height);
+			const interiorResult = computeBuildingInterior(decoded.data, decoded.width, decoded.height, { maxDim: 400 });
 			cachedInterior = interiorResult.interior;
 			cachedRoomLabels = labelRooms(cachedInterior, decoded.width, decoded.height);
 
@@ -885,6 +888,7 @@
 	$effect(() => {
 		const _key = autoSolveKey;
 		const _mask = wallState.wallMask;
+		const _rtMask = wallState.roomTypeMask;
 		if (apState.aps.length === 0 || !_mask) return;
 		if (coverageTimeout) clearTimeout(coverageTimeout);
 		coverageTimeout = setTimeout(() => updateCoverage(), 300);
@@ -1255,6 +1259,7 @@
 	<WallMaterialPopup
 		x={wallPopup.x}
 		y={wallPopup.y}
+		maxY={containerEl?.getBoundingClientRect().bottom ?? window.innerHeight}
 		currentMaterial={wallPopup.material}
 		onselect={handleMaterialSelect}
 		onclose={() => { wallPopup = null; }}
@@ -1265,6 +1270,7 @@
 	<RoomTypePopup
 		x={roomPopup.x}
 		y={roomPopup.y}
+		maxY={containerEl?.getBoundingClientRect().bottom ?? window.innerHeight}
 		currentTypeId={roomPopup.typeId}
 		currentDensity={roomPopup.density}
 		currentLabel={roomPopup.customLabel}

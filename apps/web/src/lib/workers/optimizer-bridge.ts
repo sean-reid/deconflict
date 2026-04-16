@@ -62,6 +62,8 @@ export class OptimizerBridge {
 			fixedAps?: Array<{ x: number; y: number; interferenceRadius: number; signalScale: number }>;
 			iterations?: number;
 			onProgress?: (progress: OptimizeProgress) => void;
+			densityMap?: Float32Array | null;
+			medianDensity?: number;
 		}
 	): Promise<OptimizeResult> {
 		return new Promise((resolve, reject) => {
@@ -72,8 +74,12 @@ export class OptimizerBridge {
 			this.pendingReject = reject;
 			this.onProgress = options?.onProgress ?? null;
 
-			// Copy the mask so we can transfer it
+			// Copy buffers so we can transfer them
 			const maskCopy = new Uint8Array(wallMask);
+			const densityCopy = options?.densityMap ? new Float32Array(options.densityMap) : null;
+			const transferable: ArrayBuffer[] = [maskCopy.buffer];
+			if (densityCopy) transferable.push(densityCopy.buffer);
+
 			const msg = {
 				type: 'optimize' as const,
 				aps,
@@ -82,9 +88,11 @@ export class OptimizerBridge {
 				maskWidth,
 				maskHeight,
 				wallAttenuation,
-				iterations: options?.iterations ?? 5000
+				iterations: options?.iterations ?? 5000,
+				densityMap: densityCopy,
+				medianDensity: options?.medianDensity ?? 0
 			};
-			this.getWorker().postMessage(msg, [maskCopy.buffer]);
+			this.getWorker().postMessage(msg, transferable);
 		});
 	}
 

@@ -80,8 +80,10 @@
 	.wall-toolbar {
 		position: absolute;
 		top: 8px;
-		left: 50%;
-		transform: translateX(-50%);
+		left: 8px;
+		right: 8px;
+		margin: 0 auto;
+		width: fit-content;
 		z-index: 20;
 		display: flex;
 		flex-direction: column;

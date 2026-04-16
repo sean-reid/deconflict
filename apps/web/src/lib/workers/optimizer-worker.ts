@@ -26,6 +26,10 @@ interface OptimizeMessage {
 	maskHeight: number;
 	wallAttenuation: number;
 	iterations: number;
+	/** Per-pixel device density (devices/sqm). -1 = unlabeled. Null = no room data. */
+	densityMap: Float32Array | null;
+	/** Median density of labeled rooms — used as baseline for unlabeled pixels. */
+	medianDensity: number;
 }
 
 interface CancelMessage {
@@ -192,9 +196,11 @@ function evaluateCoverage(
 	positions: Position[],
 	samples: Array<{ x: number; y: number }>,
 	cache: WallCache,
-	fixedAps: FixedApInput[] = []
+	fixedAps: FixedApInput[] = [],
+	sampleDensity: number[] = []
 ): number {
-	let total = 0;
+	let totalWeighted = 0;
+	let totalWeight = 0;
 	for (let s = 0; s < samples.length; s++) {
 		let best = 0;
 		for (const ap of positions) {
@@ -226,9 +232,11 @@ function evaluateCoverage(
 			}
 			if (signal > best) best = signal;
 		}
-		total += best;
+		const w = sampleDensity[s] ?? 1;
+		totalWeighted += best * w;
+		totalWeight += w;
 	}
-	return total / samples.length;
+	return totalWeight > 0 ? totalWeighted / totalWeight : 0;
 }
 
 function evaluateExact(
@@ -297,7 +305,16 @@ function yieldToEventLoop(): Promise<void> {
 // ─── Main optimization pipeline ─────────────────────────────────────
 
 async function runOptimization(msg: OptimizeMessage): Promise<void> {
-	const { aps, fixedAps, wallMask: mask, maskWidth: w, maskHeight: h, wallAttenuation } = msg;
+	const {
+		aps,
+		fixedAps,
+		wallMask: mask,
+		maskWidth: w,
+		maskHeight: h,
+		wallAttenuation,
+		densityMap,
+		medianDensity
+	} = msg;
 
 	const { interior } = computeBuildingInterior(mask, w, h, {
 		maxDim: 200,
@@ -326,14 +343,58 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 	}
 
 	const numAps = aps.length;
+	const baseline = medianDensity > 0 ? medianDensity : 0.3;
 
-	// Sample points
+	// Sample points — density-weighted if room type data is available
 	const sampleCount = Math.min(400, interiorPixels.length);
 	const samples: Array<{ x: number; y: number }> = [];
-	const step = interiorPixels.length / sampleCount;
-	for (let i = 0; i < sampleCount; i++) {
-		const idx = interiorPixels[Math.floor(i * step)]!;
-		samples.push({ x: idx % w, y: Math.floor(idx / w) });
+	/** Per-sample density weight (1.0 = unassigned/default). */
+	const sampleDensity: number[] = [];
+
+	if (densityMap && densityMap.length === w * h) {
+		// Weighted sampling: unlabeled pixels use median density as baseline
+		const weights = new Float32Array(interiorPixels.length);
+		let totalWeight = 0;
+		for (let i = 0; i < interiorPixels.length; i++) {
+			const raw = densityMap[interiorPixels[i]!]!;
+			// -1 = unlabeled → use baseline; >= 0 = explicit (including 0)
+			const d = raw >= 0 ? raw : baseline;
+			weights[i] = d;
+			totalWeight += d;
+		}
+
+		// Systematic weighted resampling (deterministic, no randomness)
+		const stepW = totalWeight / sampleCount;
+		let cum = 0;
+		let nextThreshold = stepW * 0.5; // start at half-step for centering
+		let pi = 0;
+		for (let s = 0; s < sampleCount && pi < interiorPixels.length; s++) {
+			while (pi < interiorPixels.length - 1 && cum + weights[pi]! < nextThreshold) {
+				cum += weights[pi]!;
+				pi++;
+			}
+			const idx = interiorPixels[pi]!;
+			samples.push({ x: idx % w, y: Math.floor(idx / w) });
+			const raw = densityMap[idx]!;
+			sampleDensity.push(raw >= 0 ? raw : baseline);
+			nextThreshold += stepW;
+			cum += weights[pi]!;
+			pi++;
+		}
+	} else {
+		// Uniform sampling (no density data)
+		const step = interiorPixels.length / sampleCount;
+		for (let i = 0; i < sampleCount; i++) {
+			const idx = interiorPixels[Math.floor(i * step)]!;
+			samples.push({ x: idx % w, y: Math.floor(idx / w) });
+			sampleDensity.push(0);
+		}
+	}
+
+	// If all sample densities are 0 (every room set to 0), fall back to uniform
+	const maxDensity = Math.max(...sampleDensity);
+	if (maxDensity <= 0) {
+		for (let i = 0; i < sampleDensity.length; i++) sampleDensity[i] = 1;
 	}
 
 	// Build wall cache ONCE (stride-3 DDA, O(1) grid lookup)
@@ -440,7 +501,9 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				if (signal > bestSignal) bestSignal = signal;
 			}
 			const deficit = 1.0 - bestSignal;
-			const weight = 1 + deficit * 3;
+			// Density-proportional: conference room (0.8) pulls ~3x harder than stairwell (0.03)
+			const densityW = sampleDensity[s] ?? baseline;
+			const weight = (1 + deficit * 3) * densityW;
 			buckets[bestAp]!.sumX += samples[s]!.x * weight;
 			buckets[bestAp]!.sumY += samples[s]!.y * weight;
 			buckets[bestAp]!.sumW += weight;
@@ -460,7 +523,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		if (maxMove < 1.0) break;
 	}
 
-	const lloydsScore = evaluateCoverage(positions, samples, cache, fixedAps);
+	const lloydsScore = evaluateCoverage(positions, samples, cache, fixedAps, sampleDensity);
 	self.postMessage({
 		type: 'progress',
 		positions: positions.map((p) => ({ id: p.id, x: p.x, y: p.y })),
@@ -517,7 +580,7 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 				radius: aps[a]!.interferenceRadius
 			});
 		}
-		return evaluateCoverage(tempPositions, samples, cache, fixedAps);
+		return evaluateCoverage(tempPositions, samples, cache, fixedAps, sampleDensity);
 	}
 
 	for (let p = 0; p < SWARM; p++) {
@@ -659,7 +722,8 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		aps.map((a) => ({ ...a, radius: a.interferenceRadius })),
 		samples,
 		cache,
-		fixedAps
+		fixedAps,
+		sampleDensity
 	);
 	const improvement = initialScore > 0 ? ((finalScore - initialScore) / initialScore) * 100 : 0;
 
