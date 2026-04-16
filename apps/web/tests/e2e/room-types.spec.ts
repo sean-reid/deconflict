@@ -81,6 +81,58 @@ test.describe('Room types', () => {
 		}
 	});
 
+	test('popup stays within viewport when right-clicking near bottom', async ({ page }) => {
+		const canvas = page.locator('canvas');
+
+		// First, right-click an interior pixel at normal viewport to confirm popup works
+		await canvas.click({ position: { x: 300, y: 250 }, button: 'right' });
+		await page.waitForTimeout(500);
+		const popup = page.locator('.popup');
+		const normalVisible = await popup.isVisible({ timeout: 2000 }).catch(() => false);
+		if (!normalVisible) return; // no walls detected, skip test
+
+		const normalBox = await popup.boundingBox();
+		await page.keyboard.press('Escape');
+		await page.waitForTimeout(200);
+		if (!normalBox) return;
+
+		// Shrink viewport so popup would overflow at this click point
+		const shortHeight = Math.round(250 + normalBox.height * 0.4);
+		await page.setViewportSize({ width: 1280, height: shortHeight });
+		await page.waitForTimeout(300);
+
+		// Force-click bypasses the status bar interception at short viewports
+		await canvas.click({ position: { x: 300, y: 200 }, button: 'right', force: true });
+		await page.waitForTimeout(800);
+
+		await page.screenshot({
+			path: '/Users/seanreid/deconflict/apps/web/test-results/room-popup-near-bottom.png',
+			fullPage: true
+		});
+
+		if (await popup.isVisible({ timeout: 2000 }).catch(() => false)) {
+			const popupBox = await popup.boundingBox();
+			const vh = page.viewportSize()!.height;
+			expect(popupBox!.y + popupBox!.height).toBeLessThanOrEqual(vh + 2);
+
+			// Select Custom — popup grows (label input + slider)
+			const customRow = popup.locator('.type-row', { hasText: 'Custom' }).first();
+			await customRow.click();
+			await page.waitForTimeout(600);
+
+			await page.screenshot({
+				path: '/Users/seanreid/deconflict/apps/web/test-results/room-popup-custom-near-bottom.png',
+				fullPage: true
+			});
+
+			const popupBox2 = await popup.boundingBox();
+			expect(popupBox2!.y + popupBox2!.height).toBeLessThanOrEqual(vh + 2);
+			expect(popupBox2!.y).toBeGreaterThanOrEqual(0);
+
+			await page.keyboard.press('Escape');
+		}
+	});
+
 	test('left-click on interior places AP (not room popup)', async ({ page }) => {
 		const canvas = page.locator('canvas');
 

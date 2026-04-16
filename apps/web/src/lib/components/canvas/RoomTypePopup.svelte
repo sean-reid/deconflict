@@ -28,8 +28,10 @@
 	let searchInput: HTMLInputElement;
 	let popupEl: HTMLDivElement;
 	let highlightIndex = $state(-1);
-	let clampedX = $state(x);
-	let clampedY = $state(y);
+	// Pre-clamp: estimate max popup height (~400px or viewport - 16px) and ensure it fits
+	const estimatedMaxH = typeof window !== 'undefined' ? Math.min(400, window.innerHeight - 16) : 400;
+	let clampedX = $state(Math.max(8, Math.min(x, (typeof window !== 'undefined' ? window.innerWidth : 1280) - 230)));
+	let clampedY = $state(Math.max(8, Math.min(y, (typeof window !== 'undefined' ? window.innerHeight : 800) - estimatedMaxH - 8)));
 
 	const CATEGORY_ORDER: BuildingCategory[] = ['commercial', 'residential', 'education', 'healthcare', 'hospitality', 'industrial'];
 	const CATEGORY_LABELS: Record<BuildingCategory, string> = {
@@ -189,7 +191,7 @@
 	<div
 		class="popup"
 		bind:this={popupEl}
-		style="left: {clampedX}px; top: {clampedY}px"
+		style="left: {clampedX}px; top: {clampedY}px; max-height: calc(100vh - {clampedY}px - 8px)"
 		onclick={(e) => e.stopPropagation()}
 	>
 		{#if activeTypeId > 0}
@@ -343,7 +345,6 @@
 		z-index: 51;
 		min-width: 180px;
 		max-width: 220px;
-		max-height: calc(100vh - 16px);
 		background: var(--bg-secondary);
 		border: 1px solid var(--border-default);
 		border-radius: var(--radius-lg);
