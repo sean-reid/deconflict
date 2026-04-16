@@ -391,6 +391,12 @@ async function runOptimization(msg: OptimizeMessage): Promise<void> {
 		}
 	}
 
+	// If all sample densities are 0 (every room set to 0), fall back to uniform
+	const maxDensity = Math.max(...sampleDensity);
+	if (maxDensity <= 0) {
+		for (let i = 0; i < sampleDensity.length; i++) sampleDensity[i] = 1;
+	}
+
 	// Build wall cache ONCE (stride-3 DDA, O(1) grid lookup)
 	self.postMessage({
 		type: 'progress',

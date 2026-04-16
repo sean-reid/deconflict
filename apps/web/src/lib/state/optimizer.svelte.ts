@@ -106,6 +106,10 @@ export async function updateCoverage(): Promise<void> {
 			sampleDensity.push(1);
 		}
 	}
+	// All-zero densities → fall back to uniform (avoids division by zero)
+	if (Math.max(...sampleDensity) <= 0) {
+		for (let i = 0; i < sampleDensity.length; i++) sampleDensity[i] = 1;
+	}
 
 	// Include virtual APs from other floors as fixed signal sources
 	const curFloorId = floorState.currentFloorId;
