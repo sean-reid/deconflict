@@ -56,7 +56,9 @@
 <div class="model-picker">
 	<button class="trigger" onclick={handleOpen} type="button">
 		<span class="trigger-label">{currentLabel()}</span>
-		<span class="trigger-chevron">▾</span>
+		<svg class="trigger-chevron" class:open width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+			<path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+		</svg>
 	</button>
 
 	{#if open}
@@ -109,12 +111,13 @@
 	}
 
 	.trigger {
+		position: relative;
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
 		width: 100%;
 		height: 28px;
 		padding: 0 var(--space-2);
+		padding-right: var(--space-5);
 		background: var(--bg-surface);
 		border: 1px solid var(--border-default);
 		border-radius: var(--radius-md);
@@ -123,6 +126,8 @@
 		font-size: var(--text-sm);
 		cursor: pointer;
 		transition: border-color var(--transition-fast);
+		box-sizing: border-box;
+		text-align: left;
 	}
 
 	.trigger:hover {
@@ -135,8 +140,14 @@
 	}
 
 	.trigger-chevron {
+		position: absolute;
+		right: var(--space-2);
 		color: var(--text-tertiary);
-		font-size: var(--text-xs);
+		transition: transform var(--transition-fast);
+	}
+
+	.trigger-chevron.open {
+		transform: rotate(180deg);
 	}
 
 	.backdrop {

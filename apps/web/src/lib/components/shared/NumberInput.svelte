@@ -91,6 +91,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0;
+		width: 100%;
 	}
 
 	.step-btn {
@@ -128,7 +129,8 @@
 	}
 
 	input {
-		width: 60px;
+		flex: 1;
+		min-width: 0;
 		height: 24px;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-default);

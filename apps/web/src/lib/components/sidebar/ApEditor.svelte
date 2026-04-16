@@ -259,7 +259,6 @@
 				value={singleAp.band}
 				options={bandOptions}
 				onchange={handleBandChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -271,7 +270,6 @@
 				value={String(singleAp.channelWidth)}
 				options={getWidths(singleAp.band)}
 				onchange={handleWidthChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -283,7 +281,6 @@
 				value={singleAp.fixedChannel != null ? String(singleAp.fixedChannel) : ''}
 				options={channelOptions}
 				onchange={handleChannelChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -351,7 +348,6 @@
 				value={selectedAps[0]?.band ?? '5ghz'}
 				options={bandOptions}
 				onchange={handleBandChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -363,7 +359,6 @@
 				value={String(selectedAps[0]?.channelWidth ?? 20)}
 				options={getWidths(selectedAps[0]?.band ?? '5ghz')}
 				onchange={handleWidthChange}
-				class="full-width"
 			/>
 		</div>
 
@@ -579,13 +574,6 @@
 		margin-top: 2px;
 	}
 
-	:global(.full-width) {
-		width: 100%;
-	}
-
-	:global(.full-width select) {
-		width: 100%;
-	}
 
 	.back-link {
 		display: inline-flex;
