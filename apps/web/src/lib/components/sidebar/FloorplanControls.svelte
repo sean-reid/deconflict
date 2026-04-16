@@ -208,6 +208,7 @@
 	}
 
 	async function loadSample(url: string, knownAreaSqm?: number) {
+		pushState();
 		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}
@@ -232,6 +233,7 @@
 	function handleFile(file: File) {
 		const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
 		if (!validTypes.includes(file.type)) return;
+		pushState();
 		if (floorplanState.floorplanUrl?.startsWith('blob:')) {
 			URL.revokeObjectURL(floorplanState.floorplanUrl);
 		}

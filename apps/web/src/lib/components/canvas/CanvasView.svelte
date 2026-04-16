@@ -117,6 +117,7 @@
 		canvasDragOver = false;
 		const file = e.dataTransfer?.files[0];
 		if (file) {
+			pushState();
 			importFloorplanFile(file);
 			appState.sidebarPanel = 'floorplan';
 			appState.sidebarOpen = true;
