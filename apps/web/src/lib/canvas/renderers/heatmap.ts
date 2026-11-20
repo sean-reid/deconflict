@@ -60,6 +60,45 @@ for (let i = 0; i < 256; i++) {
 LUT[0] = 0;
 
 /**
+ * Rasterize a screen-sized grid of cellSize×cellSize blocks into a packed RGBA buffer.
+ * `colorAt` receives each cell's screen-space centre and returns a packed colour (0 = skip).
+ *
+ * CSS sizes can be fractional (e.g. Firefox on Android); the buffer and its row
+ * stride must be integers, or typed-array writes at fractional indices are dropped.
+ */
+export function rasterizeCells(
+	width: number,
+	height: number,
+	cellSize: number,
+	colorAt: (sx: number, sy: number) => number
+): { w: number; h: number; pixels: Uint32Array } {
+	const w = Math.ceil(width);
+	const h = Math.ceil(height);
+	const pixels = new Uint32Array(w * h);
+	const cols = Math.ceil(w / cellSize);
+	const rows = Math.ceil(h / cellSize);
+	for (let row = 0; row < rows; row++) {
+		const sy = row * cellSize + (cellSize >> 1);
+		const py0 = row * cellSize;
+		const py1 = Math.min(py0 + cellSize, h);
+		for (let col = 0; col < cols; col++) {
+			const sx = col * cellSize + (cellSize >> 1);
+			const color = colorAt(sx, sy);
+			if (!color) continue;
+			const px0 = col * cellSize;
+			const px1 = Math.min(px0 + cellSize, w);
+			for (let py = py0; py < py1; py++) {
+				const rowOff = py * w;
+				for (let px = px0; px < px1; px++) {
+					pixels[rowOff + px] = color;
+				}
+			}
+		}
+	}
+	return { w, h, pixels };
+}
+
+/**
  * Heatmap layer — synchronous main-thread rendering.
  *
  * Wall attenuation uses precomputed fields from rf/propagation.ts (O(1) lookup).
@@ -126,14 +165,6 @@ export class HeatmapLayer implements Layer {
 		height: number,
 		camera: { getInverseTransform: () => number[] }
 	): HTMLCanvasElement {
-		const offscreen = document.createElement('canvas');
-		offscreen.width = width;
-		offscreen.height = height;
-		const ctx = offscreen.getContext('2d')!;
-		const cellSize = CELL_SIZE;
-		const cols = Math.ceil(width / cellSize);
-		const rows = Math.ceil(height / cellSize);
-
 		let maxTp = 0;
 		for (const ap of this.aps) {
 			const base = getBaseRate(ap.band, ap.channelWidth) * 0.5;
@@ -197,66 +228,53 @@ export class HeatmapLayer implements Layer {
 			ie = inv[4]!,
 			ig = inv[5]!;
 
-		const imgData = ctx.createImageData(width, height);
-		const u32 = new Uint32Array(imgData.data.buffer);
 		const ispCap = this.ispSpeed;
 
-		for (let row = 0; row < rows; row++) {
-			const sy = row * cellSize + (cellSize >> 1);
-			const py0 = row * cellSize;
-			const py1 = Math.min(py0 + cellSize, height);
+		const { w, h, pixels } = rasterizeCells(width, height, CELL_SIZE, (sx, sy) => {
+			const wx = ia * sx + ic * sy + ie;
+			const wy = ib * sx + idd * sy + ig;
 
-			for (let col = 0; col < cols; col++) {
-				const sx = col * cellSize + (cellSize >> 1);
-				const wx = ia * sx + ic * sy + ie;
-				const wy = ib * sx + idd * sy + ig;
+			let best = 0;
+			for (let i = 0; i < n; i++) {
+				const dx = wx - apX[i]!;
+				const dy = wy - apY[i]!;
+				const dSq = dx * dx + dy * dy + vertOffSq[i]!;
+				const signal = signalPower(dSq, apRadSq[i]!);
+				if (signal < 0.001) continue; // below visible threshold, skip expensive lookups
+				let tp = apBase[i]! * signal;
 
-				let best = 0;
-				for (let i = 0; i < n; i++) {
-					const dx = wx - apX[i]!;
-					const dy = wy - apY[i]!;
-					const dSq = dx * dx + dy * dy + vertOffSq[i]!;
-					const signal = signalPower(dSq, apRadSq[i]!);
-					if (signal < 0.001) continue; // below visible threshold, skip expensive lookups
-					let tp = apBase[i]! * signal;
-
-					// Wall attenuation (precomputed field, O(1) lookup)
-					const field = fields[i];
-					if (field) {
-						const loss = lookupAtten(field, wx, wy);
-						if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
-					}
-
-					// Floor slab attenuation (ITU-R P.1238 empirical model).
-					// Uses measured aggregate floor isolation that accounts for
-					// direct penetration + diffraction + multipath. Applied as
-					// flat dB loss. The 3D distance (via vertOffSq above) already
-					// captures the oblique geometry — closer floors = shorter 3D
-					// path = stronger signal, steeper angles = longer 3D path.
-					const fdt = floorDbThickness[i]!;
-					if (fdt > 0) {
-						tp *= Math.exp(fdt * -0.11512925464);
-					}
-
-					if (ispCap > 0 && tp > ispCap) tp = ispCap;
-					if (tp > best) best = tp;
+				// Wall attenuation (precomputed field, O(1) lookup)
+				const field = fields[i];
+				if (field) {
+					const loss = lookupAtten(field, wx, wy);
+					if (loss > 0) tp *= Math.exp(loss * -0.11512925464);
 				}
 
-				const ratio = best * invMax;
-				const color = ratio <= 0 ? 0 : LUT[Math.min(255, (ratio * 255) | 0)]!;
-				if (!color) continue;
-
-				const px0 = col * cellSize;
-				const px1 = Math.min(px0 + cellSize, width);
-				for (let py = py0; py < py1; py++) {
-					const rowOff = py * width;
-					for (let px = px0; px < px1; px++) {
-						u32[rowOff + px] = color;
-					}
+				// Floor slab attenuation (ITU-R P.1238 empirical model).
+				// Uses measured aggregate floor isolation that accounts for
+				// direct penetration + diffraction + multipath. Applied as
+				// flat dB loss. The 3D distance (via vertOffSq above) already
+				// captures the oblique geometry — closer floors = shorter 3D
+				// path = stronger signal, steeper angles = longer 3D path.
+				const fdt = floorDbThickness[i]!;
+				if (fdt > 0) {
+					tp *= Math.exp(fdt * -0.11512925464);
 				}
+
+				if (ispCap > 0 && tp > ispCap) tp = ispCap;
+				if (tp > best) best = tp;
 			}
-		}
 
+			const ratio = best * invMax;
+			return ratio <= 0 ? 0 : LUT[Math.min(255, (ratio * 255) | 0)]!;
+		});
+
+		const offscreen = document.createElement('canvas');
+		offscreen.width = w;
+		offscreen.height = h;
+		const ctx = offscreen.getContext('2d')!;
+		const imgData = ctx.createImageData(w, h);
+		imgData.data.set(new Uint8ClampedArray(pixels.buffer));
 		ctx.putImageData(imgData, 0, 0);
 		return offscreen;
 	}
