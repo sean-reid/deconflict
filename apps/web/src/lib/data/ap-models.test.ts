@@ -40,6 +40,7 @@ const UBIQUITI_WIFI7: [id: string, model: string, bands: ApBandSpec[]][] = [
 	['ubiquiti-u7-industrial', 'U7 Industrial', [b24(23, 2, 40), b5(24, 2, 30)]],
 	['ubiquiti-e7', 'E7', [b24(23, 2, 40), b5(30, 4, 35), b6(24, 4, 22)]],
 	['ubiquiti-e7-campus', 'E7 Campus', [b24(23, 2, 45), b5(30, 4, 38), b6(30, 4, 25)]],
+	['ubiquiti-e7-campus-indoor', 'E7 Campus Indoor', [b24(23, 2, 45), b5(30, 4, 38), b6(30, 4, 25)]],
 	['ubiquiti-e7-audience', 'E7 Audience', [b5(30, 4, 38), b6(30, 4, 25)]],
 	['ubiquiti-e7-audience-indoor', 'E7 Audience Indoor', [b5(30, 4, 38), b6(30, 4, 25)]]
 ];

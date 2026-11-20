@@ -274,7 +274,7 @@ export const UBIQUITI_MODELS: readonly ApModel[] = [
 			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 20, streams: 2 }
 		]
 	},
-	// https://techspecs.ui.com/unifi/wifi/u7-mesh
+	// https://techspecs.ui.com/unifi/wifi/u7-mesh | 5 GHz omni or directional mode, modelled as omni
 	{
 		id: 'ubiquiti-u7-mesh',
 		vendor: 'Ubiquiti',
@@ -334,6 +334,7 @@ export const UBIQUITI_MODELS: readonly ApModel[] = [
 		]
 	},
 	// https://techspecs.ui.com/unifi/wifi/e7-campus-us | directional antenna, modelled as omni
+	// 6 GHz 30 dBm is the datasheet's only value (Extended Range mode, FCC/IC only)
 	{
 		id: 'ubiquiti-e7-campus',
 		vendor: 'Ubiquiti',
@@ -345,8 +346,22 @@ export const UBIQUITI_MODELS: readonly ApModel[] = [
 			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 30, typicalIndoorRange: 25, streams: 4 }
 		]
 	},
+	// https://techspecs.ui.com/unifi/wifi/e7-campus-indoor | directional antenna, modelled as omni
+	// 6 GHz 30 dBm (36 dBm EIRP) is the datasheet's only value
+	{
+		id: 'ubiquiti-e7-campus-indoor',
+		vendor: 'Ubiquiti',
+		model: 'E7 Campus Indoor',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 45, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 30, typicalIndoorRange: 38, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 30, typicalIndoorRange: 25, streams: 4 }
+		]
+	},
 	// https://techspecs.ui.com/unifi/wifi/e7-audience-us | directional antenna, modelled as omni
 	// No 2.4 GHz; two 4x4 6 GHz radios (low/high band), listed as one 6 GHz entry
+	// 6 GHz 30 dBm (36 dBm EIRP) is the datasheet's only value
 	{
 		id: 'ubiquiti-e7-audience',
 		vendor: 'Ubiquiti',
@@ -359,6 +374,7 @@ export const UBIQUITI_MODELS: readonly ApModel[] = [
 	},
 	// https://techspecs.ui.com/unifi/wifi/e7-audience-indoor | directional antenna, modelled as omni
 	// No 2.4 GHz; two 4x4 6 GHz radios (low/high band), listed as one 6 GHz entry
+	// 6 GHz 30 dBm (36 dBm EIRP) is the datasheet's only value
 	{
 		id: 'ubiquiti-e7-audience-indoor',
 		vendor: 'Ubiquiti',

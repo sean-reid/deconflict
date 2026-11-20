@@ -57,11 +57,12 @@
 | ubiquiti-u7-industrial      | U7 Industrial      | 40/23/2/40 | 160/24/2/30 |             | u7-industrial      |
 | ubiquiti-e7                 | E7                 | 40/23/2/40 | 160/30/4/35 | 320/24/4/22 | e7                 |
 | ubiquiti-e7-campus          | E7 Campus          | 40/23/2/45 | 160/30/4/38 | 320/30/4/25 | e7-campus-us       |
+| ubiquiti-e7-campus-indoor   | E7 Campus Indoor   | 40/23/2/45 | 160/30/4/38 | 320/30/4/25 | e7-campus-indoor   |
 | ubiquiti-e7-audience        | E7 Audience        |            | 160/30/4/38 | 320/30/4/25 | e7-audience-us     |
 | ubiquiti-e7-audience-indoor | E7 Audience Indoor |            | 160/30/4/38 | 320/30/4/25 | e7-audience-indoor |
 
 Alcance (`typicalIndoorRange`): estimación propia en línea con los modelos existentes; el cálculo no lo usa.
-Direccionales (nota en comentario): U7 Outdoor, U7 Pro Outdoor, U7 Industrial, E7 Campus, E7 Audience, E7 Audience Indoor.
+Direccionales (nota en comentario): U7 Outdoor, U7 Pro Outdoor, U7 Industrial, E7 Campus, E7 Campus Indoor, E7 Audience, E7 Audience Indoor.
 
 - [ ] **Step 1: Escribir el test que falla**
 
@@ -75,9 +76,9 @@ Direccionales (nota en comentario): U7 Outdoor, U7 Pro Outdoor, U7 Industrial, E
 - [ ] **Step 2: Ver que falla**
 
 Run: `pnpm --filter @deconflict/web test`
-Expected: FAIL en los 14 casos de la tabla (`findModel` devuelve `undefined`); el resto pasa.
+Expected: FAIL en los 15 casos de la tabla (`findModel` devuelve `undefined`); el resto pasa.
 
-- [ ] **Step 3: Añadir las 14 entradas a `UBIQUITI_MODELS`**
+- [ ] **Step 3: Añadir las 15 entradas a `UBIQUITI_MODELS`**
 
 Mismo formato y estilo de comentario que las entradas U7 existentes, en el orden de la tabla. Separar E7 con su propio rótulo `// ─── WiFi 7 Enterprise (E7)`. Actualizar el comentario de cabecera para indicar que los modelos nuevos no llevan FCC ID.
 
