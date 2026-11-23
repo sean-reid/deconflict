@@ -72,6 +72,9 @@
 		<button class="zoom-btn" onclick={handleFit} aria-label="Fit to view">Fit</button>
 	</div>
 	<div class="status-right">
+		{#if persistenceState.storageError}
+			<span class="storage-error" role="alert">{persistenceState.storageError}</span>
+		{/if}
 		{#if showSaved}
 			<span class="saved-indicator">Saved</span>
 		{/if}
@@ -128,6 +131,12 @@
 	.zoom-btn:hover {
 		color: var(--text-secondary);
 		background: var(--bg-hover);
+	}
+
+	.storage-error {
+		font-size: var(--text-xs);
+		font-family: var(--font-mono);
+		color: var(--color-error);
 	}
 
 .saved-indicator {

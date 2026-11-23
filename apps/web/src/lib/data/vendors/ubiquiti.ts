@@ -7,6 +7,11 @@
  *
  * TX power values are conducted power (dBm) from manufacturer datasheets
  * and verified against FCC test reports where available.
+ *
+ * Entries without an FCC ID comment were taken from techspecs.ui.com only.
+ * 240 MHz on 5 GHz is stored as 160 (largest supported ChannelWidth). Where a
+ * 6 GHz radio lists two TX powers (LPI / AFC), the indoor LPI value is used.
+ * Models with directional antennas are modelled as omni, like all others.
  */
 
 import type { ApModel } from '../ap-models.js';
@@ -198,6 +203,186 @@ export const UBIQUITI_MODELS: readonly ApModel[] = [
 			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 22, typicalIndoorRange: 28, streams: 2 },
 			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 26, typicalIndoorRange: 22, streams: 2 },
 			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 23, typicalIndoorRange: 15, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-lite
+	{
+		id: 'ubiquiti-u7-lite',
+		vendor: 'Ubiquiti',
+		model: 'U7 Lite',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 30, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 22, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-lr
+	{
+		id: 'ubiquiti-u7-lr',
+		vendor: 'Ubiquiti',
+		model: 'U7 Long-Range',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 26, typicalIndoorRange: 45, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 27, typicalIndoorRange: 35, streams: 3 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-pro-xg
+	{
+		id: 'ubiquiti-u7-pro-xg',
+		vendor: 'Ubiquiti',
+		model: 'U7 Pro XG',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 35, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 26, typicalIndoorRange: 28, streams: 2 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 24, typicalIndoorRange: 18, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-pro-xgs
+	{
+		id: 'ubiquiti-u7-pro-xgs',
+		vendor: 'Ubiquiti',
+		model: 'U7 Pro XGS',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 29, typicalIndoorRange: 32, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 24, typicalIndoorRange: 20, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-pro-xg-wall
+	{
+		id: 'ubiquiti-u7-pro-xg-wall',
+		vendor: 'Ubiquiti',
+		model: 'U7 Pro XG Wall',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 28, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 26, typicalIndoorRange: 22, streams: 2 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 24, typicalIndoorRange: 15, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-iw
+	{
+		id: 'ubiquiti-u7-in-wall',
+		vendor: 'Ubiquiti',
+		model: 'U7 In-Wall',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 25, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 20, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-mesh | 5 GHz omni or directional mode, modelled as omni
+	{
+		id: 'ubiquiti-u7-mesh',
+		vendor: 'Ubiquiti',
+		model: 'U7 Mesh',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 30, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 25, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-outdoor | directional antenna, modelled as omni
+	{
+		id: 'ubiquiti-u7-outdoor',
+		vendor: 'Ubiquiti',
+		model: 'U7 Outdoor',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 26, typicalIndoorRange: 32, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-pro-outdoor-us | directional antenna, modelled as omni
+	{
+		id: 'ubiquiti-u7-pro-outdoor',
+		vendor: 'Ubiquiti',
+		model: 'U7 Pro Outdoor',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 26, typicalIndoorRange: 32, streams: 2 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 26, typicalIndoorRange: 22, streams: 2 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/u7-industrial | directional antenna, modelled as omni
+	{
+		id: 'ubiquiti-u7-industrial',
+		vendor: 'Ubiquiti',
+		model: 'U7 Industrial',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 24, typicalIndoorRange: 30, streams: 2 }
+		]
+	},
+
+	// ─── WiFi 7 Enterprise (E7) ─────────────────────────────────────
+	// https://techspecs.ui.com/unifi/wifi/e7 | 6 GHz: 24 dBm LPI (30 dBm with AFC)
+	{
+		id: 'ubiquiti-e7',
+		vendor: 'Ubiquiti',
+		model: 'E7',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 40, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 30, typicalIndoorRange: 35, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 24, typicalIndoorRange: 22, streams: 4 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/e7-campus-us | directional antenna, modelled as omni
+	// 6 GHz 30 dBm is the datasheet's only value (Extended Range mode, FCC/IC only)
+	{
+		id: 'ubiquiti-e7-campus',
+		vendor: 'Ubiquiti',
+		model: 'E7 Campus',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 45, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 30, typicalIndoorRange: 38, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 30, typicalIndoorRange: 25, streams: 4 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/e7-campus-indoor | directional antenna, modelled as omni
+	// 6 GHz 30 dBm (36 dBm EIRP) is the datasheet's only value
+	{
+		id: 'ubiquiti-e7-campus-indoor',
+		vendor: 'Ubiquiti',
+		model: 'E7 Campus Indoor',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '2.4ghz', maxChannelWidth: 40, maxTxPower: 23, typicalIndoorRange: 45, streams: 2 },
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 30, typicalIndoorRange: 38, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 30, typicalIndoorRange: 25, streams: 4 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/e7-audience-us | directional antenna, modelled as omni
+	// No 2.4 GHz; two 4x4 6 GHz radios (low/high band), listed as one 6 GHz entry
+	// 6 GHz 30 dBm (36 dBm EIRP) is the datasheet's only value
+	{
+		id: 'ubiquiti-e7-audience',
+		vendor: 'Ubiquiti',
+		model: 'E7 Audience',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 30, typicalIndoorRange: 38, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 30, typicalIndoorRange: 25, streams: 4 }
+		]
+	},
+	// https://techspecs.ui.com/unifi/wifi/e7-audience-indoor | directional antenna, modelled as omni
+	// No 2.4 GHz; two 4x4 6 GHz radios (low/high band), listed as one 6 GHz entry
+	// 6 GHz 30 dBm (36 dBm EIRP) is the datasheet's only value
+	{
+		id: 'ubiquiti-e7-audience-indoor',
+		vendor: 'Ubiquiti',
+		model: 'E7 Audience Indoor',
+		wifiStandard: 'WiFi 7',
+		bands: [
+			{ band: '5ghz', maxChannelWidth: 160, maxTxPower: 30, typicalIndoorRange: 38, streams: 4 },
+			{ band: '6ghz', maxChannelWidth: 320, maxTxPower: 30, typicalIndoorRange: 25, streams: 4 }
 		]
 	}
 ];

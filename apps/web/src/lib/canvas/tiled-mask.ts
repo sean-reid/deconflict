@@ -29,6 +29,20 @@ export interface MaterialTiledMask {
 	defaultValue: number;
 }
 
+export const MAX_UNDO_STEPS = 50;
+export const MAX_UNDO_BYTES = 32 * 1024 * 1024;
+
+/** Tile contents before an operation touched them (null = tile did not exist). */
+interface TileSnapshot {
+	wall: Uint8Array | null;
+	material: Uint8Array | null;
+}
+
+interface UndoStep {
+	tiles: Map<string, TileSnapshot>;
+	bytes: number;
+}
+
 export class TiledMask {
 	tiles = new Map<string, Uint8Array>();
 	/** Optional per-pixel material data (same tile layout). */
@@ -53,6 +67,85 @@ export class TiledMask {
 	private cachedWidth = 0;
 	private cachedHeight = 0;
 
+	// Undo history: one step per operation, oldest first
+	private openStep: UndoStep | null = null;
+	private undoSteps: UndoStep[] = [];
+	private undoBytes = 0;
+
+	/** Start recording an undoable operation (no-op if one is already open). */
+	beginOp(): void {
+		if (this.openStep) return;
+		this.openStep = { tiles: new Map(), bytes: 0 };
+	}
+
+	/** Close the open operation; returns true if it touched any tile and was kept. */
+	endOp(): boolean {
+		const step = this.openStep;
+		this.openStep = null;
+		if (!step || step.tiles.size === 0) return false;
+		this.undoSteps.push(step);
+		this.undoBytes += step.bytes;
+		while (
+			this.undoSteps.length > MAX_UNDO_STEPS ||
+			(this.undoBytes > MAX_UNDO_BYTES && this.undoSteps.length > 0)
+		) {
+			this.undoBytes -= this.undoSteps.shift()!.bytes;
+		}
+		return this.undoSteps.includes(step);
+	}
+
+	/** Restore the tiles of the last operation; returns false if there is nothing to undo. */
+	undoOp(): boolean {
+		if (this.openStep) this.endOp();
+		const step = this.undoSteps.pop();
+		if (!step) return false;
+		this.undoBytes -= step.bytes;
+		for (const [key, snap] of step.tiles) {
+			if (snap.wall) this.tiles.set(key, snap.wall);
+			else this.tiles.delete(key);
+			if (this.materialTiles) {
+				if (snap.material) this.materialTiles.tiles.set(key, snap.material);
+				else this.materialTiles.tiles.delete(key);
+			}
+		}
+		this.dirty = true;
+		return true;
+	}
+
+	get undoDepth(): number {
+		return this.undoSteps.length;
+	}
+
+	clearHistory(): void {
+		this.openStep = null;
+		this.undoSteps = [];
+		this.undoBytes = 0;
+	}
+
+	/** Copy a tile's wall and material data the first time an open operation touches it. */
+	private recordTile(key: string): void {
+		const step = this.openStep;
+		if (!step || step.tiles.has(key)) return;
+		const wall = this.tiles.get(key);
+		const material = this.materialTiles?.tiles.get(key);
+		const snap: TileSnapshot = {
+			wall: wall ? wall.slice() : null,
+			material: material ? material.slice() : null
+		};
+		step.bytes += (snap.wall?.byteLength ?? 0) + (snap.material?.byteLength ?? 0);
+		step.tiles.set(key, snap);
+	}
+
+	/** Read a pixel's material id (default when unset). */
+	getMaterial(x: number, y: number): number {
+		if (!this.materialTiles) return 0;
+		const tile = this.materialTiles.tiles.get(
+			tileKey(floorDiv(x, TILE_SIZE), floorDiv(y, TILE_SIZE))
+		);
+		if (!tile) return this.materialTiles.defaultValue;
+		return tile[mod(y, TILE_SIZE) * TILE_SIZE + mod(x, TILE_SIZE)]!;
+	}
+
 	/** Read a single pixel (for non-hot-path use). */
 	getPixel(x: number, y: number): number {
 		const tx = floorDiv(x, TILE_SIZE);
@@ -69,6 +162,7 @@ export class TiledMask {
 		const tx = floorDiv(x, TILE_SIZE);
 		const ty = floorDiv(y, TILE_SIZE);
 		const key = tileKey(tx, ty);
+		this.recordTile(key);
 		let tile = this.tiles.get(key);
 		if (!tile) {
 			tile = new Uint8Array(TILE_PIXELS);
@@ -94,6 +188,7 @@ export class TiledMask {
 		const tx = floorDiv(x, TILE_SIZE);
 		const ty = floorDiv(y, TILE_SIZE);
 		const key = tileKey(tx, ty);
+		this.recordTile(key);
 		let tile = this.materialTiles.tiles.get(key);
 		if (!tile) {
 			tile = new Uint8Array(TILE_PIXELS);

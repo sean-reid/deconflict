@@ -31,6 +31,7 @@
 		"svelte-eslint-parser": "^1.6.0",
 		"typescript": "^5.8.3",
 		"vite": "^6.3.5",
+		"vite-plugin-static-copy": "^4.1.1",
 		"vitest": "^3.2.1"
 	},
 	"dependencies": {
@@ -38,6 +39,7 @@
 		"@deconflict/geometry": "workspace:*",
 		"@deconflict/solver": "workspace:*",
 		"jspdf": "^4.2.1",
+		"pdfjs-dist": "^6.5.438",
 		"tesseract.js": "^7.0.0"
 	}
 }
