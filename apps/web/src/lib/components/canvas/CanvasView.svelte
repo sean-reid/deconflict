@@ -1163,6 +1163,12 @@
 		}
 	}
 
+	function handleTouchCancel(e: TouchEvent) {
+		// The system took the touch (e.g. an edge swipe): drop the pending point or stroke
+		if (appState.wallEditMode) wallEditHandler.cancelGesture();
+		handleTouchEnd(e);
+	}
+
 	function processPointerDown(e: PointerEvent) {
 		if (!engine) return;
 		if (activeTouches >= 2) return;
@@ -1296,7 +1302,7 @@
 		ontouchstart={handleTouchStart}
 		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}
-		ontouchcancel={handleTouchEnd}
+		ontouchcancel={handleTouchCancel}
 	></canvas>
 	{#if !appState.wallEditMode}
 		<LayerPanel />

@@ -197,6 +197,21 @@ test.describe('Wall shape tools', () => {
 test.describe('Wall shape tools (touch)', () => {
 	test.use({ hasTouch: true });
 
+	test('a cancelled touch does not place a point', async ({ page }) => {
+		await startFromScratch(page);
+		const box = (await page.locator('canvas').boundingBox())!;
+		const midBefore = await canvasPixel(page, 400, 200);
+		await page.touchscreen.tap(box.x + 300, box.y + 200);
+		// The system takes over the second touch (e.g. an edge swipe): touchcancel, not touchend
+		const cdp = await page.context().newCDPSession(page);
+		const point = { x: box.x + 500, y: box.y + 200, id: 1 };
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+		await page.locator('.wall-toolbar').locator('text=Done').click();
+		await page.waitForTimeout(300);
+		expect(await canvasPixel(page, 400, 200)).toEqual(midBefore);
+	});
+
 	test('touch taps draw a line', async ({ page }) => {
 		await startFromScratch(page);
 		const box = (await page.locator('canvas').boundingBox())!;

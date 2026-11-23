@@ -44,6 +44,8 @@ export class WallEditHandler {
 
 	// Shape tool state
 	private vertices: Point[] = [];
+	// Per polyline segment: whether stamping it recorded an undo step (erase/material over empty space does not)
+	private segmentSteps: boolean[] = [];
 	private cursor: Point | null = null;
 	private pressing = false;
 	private snappedToWall = false;
@@ -154,6 +156,7 @@ export class WallEditHandler {
 	/** End the shape in progress without stamping anything else. */
 	finishShape(): void {
 		this.vertices = [];
+		this.segmentSteps = [];
 		this.cursor = null;
 		this.pressing = false;
 		this.snappedToWall = false;
@@ -175,11 +178,16 @@ export class WallEditHandler {
 			this.vertices = [];
 			done = true;
 		} else if (this.vertices.length >= 2) {
-			if (mask?.undoOp()) {
-				this.vertices.pop();
-				restored = true;
-			} else {
-				this.vertices = [];
+			const hadStep = this.segmentSteps.pop() ?? false;
+			this.vertices.pop();
+			if (hadStep) {
+				if (mask?.undoOp()) {
+					restored = true;
+				} else {
+					// The step was evicted from the history: drop the chain
+					this.vertices = [];
+					this.segmentSteps = [];
+				}
 			}
 			done = true;
 		} else if (mask?.undoOp()) {
@@ -317,6 +325,7 @@ export class WallEditHandler {
 		const tool = appState.wallTool;
 		if (this.vertices.length === 0) {
 			this.vertices = [p];
+			this.segmentSteps = [];
 			return;
 		}
 		const anchor = this.vertices[this.vertices.length - 1]!;
@@ -329,9 +338,13 @@ export class WallEditHandler {
 		} else if (this.willClose) {
 			this.stamp(() => this.stampSegment(anchor, this.vertices[0]!));
 			this.vertices = [];
+			this.segmentSteps = [];
 		} else if (this.willFinish) {
 			this.vertices = [];
-		} else if (this.stamp(() => this.stampSegment(anchor, p))) {
+			this.segmentSteps = [];
+		} else {
+			// The tapped point is the new anchor even if the segment changed nothing
+			this.segmentSteps.push(this.stamp(() => this.stampSegment(anchor, p)));
 			this.vertices.push(p);
 		}
 	}

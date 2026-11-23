@@ -109,6 +109,28 @@ describe('polyline tool', () => {
 		]);
 	});
 
+	it('moves the anchor across empty space in erase mode', () => {
+		const { h, mask } = setup();
+		for (let y = -100; y <= 100; y++) mask.setPixel(50, y, 1);
+		appState.wallEditMode = 'erase';
+		tap(h, 0, 0);
+		tap(h, 0, 80);
+		tap(h, 100, 80);
+		expect(mask.getPixel(50, 80)).toBe(0);
+		expect(mask.getPixel(50, 40)).toBe(1);
+		expect(h.undo()).toBe(true);
+		expect(mask.getPixel(50, 80)).toBe(1);
+		// The angle snap leaves float noise (~1e-15) on the straightened axis
+		const rounded = () =>
+			h.preview?.vertices.map((v) => ({ x: Math.round(v.x), y: Math.round(v.y) }));
+		expect(rounded()).toEqual([
+			{ x: 0, y: 0 },
+			{ x: 0, y: 80 }
+		]);
+		expect(h.undo()).toBe(true);
+		expect(rounded()).toEqual([{ x: 0, y: 0 }]);
+	});
+
 	it('survives undoing past the end of the history', () => {
 		const { h, mask } = setup();
 		for (let i = 0; i <= 55; i++) tap(h, i * 50, (i % 2) * 50);
