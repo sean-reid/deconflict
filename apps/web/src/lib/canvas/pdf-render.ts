@@ -25,13 +25,13 @@ export interface PdfDocumentHandle {
 	destroy(): Promise<void>;
 }
 
-type PdfJs = typeof import('pdfjs-dist');
+type PdfJs = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 
 /** Load pdf.js lazily and point it at the bundled worker. Keeps pdf.js out of the entry chunk. */
 async function loadPdfJs(): Promise<PdfJs> {
 	const [pdfjs, worker] = await Promise.all([
-		import('pdfjs-dist'),
-		import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+		import('pdfjs-dist/legacy/build/pdf.mjs'),
+		import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')
 	]);
 	pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
 	return pdfjs;
