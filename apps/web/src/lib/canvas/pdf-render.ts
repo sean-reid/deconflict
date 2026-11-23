@@ -1,3 +1,4 @@
+import { base } from '$app/paths';
 import { pdfRenderScale } from '$canvas/pdf-import-math.js';
 
 /** Readable error raised when a PDF cannot be opened or rendered. The message is safe to show to users. */
@@ -11,9 +12,9 @@ export class PdfRenderError extends Error {
 export interface RenderedPdfPage {
 	/** Object URL of the page rendered as a PNG. The caller owns it and must revoke it. */
 	blobUrl: string;
-	/** Page width in PDF points (1/72 in), after applying the page rotation. */
+	/** Page width in PDF points (1/72 in), after applying the page rotation and `UserUnit`. */
 	widthPt: number;
-	/** Page height in PDF points (1/72 in), after applying the page rotation. */
+	/** Page height in PDF points (1/72 in), after applying the page rotation and `UserUnit`. */
 	heightPt: number;
 }
 
@@ -35,6 +36,14 @@ async function loadPdfJs(): Promise<PdfJs> {
 	]);
 	pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
 	return pdfjs;
+}
+
+/**
+ * Where pdf.js finds its image decoders (JBIG2/CCITT, JPEG2000, ICC profiles).
+ * The files are copied there by the Vite config. Must end with a slash.
+ */
+function pdfWasmUrl(): string {
+	return new URL(`${base}/pdfjs/wasm/`, location.href).href;
 }
 
 function toReadableError(pdfjs: PdfJs, e: unknown): PdfRenderError {
@@ -71,7 +80,7 @@ export async function openPdf(file: File): Promise<PdfDocumentHandle> {
 	let loadingTask: ReturnType<PdfJs['getDocument']> | null = null;
 	try {
 		const data = new Uint8Array(await file.arrayBuffer());
-		loadingTask = pdfjs.getDocument({ data });
+		loadingTask = pdfjs.getDocument({ data, wasmUrl: pdfWasmUrl() });
 		const doc = await loadingTask.promise;
 		const task = loadingTask;
 
@@ -83,9 +92,9 @@ export async function openPdf(file: File): Promise<PdfDocumentHandle> {
 					const page = await doc.getPage(pageNumber);
 					try {
 						// getViewport applies the page's own rotation by default.
-						const base = page.getViewport({ scale: 1 });
+						const baseViewport = page.getViewport({ scale: 1 });
 						const viewport = page.getViewport({
-							scale: pdfRenderScale(base.width, base.height)
+							scale: pdfRenderScale(baseViewport.width, baseViewport.height)
 						});
 
 						canvas = document.createElement('canvas');
@@ -100,10 +109,12 @@ export async function openPdf(file: File): Promise<PdfDocumentHandle> {
 						await page.render({ canvas, canvasContext: ctx, viewport }).promise;
 						const blob = await canvasToPngBlob(canvas);
 
+						// UserUnit scales the default 1/72 in unit; pdf.js leaves it out of the viewport.
+						const userUnit = page.userUnit > 0 ? page.userUnit : 1;
 						return {
 							blobUrl: URL.createObjectURL(blob),
-							widthPt: base.width,
-							heightPt: base.height
+							widthPt: baseViewport.width * userUnit,
+							heightPt: baseViewport.height * userUnit
 						};
 					} finally {
 						page.cleanup();
@@ -125,29 +136,5 @@ export async function openPdf(file: File): Promise<PdfDocumentHandle> {
 	} catch (e) {
 		if (loadingTask) await loadingTask.destroy().catch(() => {});
 		throw toReadableError(pdfjs, e);
-	}
-}
-
-/**
- * Render every page of a PDF to a PNG object URL.
- * The caller owns the returned URLs and must revoke them.
- */
-export async function renderPdfPages(
-	file: File,
-	onPage?: (i: number, n: number) => void
-): Promise<RenderedPdfPage[]> {
-	const doc = await openPdf(file);
-	const pages: RenderedPdfPage[] = [];
-	try {
-		for (let i = 1; i <= doc.numPages; i++) {
-			onPage?.(i, doc.numPages);
-			pages.push(await doc.renderPage(i));
-		}
-		return pages;
-	} catch (e) {
-		for (const page of pages) URL.revokeObjectURL(page.blobUrl);
-		throw e;
-	} finally {
-		await doc.destroy();
 	}
 }
