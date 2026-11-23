@@ -92,6 +92,14 @@
 	let detectedWorldArea = $state<number | null>(null);
 	let calibrationDone = $state(false);
 
+	// Area calibration belongs to the floor it was detected on: forget it when the floor changes.
+	$effect(() => {
+		void floorState.currentFloorId;
+		detectedWorldArea = null;
+		calibrationDone = false;
+		areaInput = '';
+	});
+
 	let hasFloorplan = $derived(floorplanState.floorplanUrl !== null || wallState.wallMask !== null);
 
 	const sampleFloorplans = [
