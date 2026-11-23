@@ -267,6 +267,25 @@ describe('PDF import orchestration', () => {
 		expect(pdfImportState).toMatchObject({ open: false, error: '' });
 	});
 
+	it('honours a cancel pressed while the document is being closed', async () => {
+		const doc = fakeDoc(3);
+		doc.destroy.mockImplementation(async () => {
+			requestPdfImportCancel();
+		});
+
+		const result = await runFlow(100);
+
+		expect(result).toBeNull();
+		expect(mocks.pushState).not.toHaveBeenCalled();
+		expect(floorState.floors).toHaveLength(1);
+		expect(floorplanState.floorplanUrl).toBeNull();
+		expect(wallState.wallMask).toBeNull();
+		expect(revoked).toEqual([pageUrl(1), pageUrl(2), pageUrl(3)]);
+		expect(doc.destroy).toHaveBeenCalledTimes(1);
+		expect(pdfImportState).toMatchObject({ open: false, error: '' });
+		expect(mocks.scheduleSave).not.toHaveBeenCalled();
+	});
+
 	it('rejects importPdfFloorplan with a cancellation error', async () => {
 		fakeDoc(2);
 		startPdfImport();

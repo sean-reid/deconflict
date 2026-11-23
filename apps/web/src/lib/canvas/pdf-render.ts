@@ -109,12 +109,11 @@ export async function openPdf(file: File): Promise<PdfDocumentHandle> {
 						await page.render({ canvas, canvasContext: ctx, viewport }).promise;
 						const blob = await canvasToPngBlob(canvas);
 
-						// UserUnit scales the default 1/72 in unit; pdf.js leaves it out of the viewport.
-						const userUnit = page.userUnit > 0 ? page.userUnit : 1;
+						// pdf.js already includes the page's UserUnit in the viewport size.
 						return {
 							blobUrl: URL.createObjectURL(blob),
-							widthPt: baseViewport.width * userUnit,
-							heightPt: baseViewport.height * userUnit
+							widthPt: baseViewport.width,
+							heightPt: baseViewport.height
 						};
 					} finally {
 						page.cleanup();

@@ -164,6 +164,12 @@ export async function importPdfFloorplan(
 		await doc.destroy();
 	}
 
+	// Closing the document yields, so a Cancel pressed meanwhile is only seen here.
+	if (isPdfImportCancelRequested()) {
+		for (const page of pages) URL.revokeObjectURL(page.blobUrl);
+		throw new PdfImportCancelledError();
+	}
+
 	const [first, ...rest] = pages;
 	if (!first) return null;
 

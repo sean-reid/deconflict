@@ -154,6 +154,14 @@ describe('persistence of floorplan images', () => {
 		expect(persistenceState.storageError).toBe('Storage full: project not saved');
 	});
 
+	it('keeps the project message when the floorplan image does not fit either', () => {
+		storage.failWhen = () => true;
+
+		save();
+
+		expect(persistenceState.storageError).toBe('Storage full: project not saved');
+	});
+
 	it('clears the warning after a save that fits', () => {
 		storage.failWhen = () => true;
 		save();

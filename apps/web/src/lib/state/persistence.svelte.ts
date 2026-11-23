@@ -213,7 +213,10 @@ function saveToStorage(): void {
 						localStorage.setItem(key, canvas.toDataURL('image/png'));
 					} catch (e) {
 						// too large for what is left of the storage quota
-						if (isQuotaError(e)) persistenceState.storageError = STORAGE_FULL_FLOORPLAN;
+						// Keep the more serious "project not saved" message if it is already showing.
+						if (isQuotaError(e) && persistenceState.storageError !== STORAGE_FULL_PROJECT) {
+							persistenceState.storageError = STORAGE_FULL_FLOORPLAN;
+						}
 					}
 				};
 				img.src = floor.floorplanUrl;
