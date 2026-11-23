@@ -1302,7 +1302,11 @@
 		<LayerPanel />
 	{/if}
 	{#if appState.wallEditMode}
-		<WallEditToolbar bind:activeMaterial={wallEditMaterial} ondone={handleWallEditDone} />
+		<WallEditToolbar
+			bind:activeMaterial={wallEditMaterial}
+			ondone={handleWallEditDone}
+			onundo={() => { wallEditHandler?.undo(); engine?.markDirty(); }}
+		/>
 		{#if brushCursorVisible}
 			<div
 				class="brush-cursor"

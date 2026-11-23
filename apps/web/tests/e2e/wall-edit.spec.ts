@@ -131,7 +131,10 @@ async function startFromScratch(page: Page): Promise<void> {
 	await setupCleanState(page);
 	await page.goto('/');
 	await page.waitForSelector('canvas');
-	await page.getByRole('tab', { name: 'Floorplan' }).click();
+	// On narrow screens the sidebar starts closed
+	const tab = page.getByRole('tab', { name: 'Floorplan' });
+	if (!(await tab.isVisible())) await page.getByRole('button', { name: 'Toggle sidebar' }).click();
+	await tab.click();
 	await page.getByText('Draw from Scratch').click();
 	await expect(page.locator('.wall-toolbar')).toBeVisible();
 	await page.waitForTimeout(300);
@@ -203,5 +206,61 @@ test.describe('Wall shape tools (touch)', () => {
 		await page.locator('.wall-toolbar').locator('text=Done').click();
 		await page.waitForTimeout(300);
 		expect(await canvasPixel(page, 400, 200)).not.toEqual(midBefore);
+	});
+});
+
+test.describe('Wall shape toolbar', () => {
+	test('toolbar shows shape tools', async ({ page }) => {
+		await startFromScratch(page);
+		const toolbar = page.locator('.wall-toolbar');
+		for (const name of ['Brush', 'Line', 'Polyline', 'Rect', 'Snap', 'Undo']) {
+			await expect(toolbar.getByRole('button', { name, exact: true })).toBeVisible();
+		}
+		await expect(toolbar.getByRole('button', { name: 'Line', exact: true })).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+		await expect(toolbar.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+	});
+
+	test('undo button removes the last shape', async ({ page }) => {
+		await startFromScratch(page);
+		const canvas = page.locator('canvas');
+		const undo = page.locator('.wall-toolbar').getByRole('button', { name: 'Undo', exact: true });
+		const midBefore = await canvasPixel(page, 400, 200);
+		await canvas.click({ position: { x: 300, y: 200 } });
+		await canvas.click({ position: { x: 500, y: 200 } });
+		await expect(undo).toBeEnabled();
+		await undo.click();
+		await page.mouse.move(0, 0);
+		await page.waitForTimeout(200);
+		expect(await canvasPixel(page, 400, 200)).toEqual(midBefore);
+		await expect(undo).toBeDisabled();
+	});
+
+	test('switching to erase mid-polyline does not erase from the old anchor', async ({ page }) => {
+		await startFromScratch(page);
+		const canvas = page.locator('canvas');
+		const toolbar = page.locator('.wall-toolbar');
+		const nearEndBefore = await canvasPixel(page, 495, 200);
+		await toolbar.getByRole('button', { name: 'Polyline', exact: true }).click();
+		await canvas.click({ position: { x: 300, y: 200 } });
+		await canvas.click({ position: { x: 500, y: 200 } });
+		await toolbar.locator('text=Erase').click();
+		await canvas.click({ position: { x: 500, y: 350 } });
+		await toolbar.locator('text=Done').click();
+		await page.waitForTimeout(300);
+		expect(await canvasPixel(page, 495, 200)).not.toEqual(nearEndBefore);
+	});
+
+	test('toolbar fits a 360px screen', async ({ page }) => {
+		await page.setViewportSize({ width: 360, height: 740 });
+		await startFromScratch(page);
+		const toolbar = page.locator('.wall-toolbar');
+		const fits = await toolbar.evaluate((el) => el.scrollWidth <= el.clientWidth);
+		expect(fits).toBe(true);
+		const box = (await toolbar.boundingBox())!;
+		expect(box.x).toBeGreaterThanOrEqual(0);
+		expect(box.x + box.width).toBeLessThanOrEqual(360);
 	});
 });
