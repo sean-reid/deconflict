@@ -8,10 +8,12 @@ import { pushState } from '$state/history.svelte.js';
 import {
 	PdfImportCancelledError,
 	closePdfImport,
+	isPdfImportCancelRequested,
 	pdfImportState,
 	requestPdfScale,
 	showPdfError,
-	showPdfProgress
+	showPdfProgress,
+	startPdfImport
 } from '$state/pdf-import.svelte.js';
 import { scheduleSave } from '$state/persistence.svelte.js';
 import { detectBoundary, prepareSvgForDetection } from '$canvas/boundary-detect.js';
@@ -41,7 +43,6 @@ export interface FloorplanAnalysis {
  */
 export async function analyzeFloorplan(
 	url: string,
-	isSvg: boolean,
 	opts?: { skipOcr?: boolean }
 ): Promise<FloorplanAnalysis> {
 	// For SVGs, strip text for cleaner boundary detection
@@ -103,11 +104,16 @@ export function applyWupm(worldUnitsPerMeter: number): void {
  * proportionally (or the default 150 becomes 15 m when there was no previous calibration).
  */
 export function calibrateCurrentFloorForPdfPage(wupm: number | null): void {
-	const previous = floorplanState.calibration;
-	floorplanState.calibration = null;
-	if (wupm === null) return;
-	floorplanState.calibration = previous;
+	if (wupm === null) {
+		floorplanState.calibration = null;
+		return;
+	}
+	// Keep the previous calibration: applyWupm compares against it to rescale the AP radii.
 	applyWupm(wupm);
+}
+
+function throwIfCancelled(): void {
+	if (isPdfImportCancelRequested()) throw new PdfImportCancelledError();
 }
 
 interface AnalyzedPdfPage {
@@ -120,9 +126,10 @@ interface AnalyzedPdfPage {
 /**
  * Import a PDF floorplan: one floor per page. Page 1 replaces the floorplan of the
  * current floor; pages 2..N are added as new floors (the current floor is not switched).
- * Every page is rendered and analysed before any state changes, so a failure leaves the
- * project untouched. Returns the page-1 analysis so callers can offer area calibration
- * when no scale was given.
+ * Every page is rendered and analysed before any state changes, so a failure or a cancel
+ * (see `requestPdfImportCancel`) leaves the project untouched and records no undo step;
+ * a cancel rejects with `PdfImportCancelledError`. Returns the page-1 analysis so callers
+ * can offer area calibration when no scale was given.
  */
 export async function importPdfFloorplan(
 	file: File,
@@ -133,12 +140,13 @@ export async function importPdfFloorplan(
 	const pages: AnalyzedPdfPage[] = [];
 	try {
 		for (let i = 1; i <= doc.numPages; i++) {
+			throwIfCancelled();
 			onProgress?.(i, doc.numPages);
 			const rendered = await doc.renderPage(i);
 			let analysis: FloorplanAnalysis = { boundary: null, worldArea: null, wallMask: null };
 			try {
 				// Rendered PDFs contain text, so OCR is not skipped.
-				analysis = await analyzeFloorplan(rendered.blobUrl, false, { skipOcr: false });
+				analysis = await analyzeFloorplan(rendered.blobUrl, { skipOcr: false });
 			} catch (e) {
 				console.warn(`Floorplan detection failed for PDF page ${i}:`, e);
 			}
@@ -148,6 +156,7 @@ export async function importPdfFloorplan(
 				wupm: scaleDenominator === null ? null : wupmFromScale(rendered.widthPt, scaleDenominator)
 			});
 		}
+		throwIfCancelled();
 	} catch (e) {
 		for (const page of pages) URL.revokeObjectURL(page.blobUrl);
 		throw e;
@@ -192,7 +201,8 @@ export interface PdfImportFlowResult {
 /**
  * Entry point for PDF floorplans (sidebar and canvas drop): asks for the drawing scale,
  * imports one floor per page while showing progress, and shows a readable error on failure.
- * Returns null if the user cancelled, another PDF import is in progress, or the import failed.
+ * Returns null if the user cancelled (before or during the import), another PDF import is in
+ * progress, or the import failed.
  */
 export async function runPdfImportFlow(file: File): Promise<PdfImportFlowResult | null> {
 	if (pdfImportState.open) return null;
@@ -206,11 +216,16 @@ export async function runPdfImportFlow(file: File): Promise<PdfImportFlowResult 
 	}
 
 	try {
-		showPdfProgress(0, 0);
+		startPdfImport();
 		const analysis = await importPdfFloorplan(file, scaleDenominator, showPdfProgress);
 		closePdfImport();
 		return { scaleDenominator, analysis };
 	} catch (e) {
+		if (e instanceof PdfImportCancelledError || isPdfImportCancelRequested()) {
+			// The user cancelled: nothing was imported and there is nothing to report.
+			closePdfImport();
+			return null;
+		}
 		console.warn('PDF import failed:', e);
 		showPdfError(e instanceof PdfRenderError ? e.message : 'Could not import this PDF.');
 		return null;
@@ -235,7 +250,7 @@ export async function importFloorplanFile(file: File): Promise<void> {
 
 	try {
 		// Area for calibration is not auto-applied without user input
-		const { boundary, wallMask } = await analyzeFloorplan(blobUrl, isSvg, { skipOcr: isSvg });
+		const { boundary, wallMask } = await analyzeFloorplan(blobUrl, { skipOcr: isSvg });
 		if (boundary) {
 			projectState.floorplanBoundary = boundary;
 		}

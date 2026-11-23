@@ -11,10 +11,15 @@ export const pdfImportState = $state({
 	/** Page being imported (1-based); 0 while the PDF is still being opened. */
 	page: 0,
 	pages: 0,
-	error: ''
+	error: '',
+	/** True once the user asked to cancel the running import and it has not stopped yet. */
+	cancelling: false
 });
 
-/** Raised by `requestPdfScale` when the user cancels the dialog. */
+/** Cancel flag of the running import. Polled by the import between pages. */
+let importCancelRequested = false;
+
+/** Raised when the user cancels: by `requestPdfScale` for the dialog, by the import for a running import. */
 export class PdfImportCancelledError extends Error {
 	constructor() {
 		super('PDF import cancelled');
@@ -40,6 +45,7 @@ export function requestPdfScale(): Promise<number | null> {
 	pdfImportState.page = 0;
 	pdfImportState.pages = 0;
 	pdfImportState.error = '';
+	pdfImportState.cancelling = false;
 	pdfImportState.open = true;
 	return new Promise<number | null>((resolve, reject) => {
 		pending = { resolve, reject };
@@ -61,6 +67,28 @@ export function cancelPdfScale(): void {
 	request?.reject(new PdfImportCancelledError());
 }
 
+/** Start a new import: shows "Opening PDF..." and clears any earlier cancel request. */
+export function startPdfImport(): void {
+	importCancelRequested = false;
+	pdfImportState.cancelling = false;
+	showPdfProgress(0, 0);
+}
+
+/**
+ * Ask the running import to stop. Only has an effect while importing; the import notices
+ * at its next check, discards its work and closes the dialog.
+ */
+export function requestPdfImportCancel(): void {
+	if (!pdfImportState.open || pdfImportState.phase !== 'importing') return;
+	importCancelRequested = true;
+	pdfImportState.cancelling = true;
+}
+
+/** Whether the user asked to cancel the running import. */
+export function isPdfImportCancelRequested(): boolean {
+	return importCancelRequested;
+}
+
 /** Show "Importing page i of N" (page 0 means the PDF is still being opened). */
 export function showPdfProgress(page: number, pages: number): void {
 	pdfImportState.phase = 'importing';
@@ -79,4 +107,5 @@ export function showPdfError(message: string): void {
 /** Close the dialog (after success, or when the error is dismissed). */
 export function closePdfImport(): void {
 	pdfImportState.open = false;
+	pdfImportState.cancelling = false;
 }

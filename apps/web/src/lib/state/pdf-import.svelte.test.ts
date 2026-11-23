@@ -3,10 +3,13 @@ import {
 	PdfImportCancelledError,
 	cancelPdfScale,
 	closePdfImport,
+	isPdfImportCancelRequested,
 	pdfImportState,
+	requestPdfImportCancel,
 	requestPdfScale,
 	showPdfError,
 	showPdfProgress,
+	startPdfImport,
 	submitPdfScale
 } from './pdf-import.svelte.js';
 
@@ -14,6 +17,7 @@ describe('pdf import state', () => {
 	beforeEach(() => {
 		// Settle any request left pending by a previous test, then reset the dialog.
 		cancelPdfScale();
+		startPdfImport(); // clears the cancel flag
 		closePdfImport();
 		pdfImportState.phase = 'scale';
 		pdfImportState.page = 0;
@@ -75,5 +79,64 @@ describe('pdf import state', () => {
 		showPdfError('boom');
 		void requestPdfScale().catch(() => {});
 		expect(pdfImportState).toMatchObject({ phase: 'scale', page: 0, pages: 0, error: '' });
+	});
+
+	describe('cancelling a running import', () => {
+		it('starts an import in the importing phase with no cancel pending', () => {
+			startPdfImport();
+			expect(pdfImportState).toMatchObject({
+				open: true,
+				phase: 'importing',
+				page: 0,
+				pages: 0,
+				cancelling: false
+			});
+			expect(isPdfImportCancelRequested()).toBe(false);
+		});
+
+		it('flags the cancel and shows it while importing', () => {
+			startPdfImport();
+			showPdfProgress(2, 3);
+			requestPdfImportCancel();
+			expect(isPdfImportCancelRequested()).toBe(true);
+			expect(pdfImportState.cancelling).toBe(true);
+			// The dialog stays open until the import notices and closes it.
+			expect(pdfImportState.open).toBe(true);
+		});
+
+		it('ignores a cancel request outside the importing phase', () => {
+			// Dialog closed.
+			requestPdfImportCancel();
+			expect(isPdfImportCancelRequested()).toBe(false);
+
+			// Scale phase: cancelling there is `cancelPdfScale`'s job.
+			void requestPdfScale().catch(() => {});
+			requestPdfImportCancel();
+			expect(isPdfImportCancelRequested()).toBe(false);
+			expect(pdfImportState.cancelling).toBe(false);
+
+			// Error phase.
+			showPdfError('boom');
+			requestPdfImportCancel();
+			expect(isPdfImportCancelRequested()).toBe(false);
+		});
+
+		it('clears the cancel flag when the next import starts', () => {
+			startPdfImport();
+			requestPdfImportCancel();
+			closePdfImport();
+			expect(pdfImportState.cancelling).toBe(false);
+
+			startPdfImport();
+			expect(isPdfImportCancelRequested()).toBe(false);
+			expect(pdfImportState.cancelling).toBe(false);
+		});
+
+		it('does not show a stale cancelling state when a new scale request opens', () => {
+			startPdfImport();
+			requestPdfImportCancel();
+			void requestPdfScale().catch(() => {});
+			expect(pdfImportState).toMatchObject({ phase: 'scale', cancelling: false });
+		});
 	});
 });

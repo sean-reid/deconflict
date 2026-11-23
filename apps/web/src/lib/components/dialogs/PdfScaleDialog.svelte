@@ -5,7 +5,8 @@
 		pdfImportState,
 		submitPdfScale,
 		cancelPdfScale,
-		closePdfImport
+		closePdfImport,
+		requestPdfImportCancel
 	} from '$state/pdf-import.svelte.js';
 
 	const PRESETS = [50, 100, 200];
@@ -42,6 +43,11 @@
 		if (!pdfImportState.open) return;
 		if (pdfImportState.phase === 'scale') {
 			if (e.key === 'Escape') cancelPdfScale();
+		} else if (pdfImportState.phase === 'importing') {
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				requestPdfImportCancel();
+			}
 		} else if (pdfImportState.phase === 'error') {
 			if (e.key === 'Escape' || e.key === 'Enter') {
 				e.preventDefault();
@@ -114,12 +120,21 @@
 				</div>
 			{:else if pdfImportState.phase === 'importing'}
 				<p class="message" role="status" aria-live="polite">
-					{#if pdfImportState.pages > 0}
+					{#if pdfImportState.cancelling}
+						Cancelling...
+					{:else if pdfImportState.pages > 0}
 						Importing page {pdfImportState.page} of {pdfImportState.pages}
 					{:else}
 						Opening PDF...
 					{/if}
 				</p>
+				<div class="actions">
+					<Button
+						variant="ghost"
+						disabled={pdfImportState.cancelling}
+						onclick={requestPdfImportCancel}>Cancel</Button
+					>
+				</div>
 			{:else}
 				<p class="message error" role="alert">{pdfImportState.error}</p>
 				<div class="actions">

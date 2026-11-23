@@ -109,7 +109,7 @@
 		return `1px = ${mPerPx.toFixed(2)}m`;
 	});
 
-	async function runBoundaryDetection(url: string, isSvg = false) {
+	async function runBoundaryDetection(url: string) {
 		detecting = true;
 		calibrationDone = false;
 		detectedWorldArea = null;
@@ -119,7 +119,7 @@
 
 		try {
 			// Run OCR on all images (no skipOcr) - SVGs may have path-based text that prepareSvgForDetection can't strip
-			const { boundary, worldArea, wallMask } = await analyzeFloorplan(url, isSvg);
+			const { boundary, worldArea, wallMask } = await analyzeFloorplan(url);
 			if (boundary) {
 				floorplanState.floorplanBoundary = boundary;
 				detectedWorldArea = worldArea;
@@ -176,7 +176,7 @@
 			const blob = await response.blob();
 			const blobUrl = URL.createObjectURL(blob);
 			floorplanState.floorplanUrl = blobUrl;
-			await runBoundaryDetection(blobUrl, url.endsWith('.svg'));
+			await runBoundaryDetection(blobUrl);
 
 			// Auto-calibrate if we know the area
 			if (knownAreaSqm && detectedWorldArea && detectedWorldArea > 0) {
@@ -209,7 +209,7 @@
 		pushState();
 		const blobUrl = URL.createObjectURL(file);
 		floorplanState.floorplanUrl = blobUrl;
-		runBoundaryDetection(blobUrl, file.type === 'image/svg+xml');
+		runBoundaryDetection(blobUrl);
 	}
 
 	function handleInputChange(e: Event) {
