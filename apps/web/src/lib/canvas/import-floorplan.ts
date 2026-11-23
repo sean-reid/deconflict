@@ -96,6 +96,20 @@ export function applyWupm(worldUnitsPerMeter: number): void {
 	scheduleSave();
 }
 
+/**
+ * Reset the current floor's calibration for a newly imported PDF page 1.
+ * Without a scale the calibration is cleared, as for an image import. With a scale, the
+ * previous calibration is kept until `applyWupm` runs, so AP radii are rescaled
+ * proportionally (or the default 150 becomes 15 m when there was no previous calibration).
+ */
+export function calibrateCurrentFloorForPdfPage(wupm: number | null): void {
+	const previous = floorplanState.calibration;
+	floorplanState.calibration = null;
+	if (wupm === null) return;
+	floorplanState.calibration = previous;
+	applyWupm(wupm);
+}
+
 interface AnalyzedPdfPage {
 	blobUrl: string;
 	analysis: FloorplanAnalysis;
@@ -148,11 +162,10 @@ export async function importPdfFloorplan(
 
 	// Page 1: same resets and writes as an image import, on the current floor.
 	floorplanState.floorplanUrl = first.blobUrl;
-	floorplanState.calibration = null;
+	calibrateCurrentFloorForPdfPage(first.wupm);
 	floorplanState.floorplanBoundary = null;
 	if (first.analysis.boundary) floorplanState.floorplanBoundary = first.analysis.boundary;
 	if (first.analysis.wallMask) wallState.wallMask = first.analysis.wallMask;
-	if (first.wupm !== null) applyWupm(first.wupm);
 
 	// Pages 2..N: new floors, written straight into their Floor objects.
 	for (const page of rest) {
