@@ -1,15 +1,24 @@
 <script lang="ts">
-	import { appState } from '$state/app.svelte';
+	import { appState, type WallTool } from '$state/app.svelte';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
 	import Icon from '$components/shared/Icon.svelte';
 
 	let {
 		activeMaterial = $bindable(0 as WallMaterialId),
-		ondone
+		ondone,
+		onundo
 	}: {
 		activeMaterial: WallMaterialId;
 		ondone: () => void;
+		onundo: () => void;
 	} = $props();
+
+	const TOOLS: { id: WallTool; label: string; title: string }[] = [
+		{ id: 'brush', label: 'Brush', title: 'Freehand brush' },
+		{ id: 'line', label: 'Line', title: 'Straight line: tap start, tap end' },
+		{ id: 'polyline', label: 'Polyline', title: 'Connected segments: tap each corner, tap the last point again to finish' },
+		{ id: 'rect', label: 'Rect', title: 'Rectangle: tap two opposite corners' }
+	];
 
 	const mat = $derived(WALL_MATERIALS[activeMaterial] ?? WALL_MATERIALS[0]!);
 
@@ -46,7 +55,49 @@
 			<span class="tool-label">Material</span>
 		</button>
 
+		<span class="spacer"></span>
+
+		<button class="done-btn" onclick={ondone}>Done</button>
+	</div>
+
+	<div class="row-tools">
+		{#each TOOLS as t (t.id)}
+			<button
+				class="tool"
+				class:active={appState.wallTool === t.id}
+				onclick={() => { appState.wallTool = t.id; }}
+				aria-label={t.label}
+				aria-pressed={appState.wallTool === t.id}
+				title={t.title}
+			>
+				<Icon name={t.id} size={14} />
+				<span class="tool-label">{t.label}</span>
+			</button>
+		{/each}
+
 		<span class="separator"></span>
+
+		<button
+			class="tool"
+			class:active={appState.wallSnapAngles}
+			onclick={() => { appState.wallSnapAngles = !appState.wallSnapAngles; }}
+			aria-label="Snap"
+			aria-pressed={appState.wallSnapAngles}
+			title="Snap to 45° angles"
+		>
+			<Icon name="magnet" size={14} />
+			<span class="tool-label">Snap</span>
+		</button>
+		<button
+			class="tool"
+			onclick={onundo}
+			disabled={!appState.wallCanUndo}
+			aria-label="Undo"
+			title="Undo (Ctrl+Z)"
+		>
+			<Icon name="undo" size={14} />
+			<span class="tool-label">Undo</span>
+		</button>
 
 		<input
 			type="range"
@@ -55,9 +106,8 @@
 			bind:value={appState.wallBrushSize}
 			class="brush-slider"
 			aria-label="Brush size"
+			title="Wall thickness"
 		/>
-
-		<button class="done-btn" onclick={ondone}>Done</button>
 	</div>
 
 	{#if appState.wallEditMode === 'material' || appState.wallEditMode === 'draw'}
@@ -100,6 +150,24 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+	}
+
+	.row-tools {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.spacer {
+		flex: 1;
+	}
+
+	.tool:disabled,
+	.tool:disabled:hover {
+		opacity: 0.4;
+		cursor: default;
+		background: none;
+		color: var(--text-secondary);
 	}
 
 	.row-bottom {

@@ -1,5 +1,6 @@
 export type SidebarPanel = 'floorplan' | 'aps';
 export type WallEditMode = 'erase' | 'draw' | 'material' | null;
+export type WallTool = 'brush' | 'line' | 'polyline' | 'rect';
 
 export const appState = $state({
 	sidebarPanel: 'floorplan' as SidebarPanel,
@@ -13,5 +14,8 @@ export const appState = $state({
 	showRoomLabels: true,
 	wallEditMode: null as WallEditMode,
 	wallEditLastMode: 'erase' as Exclude<WallEditMode, null>,
-	wallBrushSize: 15
+	wallBrushSize: 15,
+	wallTool: 'line' as WallTool,
+	wallSnapAngles: true,
+	wallCanUndo: false
 });

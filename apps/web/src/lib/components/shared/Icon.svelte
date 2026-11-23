@@ -67,14 +67,25 @@
 		eraser:
 			'M6 14l6-6M3.5 9.5l7-7 3 3-7 7-4 1zM10.5 2.5l3 3',
 		pencil:
-			'M12 2l2 2-9 9-3 1 1-3zM10 4l2 2'
+			'M12 2l2 2-9 9-3 1 1-3zM10 4l2 2',
+		brush:
+			'M2 13c1.5-3 3-1 4.5-4S9.5 6 11 4.5 13.5 3 14 3',
+		line:
+			'M3 13L13 3',
+		polyline:
+			'M2 13l4-7 4 4 4-7',
+		rect:
+			'M2.5 3.5h11v9h-11z',
+		magnet:
+			'M4 2.5v5.5a4 4 0 008 0V2.5M4 2.5h2.5V8a1.5 1.5 0 003 0V2.5H12M4 5h2.5M9.5 5H12'
 	};
 
 	const strokeIcons = new Set([
 		'cursor', 'crosshair', 'hand', 'chart', 'download', 'trash',
 		'grid', 'radio', 'link', 'tag', 'plus', 'minus', 'file',
 		'upload', 'settings', 'keyboard', 'chevron-down', 'undo', 'redo',
-		'sidebar', 'help', 'eye', 'eye-off', 'sparkles', 'eraser', 'pencil'
+		'sidebar', 'help', 'eye', 'eye-off', 'sparkles', 'eraser', 'pencil',
+		'brush', 'line', 'polyline', 'rect', 'magnet'
 	]);
 </script>
 
