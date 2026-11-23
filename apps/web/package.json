@@ -38,6 +38,7 @@
 		"@deconflict/geometry": "workspace:*",
 		"@deconflict/solver": "workspace:*",
 		"jspdf": "^4.2.1",
+		"pdfjs-dist": "^6.5.438",
 		"tesseract.js": "^7.0.0"
 	}
 }

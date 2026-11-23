@@ -1,10 +1,23 @@
 import { projectState } from '$state/project.svelte.js';
 import { floorplanState } from '$state/floorplan-state.svelte.js';
+import { wallState } from '$state/wall-state.svelte.js';
 import { apState } from '$state/ap-state.svelte.js';
+import { addFloor, getFloor } from '$state/floor-state.svelte.js';
 import type { Floor } from '$state/floor-state.svelte.js';
+import { pushState } from '$state/history.svelte.js';
+import {
+	PdfImportCancelledError,
+	closePdfImport,
+	pdfImportState,
+	requestPdfScale,
+	showPdfError,
+	showPdfProgress
+} from '$state/pdf-import.svelte.js';
 import { scheduleSave } from '$state/persistence.svelte.js';
 import { detectBoundary, prepareSvgForDetection } from '$canvas/boundary-detect.js';
 import { detectWalls } from '$canvas/wall-detect.js';
+import { isPdfFile, wupmFromScale } from '$canvas/pdf-import-math.js';
+import { PdfRenderError, openPdf } from '$canvas/pdf-render.js';
 
 const FLOORPLAN_TARGET_WIDTH = 800;
 
@@ -12,7 +25,7 @@ const FLOORPLAN_TARGET_WIDTH = 800;
 export const FLOORPLAN_MIME_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml'];
 
 /** Value for the `accept` attribute of floorplan file inputs. */
-export const FLOORPLAN_ACCEPT = '.png,.jpg,.jpeg,.svg';
+export const FLOORPLAN_ACCEPT = '.png,.jpg,.jpeg,.svg,.pdf';
 
 export interface FloorplanAnalysis {
 	/** Boundary polygon in world coordinates (scaled to the target width), or null if none found. */
@@ -83,11 +96,124 @@ export function applyWupm(worldUnitsPerMeter: number): void {
 	scheduleSave();
 }
 
+interface AnalyzedPdfPage {
+	blobUrl: string;
+	analysis: FloorplanAnalysis;
+	/** World units per metre for this page, or null when no scale was given. */
+	wupm: number | null;
+}
+
+/**
+ * Import a PDF floorplan: one floor per page. Page 1 replaces the floorplan of the
+ * current floor; pages 2..N are added as new floors (the current floor is not switched).
+ * Every page is rendered and analysed before any state changes, so a failure leaves the
+ * project untouched. Returns the page-1 analysis so callers can offer area calibration
+ * when no scale was given.
+ */
+export async function importPdfFloorplan(
+	file: File,
+	scaleDenominator: number | null,
+	onProgress?: (i: number, n: number) => void
+): Promise<FloorplanAnalysis | null> {
+	const doc = await openPdf(file);
+	const pages: AnalyzedPdfPage[] = [];
+	try {
+		for (let i = 1; i <= doc.numPages; i++) {
+			onProgress?.(i, doc.numPages);
+			const rendered = await doc.renderPage(i);
+			let analysis: FloorplanAnalysis = { boundary: null, worldArea: null, wallMask: null };
+			try {
+				// Rendered PDFs contain text, so OCR is not skipped.
+				analysis = await analyzeFloorplan(rendered.blobUrl, false, { skipOcr: false });
+			} catch (e) {
+				console.warn(`Floorplan detection failed for PDF page ${i}:`, e);
+			}
+			pages.push({
+				blobUrl: rendered.blobUrl,
+				analysis,
+				wupm: scaleDenominator === null ? null : wupmFromScale(rendered.widthPt, scaleDenominator)
+			});
+		}
+	} catch (e) {
+		for (const page of pages) URL.revokeObjectURL(page.blobUrl);
+		throw e;
+	} finally {
+		await doc.destroy();
+	}
+
+	const [first, ...rest] = pages;
+	if (!first) return null;
+
+	pushState();
+
+	// Page 1: same resets and writes as an image import, on the current floor.
+	floorplanState.floorplanUrl = first.blobUrl;
+	floorplanState.calibration = null;
+	floorplanState.floorplanBoundary = null;
+	if (first.analysis.boundary) floorplanState.floorplanBoundary = first.analysis.boundary;
+	if (first.analysis.wallMask) wallState.wallMask = first.analysis.wallMask;
+	if (first.wupm !== null) applyWupm(first.wupm);
+
+	// Pages 2..N: new floors, written straight into their Floor objects.
+	for (const page of rest) {
+		const added = addFloor();
+		// Write through the reactive proxy held by floorState rather than the raw object.
+		const floor = getFloor(added.id) ?? added;
+		floor.floorplanUrl = page.blobUrl;
+		floor.floorplanBoundary = page.analysis.boundary;
+		floor.wallMask = page.analysis.wallMask;
+		if (page.wupm !== null) floor.calibration = { worldUnitsPerMeter: page.wupm };
+	}
+
+	scheduleSave();
+	return first.analysis;
+}
+
+export interface PdfImportFlowResult {
+	/** Scale denominator chosen in the dialog, or null for "I don't know". */
+	scaleDenominator: number | null;
+	/** Analysis of page 1, or null if no pages were imported. */
+	analysis: FloorplanAnalysis | null;
+}
+
+/**
+ * Entry point for PDF floorplans (sidebar and canvas drop): asks for the drawing scale,
+ * imports one floor per page while showing progress, and shows a readable error on failure.
+ * Returns null if the user cancelled, another PDF import is in progress, or the import failed.
+ */
+export async function runPdfImportFlow(file: File): Promise<PdfImportFlowResult | null> {
+	if (pdfImportState.open) return null;
+
+	let scaleDenominator: number | null;
+	try {
+		scaleDenominator = await requestPdfScale();
+	} catch (e) {
+		if (e instanceof PdfImportCancelledError) return null;
+		throw e;
+	}
+
+	try {
+		showPdfProgress(0, 0);
+		const analysis = await importPdfFloorplan(file, scaleDenominator, showPdfProgress);
+		closePdfImport();
+		return { scaleDenominator, analysis };
+	} catch (e) {
+		console.warn('PDF import failed:', e);
+		showPdfError(e instanceof PdfRenderError ? e.message : 'Could not import this PDF.');
+		return null;
+	}
+}
+
 /**
  * Import a floorplan file, run boundary + wall detection, and update project state.
- * Called from the canvas drop target.
+ * Called from the canvas drop target. PDFs go through the PDF flow (scale dialog, one
+ * floor per page) and record their own undo step; images are placed on the current floor.
  */
 export async function importFloorplanFile(file: File): Promise<void> {
+	if (isPdfFile(file)) {
+		await runPdfImportFlow(file);
+		return;
+	}
 	if (!FLOORPLAN_MIME_TYPES.includes(file.type)) return;
 
 	const blobUrl = URL.createObjectURL(file);

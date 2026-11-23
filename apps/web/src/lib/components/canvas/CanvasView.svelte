@@ -26,6 +26,7 @@
 	import { setEngineRef } from '$canvas/engine-ref.js';
 	import { restoreFromStorage } from '$state/persistence.svelte.js';
 	import { importFloorplanFile } from '$canvas/import-floorplan.js';
+	import { isPdfFile } from '$canvas/pdf-import-math.js';
 	import { labelWallBlobs, relabelBlob, labelRooms, fillRegion, encodeMaterialMask, decodeMaterialMask } from '$canvas/region-labels.js';
 	import type { RegionLabels } from '$canvas/region-labels.js';
 	import { WALL_MATERIALS, type WallMaterialId } from '$canvas/materials.js';
@@ -117,7 +118,8 @@
 		canvasDragOver = false;
 		const file = e.dataTransfer?.files[0];
 		if (file) {
-			pushState();
+			// PDFs record their own undo step once the import actually happens
+			if (!isPdfFile(file)) pushState();
 			importFloorplanFile(file);
 			appState.sidebarPanel = 'floorplan';
 			appState.sidebarOpen = true;

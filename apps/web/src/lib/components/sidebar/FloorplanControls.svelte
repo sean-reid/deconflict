@@ -75,8 +75,10 @@
 		analyzeFloorplan,
 		applyWupm,
 		FLOORPLAN_ACCEPT,
-		FLOORPLAN_MIME_TYPES
+		FLOORPLAN_MIME_TYPES,
+		runPdfImportFlow
 	} from '$canvas/import-floorplan.js';
+	import { isPdfFile } from '$canvas/pdf-import-math.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import { pushState } from '$state/history.svelte.js';
 	import Button from '$components/shared/Button.svelte';
@@ -187,7 +189,22 @@
 		}
 	}
 
+	async function handlePdfFile(file: File) {
+		// The PDF flow asks for the scale and records its own undo step.
+		const result = await runPdfImportFlow(file);
+		if (!result) return;
+		// Without a scale, fall back to calibrating page 1 from its floor area.
+		calibrationDone = result.scaleDenominator !== null;
+		detectedWorldArea =
+			result.scaleDenominator === null ? (result.analysis?.worldArea ?? null) : null;
+		areaInput = '';
+	}
+
 	function handleFile(file: File) {
+		if (isPdfFile(file)) {
+			void handlePdfFile(file);
+			return;
+		}
 		if (!FLOORPLAN_MIME_TYPES.includes(file.type)) return;
 		pushState();
 		const blobUrl = URL.createObjectURL(file);
