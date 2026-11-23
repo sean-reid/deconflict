@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { CanvasEngine } from '$canvas/engine.js';
 	import { FloorplanLayer } from '$canvas/renderers/floorplan.js';
 	import { GridLayer } from '$canvas/renderers/grid.js';
@@ -11,6 +11,7 @@
 	import { PanZoomHandler } from '$canvas/interactions/pan-zoom.js';
 	import { SelectHandler } from '$canvas/interactions/select.js';
 	import { SelectionRectLayer } from '$canvas/renderers/selection-rect.js';
+	import { ShapePreviewLayer } from '$canvas/renderers/shape-preview.js';
 	import { DragHandler } from '$canvas/interactions/drag.js';
 	import { PlaceHandler } from '$canvas/interactions/place.js';
 	import { apState, removeAps, getEffectiveWupm, radiusFromPower } from '$state/ap-state.svelte.js';
@@ -48,6 +49,17 @@
 	let brushCursorY = $state(0);
 	let brushCursorSize = $state(0);
 	let brushCursorVisible = $state(false);
+
+	// End the shape in progress on tool or mode change; leaving wall mode clears its undo history
+	$effect(() => {
+		void appState.wallTool;
+		const mode = appState.wallEditMode;
+		untrack(() => {
+			if (!wallEditHandler) return;
+			wallEditHandler.finishShape();
+			if (!mode) wallEditHandler.resetHistory();
+		});
+	});
 
 	function handleWallEditDone() {
 		appState.wallEditMode = null;
@@ -310,6 +322,7 @@
 	let selectionRectLayer: SelectionRectLayer;
 	let apLayer: ApLayer;
 	let wallLayer: WallLayer;
+	let shapePreviewLayer: ShapePreviewLayer;
 	let autoSolveTimeout: ReturnType<typeof setTimeout> | null = null;
 	let showEmptyHint = $derived(apState.aps.length === 0 && !floorplanState.floorplanUrl);
 
@@ -317,6 +330,11 @@
 		const target = e.target as HTMLElement;
 		const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 		const mod = e.metaKey || e.ctrlKey;
+
+		if (e.key === 'Escape' && appState.wallEditMode && !isInput) {
+			wallEditHandler?.finishShape();
+			return;
+		}
 
 		if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
 			if (appState.wallEditMode) return; // no undo during wall drawing
@@ -327,7 +345,13 @@
 		}
 
 		if (mod && (e.key === 'z' || e.key === 'Z')) {
-			if (appState.wallEditMode) return; // no undo during wall drawing
+			if (appState.wallEditMode) {
+				// Undo the last stroke or shape without leaving wall mode
+				e.preventDefault();
+				wallEditHandler?.undo();
+				engine?.markDirty();
+				return;
+			}
 			e.preventDefault();
 			undo();
 			engine?.markDirty();
@@ -373,12 +397,14 @@
 		roomLabelsLayer = new RoomLabelsLayer();
 		apLayer = new ApLayer();
 		selectionRectLayer = new SelectionRectLayer();
+		shapePreviewLayer = new ShapePreviewLayer(() => wallEditHandler?.preview ?? null);
 
 		// Add layers in draw order: floorplan, grid, heatmap, walls, room labels, APs, selection rect
 		engine.addLayer(floorplanLayer);
 		engine.addLayer(gridLayer);
 		engine.addLayer(heatmapLayer);
 		engine.addLayer(wallLayer);
+		engine.addLayer(shapePreviewLayer);
 		engine.addLayer(roomLabelsLayer);
 		engine.addLayer(apLayer);
 		engine.addLayer(selectionRectLayer);
@@ -971,9 +997,7 @@
 				e.preventDefault();
 				wallEditHandler.activeMaterial = wallEditMaterial;
 				wallEditHandler.defaultMaterial = wallState.wallMaterial;
-				wallEditHandler.handlePointerDown(
-					new PointerEvent('pointerdown', { clientX: t.clientX, clientY: t.clientY, button: 0 })
-				);
+				wallEditHandler.handlePointerDown({ clientX: t.clientX, clientY: t.clientY }, true);
 				return;
 			}
 
@@ -997,7 +1021,8 @@
 			// Cancel long-press and single-finger state
 			if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
 			if (appState.wallEditMode) {
-				wallEditHandler.handlePointerUp();
+				// A pinch is starting: drop the provisional point or pending stroke
+				wallEditHandler.cancelGesture();
 				brushCursorVisible = false;
 			}
 			pendingPan = false;
@@ -1058,9 +1083,7 @@
 		// Wall edit mode: single touch draws
 		if (appState.wallEditMode) {
 			e.preventDefault();
-			wallEditHandler.handlePointerMove(
-				new PointerEvent('pointermove', { clientX: t.clientX, clientY: t.clientY })
-			);
+			wallEditHandler.handlePointerMove({ clientX: t.clientX, clientY: t.clientY }, true);
 			const rect = engine.canvas.getBoundingClientRect();
 			brushCursorX = t.clientX - rect.left;
 			brushCursorY = t.clientY - rect.top;
@@ -1108,7 +1131,7 @@
 		if (activeTouches === 1 && e.touches.length === 0) {
 			// Wall edit mode: end stroke
 			if (appState.wallEditMode) {
-				wallEditHandler.handlePointerUp();
+				wallEditHandler.handlePointerUp(undefined, true);
 				brushCursorVisible = false;
 				activeTouches = 0;
 				return;

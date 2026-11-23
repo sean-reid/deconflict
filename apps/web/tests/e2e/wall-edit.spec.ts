@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { setupCleanState } from './helpers';
 
 test.describe('Wall editing', () => {
@@ -111,5 +111,97 @@ test.describe('Wall editing', () => {
 		await page.getByText('Edit Walls').click();
 		await expect(page.locator('.wall-toolbar')).toBeVisible();
 		await page.locator('.wall-toolbar').locator('text=Done').click();
+	});
+});
+
+/** RGBA of the canvas pixel at a position relative to the canvas (CSS px). */
+async function canvasPixel(page: Page, x: number, y: number): Promise<number[]> {
+	return page.evaluate(
+		({ px, py }) => {
+			const c = document.querySelector('canvas') as HTMLCanvasElement;
+			const dpr = c.width / c.clientWidth;
+			const ctx = c.getContext('2d')!;
+			return Array.from(ctx.getImageData(Math.round(px * dpr), Math.round(py * dpr), 1, 1).data);
+		},
+		{ px: x, py: y }
+	);
+}
+
+async function startFromScratch(page: Page): Promise<void> {
+	await setupCleanState(page);
+	await page.goto('/');
+	await page.waitForSelector('canvas');
+	await page.getByRole('tab', { name: 'Floorplan' }).click();
+	await page.getByText('Draw from Scratch').click();
+	await expect(page.locator('.wall-toolbar')).toBeVisible();
+	await page.waitForTimeout(300);
+}
+
+test.describe('Wall shape tools', () => {
+	const A = { x: 300, y: 200 };
+	const B = { x: 500, y: 200 };
+	const MID = { x: 400, y: 200 };
+	const OFF = { x: 400, y: 230 };
+
+	test('line tool draws a straight wall with two clicks', async ({ page }) => {
+		await startFromScratch(page);
+		const canvas = page.locator('canvas');
+		const midBefore = await canvasPixel(page, MID.x, MID.y);
+		const offBefore = await canvasPixel(page, OFF.x, OFF.y);
+		await canvas.click({ position: A });
+		await canvas.click({ position: B });
+		await page.locator('.wall-toolbar').locator('text=Done').click();
+		await page.waitForTimeout(300);
+		expect(await canvasPixel(page, MID.x, MID.y)).not.toEqual(midBefore);
+		expect(await canvasPixel(page, OFF.x, OFF.y)).toEqual(offBefore);
+	});
+
+	test('hovering after the first click previews the line', async ({ page }) => {
+		await startFromScratch(page);
+		const canvas = page.locator('canvas');
+		const midBefore = await canvasPixel(page, MID.x, MID.y);
+		await canvas.click({ position: A });
+		await canvas.hover({ position: B });
+		await page.waitForTimeout(200);
+		expect(await canvasPixel(page, MID.x, MID.y)).not.toEqual(midBefore);
+	});
+
+	test('escape drops the pending first point', async ({ page }) => {
+		await startFromScratch(page);
+		const canvas = page.locator('canvas');
+		const midBefore = await canvasPixel(page, MID.x, MID.y);
+		await canvas.click({ position: A });
+		await page.keyboard.press('Escape');
+		await canvas.click({ position: B });
+		await page.locator('.wall-toolbar').locator('text=Done').click();
+		await page.waitForTimeout(300);
+		expect(await canvasPixel(page, MID.x, MID.y)).toEqual(midBefore);
+	});
+
+	test('ctrl+z undoes the last line inside wall mode', async ({ page }) => {
+		await startFromScratch(page);
+		const canvas = page.locator('canvas');
+		const midBefore = await canvasPixel(page, MID.x, MID.y);
+		await canvas.click({ position: A });
+		await canvas.click({ position: B });
+		await page.keyboard.press('Control+z');
+		await page.locator('.wall-toolbar').locator('text=Done').click();
+		await page.waitForTimeout(300);
+		expect(await canvasPixel(page, MID.x, MID.y)).toEqual(midBefore);
+	});
+});
+
+test.describe('Wall shape tools (touch)', () => {
+	test.use({ hasTouch: true });
+
+	test('touch taps draw a line', async ({ page }) => {
+		await startFromScratch(page);
+		const box = (await page.locator('canvas').boundingBox())!;
+		const midBefore = await canvasPixel(page, 400, 200);
+		await page.touchscreen.tap(box.x + 300, box.y + 200);
+		await page.touchscreen.tap(box.x + 500, box.y + 200);
+		await page.locator('.wall-toolbar').locator('text=Done').click();
+		await page.waitForTimeout(300);
+		expect(await canvasPixel(page, 400, 200)).not.toEqual(midBefore);
 	});
 });
