@@ -70,15 +70,17 @@
 		});
 	}
 	import { appState } from '$state/app.svelte.js';
-	import { detectBoundary, prepareSvgForDetection, polygonArea } from '$canvas/boundary-detect.js';
-	import { detectWalls, encodeMask } from '$canvas/wall-detect.js';
+	import { encodeMask } from '$canvas/wall-detect.js';
+	import {
+		analyzeFloorplan,
+		applyWupm,
+		FLOORPLAN_ACCEPT,
+		FLOORPLAN_MIME_TYPES
+	} from '$canvas/import-floorplan.js';
 	import { scheduleSave } from '$state/persistence.svelte.js';
 	import { pushState } from '$state/history.svelte.js';
 	import Button from '$components/shared/Button.svelte';
 	import Icon from '$components/shared/Icon.svelte';
-
-	const FLOORPLAN_TARGET_WIDTH = 800;
-
 
 	let fileInput = $state<HTMLInputElement>();
 	let dragOver = $state(false);
@@ -114,36 +116,12 @@
 		floorplanState.floorplanBoundary = null;
 
 		try {
-			// Load the original image (same one FloorplanLayer renders)
-			const originalImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-				const i = new Image();
-				i.onload = () => resolve(i);
-				i.onerror = reject;
-				i.src = url;
-			});
-			const scaleFactor = FLOORPLAN_TARGET_WIDTH / originalImg.naturalWidth;
-
-			// For SVGs, strip text for cleaner boundary detection
-			const cleanImg = await prepareSvgForDetection(url);
-
-			// Boundary detection for area calculation
-			const result = detectBoundary(cleanImg);
-			if (result && result.polygon.length >= 3) {
-				const cleanScaleFactor = FLOORPLAN_TARGET_WIDTH / cleanImg.naturalWidth;
-				const worldPolygon = result.polygon.map((p) => ({
-					x: p.x * cleanScaleFactor,
-					y: p.y * cleanScaleFactor
-				}));
-				floorplanState.floorplanBoundary = worldPolygon;
-
-				// Use the actual pixel area from boundary detection, scaled to world coords.
-				// Morphological close ensures door gaps don't leak flood fill but area
-				// isn't inflated by the dilation step.
-				detectedWorldArea = result.areaPx * cleanScaleFactor * cleanScaleFactor;
+			// Run OCR on all images (no skipOcr) - SVGs may have path-based text that prepareSvgForDetection can't strip
+			const { boundary, worldArea, wallMask } = await analyzeFloorplan(url, isSvg);
+			if (boundary) {
+				floorplanState.floorplanBoundary = boundary;
+				detectedWorldArea = worldArea;
 			}
-
-			// Run OCR on all images - SVGs may have path-based text that prepareSvgForDetection can't strip
-			const wallMask = await detectWalls(cleanImg, FLOORPLAN_TARGET_WIDTH);
 			if (wallMask) {
 				wallState.wallMask = wallMask;
 				scheduleSave();
@@ -172,27 +150,9 @@
 			realAreaSqm = val * 0.092903;
 		}
 		const worldUnitsPerMeter = Math.sqrt(worldArea / realAreaSqm);
-		const oldCalibration = floorplanState.calibration;
-		floorplanState.calibration = { worldUnitsPerMeter };
-
-		if (oldCalibration === null) {
-			// First calibration: set uncalibrated APs (radius=150) to real 15m
-			const defaultRadiusWorld = Math.round(15 * worldUnitsPerMeter);
-			for (const ap of apState.aps) {
-				if (ap.interferenceRadius === 150) {
-					ap.interferenceRadius = defaultRadiusWorld;
-				}
-			}
-		} else {
-			// Recalibration: scale all AP radii proportionally to preserve real-world meters
-			const ratio = worldUnitsPerMeter / oldCalibration.worldUnitsPerMeter;
-			for (const ap of apState.aps) {
-				ap.interferenceRadius = Math.round(ap.interferenceRadius * ratio);
-			}
-		}
+		applyWupm(worldUnitsPerMeter);
 
 		calibrationDone = true;
-		scheduleSave();
 	}
 
 	function skipCalibration() {
@@ -228,8 +188,7 @@
 	}
 
 	function handleFile(file: File) {
-		const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
-		if (!validTypes.includes(file.type)) return;
+		if (!FLOORPLAN_MIME_TYPES.includes(file.type)) return;
 		pushState();
 		const blobUrl = URL.createObjectURL(file);
 		floorplanState.floorplanUrl = blobUrl;
@@ -375,7 +334,7 @@
 			<input
 				bind:this={fileInput}
 				type="file"
-				accept=".png,.jpg,.jpeg,.svg"
+				accept={FLOORPLAN_ACCEPT}
 				onchange={handleInputChange}
 				hidden
 			/>
