@@ -99,7 +99,46 @@ interface SavedStateV3 {
 type SavedState = SavedStateV2 | SavedStateV3;
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-export const persistenceState = $state({ lastSaved: null as Date | null });
+export const persistenceState = $state({
+	lastSaved: null as Date | null,
+	/** Message shown in the status bar when the browser storage quota blocked a save, else null. */
+	storageError: null as string | null
+});
+
+const STORAGE_FULL_PROJECT = 'Storage full: project not saved';
+const STORAGE_FULL_FLOORPLAN = 'Storage full: floorplan not saved';
+
+function isQuotaError(e: unknown): boolean {
+	return (
+		e instanceof DOMException &&
+		(e.name === 'QuotaExceededError' ||
+			e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+			e.code === 22 ||
+			e.code === 1014)
+	);
+}
+
+/**
+ * Drop floorplan images that can no longer be used: those of deleted floors and those of
+ * floors without a floorplan. Runs before saving so the freed space is available.
+ */
+function pruneFloorplanImages(): void {
+	try {
+		const prefix = `${FLOORPLAN_KEY}:`;
+		const liveIds = new Set(floorState.floors.map((f) => f.id));
+		const stale: string[] = [];
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i);
+			if (key?.startsWith(prefix) && !liveIds.has(key.slice(prefix.length))) stale.push(key);
+		}
+		for (const floor of floorState.floors) {
+			if (!floor.floorplanUrl) stale.push(`${prefix}${floor.id}`);
+		}
+		for (const key of stale) localStorage.removeItem(key);
+	} catch {
+		// localStorage unavailable
+	}
+}
 
 function syncCurrentFloorFromLegacy(): void {
 	const cur = floorState.floors.find((f) => f.id === floorState.currentFloorId);
@@ -117,6 +156,8 @@ function syncCurrentFloorFromLegacy(): void {
 
 function saveToStorage(): void {
 	syncCurrentFloorFromLegacy();
+	persistenceState.storageError = null;
+	pruneFloorplanImages();
 	try {
 		const data: SavedStateV3 = {
 			version: 3,
@@ -151,8 +192,9 @@ function saveToStorage(): void {
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 		persistenceState.lastSaved = new Date();
-	} catch {
-		// localStorage might be full or unavailable
+	} catch (e) {
+		// localStorage might be unavailable; a full one is reported to the user
+		if (isQuotaError(e)) persistenceState.storageError = STORAGE_FULL_PROJECT;
 	}
 
 	// Persist floorplan images per floor
@@ -169,8 +211,9 @@ function saveToStorage(): void {
 					ctx.drawImage(img, 0, 0);
 					try {
 						localStorage.setItem(key, canvas.toDataURL('image/png'));
-					} catch {
-						// too large
+					} catch (e) {
+						// too large for what is left of the storage quota
+						if (isQuotaError(e)) persistenceState.storageError = STORAGE_FULL_FLOORPLAN;
 					}
 				};
 				img.src = floor.floorplanUrl;
